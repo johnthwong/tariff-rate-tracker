@@ -38,16 +38,26 @@ FENTANYL_RATES <- tibble(
   fentanyl_rate = c(0.20, 0.25, 0.25)
 )
 
-# Section 301 mapping
+# Section 301 mapping — includes original lists (9903.88.xx) and Biden
+# acceleration (9903.91.xx). Products reference these via footnotes.
+# No product has both 9903.88.xx and 9903.91.xx refs (separate product sets).
 SECTION_301_RATES <- tribble(
   ~ch99_pattern, ~s301_rate,
+  # Original Section 301 (Lists 1-4, 2018-2019)
   '9903.88.01', 0.25,
   '9903.88.02', 0.25,
   '9903.88.03', 0.25,
   '9903.88.04', 0.25,
   '9903.88.09', 0.10,
   '9903.88.15', 0.075,
-  '9903.88.16', 0.15
+  '9903.88.16', 0.15,
+  # Biden Section 301 acceleration (U.S. note 31, effective 2024-2025)
+  '9903.91.01', 0.25,   # Note 31(b): critical minerals, steel/aluminum inputs
+  '9903.91.02', 0.50,   # Note 31(c)
+  '9903.91.03', 1.00,   # Note 31(d): EVs, EV batteries, medical
+  '9903.91.04', 0.25,   # Note 31(e): transitional (Jan-Dec 2025)
+  '9903.91.05', 0.50,   # Note 31(f): semiconductors, solar cells
+  '9903.91.11', 0.25    # Note 31(j): tungsten
 )
 
 # Section 232 product identification
@@ -84,13 +94,16 @@ calculate_rates_v3 <- function(products, tpc_path, ieepa_path, usmca_path) {
   # ---------------------------------------------------------------------------
   message('Loading HTS-derived IEEPA rates...')
 
-  ieepa_hts <- read_csv(ieepa_path, col_types = cols(.default = col_character())) %>%
-    filter(phase == 'phase2_aug7', terminated == 'FALSE') %>%
+  ieepa_all <- read_csv(ieepa_path, col_types = cols(.default = col_character())) %>%
+    filter(terminated == 'FALSE') %>%
     mutate(rate = as.numeric(rate))
+
+  # Phase 2 entries for non-China countries (surcharge/floor)
+  ieepa_phase2 <- ieepa_all %>% filter(phase == 'phase2_aug7')
 
   # Floor countries: "X%" total duty (EU, Japan, South Korea)
   # These pay max(base_rate, floor) instead of base_rate + surcharge
-  ieepa_floor <- ieepa_hts %>%
+  ieepa_floor <- ieepa_phase2 %>%
     filter(rate_type == 'floor') %>%
     distinct(census_code, rate) %>%
     rename(country_code = census_code, ieepa_floor = rate)
@@ -100,7 +113,7 @@ calculate_rates_v3 <- function(products, tpc_path, ieepa_path, usmca_path) {
   # Surcharge countries: "+X%" additional duty (most countries)
   # Exclude countries with floor entries to avoid double-counting.
   # Take max rate per country to handle duplicate census codes.
-  ieepa_surcharge <- ieepa_hts %>%
+  ieepa_surcharge <- ieepa_phase2 %>%
     filter(rate_type == 'surcharge', !(census_code %in% floor_codes)) %>%
     group_by(census_code) %>%
     summarise(rate = max(rate), .groups = 'drop') %>%
@@ -109,11 +122,15 @@ calculate_rates_v3 <- function(products, tpc_path, ieepa_path, usmca_path) {
   message('  Surcharge countries: ', nrow(ieepa_surcharge))
   message('  Floor countries: ', nrow(ieepa_floor))
 
-  # China's IEEPA reciprocal rate is in the 9903.90.xx range (separate from
-  # the 9903.01-02.xx country-specific entries parsed above). The rate as of
-  # the current HTS revision encodes the cumulative IEEPA reciprocal on China.
-  # TODO: Parse China's reciprocal rate from 9903.90.xx Ch99 entries.
-  CHINA_IEEPA_RECIPROCAL <- 0.25
+  # China's IEEPA reciprocal: Phase 1 entry 9903.01.63 (+34%), not in Phase 2.
+  # China was not suspended during the Phase 1 → Phase 2 transition.
+  china_reciprocal <- ieepa_all %>%
+    filter(census_code == CTY_CHINA, rate_type == 'surcharge') %>%
+    pull(rate) %>%
+    max()
+
+  CHINA_IEEPA_RECIPROCAL <- if (is.finite(china_reciprocal)) china_reciprocal else 0
+  message('  China IEEPA reciprocal: ', CHINA_IEEPA_RECIPROCAL * 100, '%')
 
   # ---------------------------------------------------------------------------
   # Load HTS-derived USMCA eligibility (from 05_parse_policy_params.R)
@@ -184,7 +201,7 @@ calculate_rates_v3 <- function(products, tpc_path, ieepa_path, usmca_path) {
       ),
 
       # IEEPA reciprocal rate (depends on date, country, and rate structure)
-      # China: separate rate (not in 9903.01-02.xx entries)
+      # China: Phase 1 entry 9903.01.63 (not in Phase 2 range)
       # Floor countries (EU, Japan, S. Korea): additional = max(0, floor - base_rate)
       # Surcharge countries: additional = surcharge rate
       # Default: 10% baseline (Apr-Jul) or 10% for unlisted countries

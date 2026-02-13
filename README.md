@@ -38,7 +38,7 @@ There are two generations of code in `src/`. The **v2 pipeline** (newer) is the 
 | `03_calculate_rates.R` | Joins products to Chapter 99 authorities via footnote refs. Applies stacking rules (see below). Expands to the country dimension. |
 | `04_validate_tpc.R` | Compares calculated rates against TPC benchmark data at the HTS-10 x country x date level. Reports match rates and identifies systematic discrepancies. |
 | `05_parse_policy_params.R` | Extracts policy parameters directly from HTS JSON: (1) IEEPA country-specific reciprocal rates from 9903.01-02.xx entries, with rate_type classification (surcharge vs floor vs passthrough), EU expansion to 27 member states; (2) USMCA eligibility from the `special` field ("S"/"S+" program codes). |
-| `calculate_rates_v3.R` | Streamlined rate calculator that loads HTS-derived IEEPA rates and USMCA eligibility from `05_parse_policy_params.R` outputs. Handles surcharge countries (most: +X% additional) and floor countries (EU/Japan/S. Korea: 15% minimum). Used for TPC comparison. |
+| `calculate_rates_v3.R` | Streamlined rate calculator that loads HTS-derived IEEPA rates and USMCA eligibility from `05_parse_policy_params.R` outputs. Handles surcharge countries (most: +X% additional), floor countries (EU/Japan/S. Korea: 15% minimum), China's Phase 1 reciprocal, and Biden Section 301 acceleration (9903.91.xx). Used for TPC comparison. |
 
 ### v1 Pipeline (original, config-driven)
 
@@ -139,32 +139,40 @@ Comparison of `calculate_rates_v3.R` output against TPC benchmark (`output/tpc_c
 | Date | Match Rate (within 2pp) | Mean Abs Diff |
 |------|------------------------|---------------|
 | 2025-03-17 | 90% | 1.9 pp |
-| 2025-04-17 | 80% | 7.4 pp |
-| 2025-07-17 | 78% | 3.5 pp |
-| 2025-10-17 | 55% | 7.6 pp |
-| 2025-11-17 | 52% | 8.5 pp |
+| 2025-04-17 | 80% | 7.0 pp |
+| 2025-07-17 | 79% | 3.7 pp |
+| 2025-10-17 | 56% | 7.7 pp |
+| 2025-11-17 | 51% | 8.9 pp |
 
-All rates are now derived from HTS source data (no TPC-derived inputs). IEEPA country-specific rates are parsed from Ch99 entries (9903.01-02.xx), USMCA eligibility from the product `special` field, and Section 301/232 from footnote references and chapter identification. The March regression vs. the prior version (which calibrated USMCA shares against TPC March data) is expected. The Oct/Nov improvement (+26pp) reflects HTS-derived country-specific reciprocal rates replacing the old binary cutoff.
+All rates are derived from HTS source data (no TPC-derived inputs). China's IEEPA reciprocal is parsed from 9903.01.63 (Phase 1, +34%); Biden Section 301 acceleration rates (9903.91.xx) are matched via product footnote references. The China match rate dropped from the prior version because the HTS statutory rate (+34%) is 9pp higher than TPC's implied rate (+25%). This likely reflects the May 2025 US-China trade agreement — the HTS encodes the pre-negotiation statutory rate.
 
 ## Known Issues
 
-### 1. China's IEEPA reciprocal rate not yet parsed from HTS
+### 1. China's IEEPA reciprocal rate discrepancy with TPC
 
-China's IEEPA reciprocal tariffs are encoded in the 9903.90.xx range, separately from the country-specific entries in 9903.01-02.xx. The current code hardcodes China's reciprocal rate at 25%. This should be parsed from the HTS Ch99 entries for consistency.
+China's IEEPA reciprocal is now parsed from 9903.01.63 (Phase 1, +34%). However, TPC data implies a 25% rate. The discrepancy likely reflects the May 2025 US-China bilateral agreement that reduced the effective rate. The HTS Rev 32 still encodes the pre-negotiation statutory rate. A date-aware adjustment may be needed once the negotiated rate is published in an HTS revision.
 
-### 2. EU/Japan/South Korea floor rate structure
+### 2. Biden Section 301 acceleration — date-varying rates
+
+The 9903.91.xx entries have phased effective dates: Sept 27, 2024 (Lists b-d), Jan 1, 2025 (Lists e, f, j), and Jan 1, 2026 (Lists g-i). The current code treats all as active for the 2025 comparison dates (which is correct for 2025 snapshots), but a proper time-series implementation should filter by effective date.
+
+### 3. EU/Japan/South Korea floor rate structure
 
 These three countries have a split rate structure in the HTS: products with base rates >= 15% get no additional duty (passthrough), while products with base rates < 15% get a 15% floor. The code handles this via the `rate_type` field (floor vs surcharge), but the product-level base rate is missing for some HTS-10 lines, causing some floor calculations to use 0 as the base rate.
 
-### 3. Section 232 derivative products not yet handled
+### 4. Section 232 derivative products not yet handled
 
 Steel and aluminum are identified by HTS chapter (72-73 for steel, 76 for aluminum), but derivative products — goods in other chapters containing steel/aluminum components — are not yet covered. The TPC benchmark assumes a 50% metal share for derivatives. The Ch99 entries reference these via "note 16(a)(ii)" in the HTS, which lists specific subheadings outside the core chapters.
 
-### 4. USMCA eligibility is binary, not utilization-adjusted
+### 5. USMCA eligibility is binary, not utilization-adjusted
 
 USMCA eligibility is parsed from the HTS `special` field ("S"/"S+" program codes). This gives a binary eligible/not-eligible flag per product. In practice, not all trade in an eligible product claims USMCA preference, so the binary approach overstates the exemption for some products and understates it for others. A utilization-rate adjustment would improve accuracy for Canada/Mexico.
 
 ## Resolved Issues
+
+### China IEEPA reciprocal and Biden 301 acceleration (Fixed)
+
+China's IEEPA reciprocal is now parsed from 9903.01.63 (Phase 1, +34%), replacing the hardcoded 25%. China was never suspended during the Phase 1 → Phase 2 transition (unlike other countries), so its Phase 1 entry remains active. Biden Section 301 acceleration rates (9903.91.xx) are now included in the rate calculation via product footnote references — ~382 products are affected with rates of +25% (critical minerals), +50% (semiconductors/solar), and +100% (EVs/batteries). These entries don't overlap with original Section 301 (9903.88.xx) footnotes on any product.
 
 ### IEEPA country-specific reciprocal rates (Fixed)
 
