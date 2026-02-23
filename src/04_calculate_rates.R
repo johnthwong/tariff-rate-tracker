@@ -259,7 +259,7 @@ create_full_rate_matrix <- function(hts_data, rate_data, countries = NULL) {
 # =============================================================================
 
 if (sys.nframe() == 0) {
-  setwd('C:/Users/ji252/Documents/GitHub/tariff_rate_tracker')
+  setwd('C:/Users/ji252/Documents/GitHub/tariff-rate-tracker')
 
   # Load data
   hts_data <- readRDS('data/processed/hts_parsed.rds')

@@ -698,7 +698,7 @@ plot_etrs <- function(etrs, tpc_etrs, output_dir) {
 # =============================================================================
 
 if (sys.nframe() == 0) {
-  setwd('C:/Users/ji252/Documents/GitHub/tariff_rate_tracker')
+  setwd('C:/Users/ji252/Documents/GitHub/tariff-rate-tracker')
 
   data <- load_data(
     products_path = 'data/processed/products_raw.csv',

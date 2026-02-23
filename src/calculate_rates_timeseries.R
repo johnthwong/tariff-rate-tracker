@@ -310,7 +310,7 @@ calculate_and_compare <- function(tpc_path) {
 # =============================================================================
 
 if (sys.nframe() == 0) {
-  setwd('C:/Users/ji252/Documents/GitHub/tariff_rate_tracker')
+  setwd('C:/Users/ji252/Documents/GitHub/tariff-rate-tracker')
 
   comparison <- calculate_and_compare('data/tpc/tariff_by_flow_day.csv')
 

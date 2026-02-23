@@ -133,7 +133,7 @@ list_chapter99_refs <- function(hts_data) {
 
 if (sys.nframe() == 0) {
   # Set working directory to project root
-  setwd('C:/Users/ji252/Documents/GitHub/tariff_rate_tracker')
+  setwd('C:/Users/ji252/Documents/GitHub/tariff-rate-tracker')
 
   # Get latest HTS archive
   hts_file <- get_latest_hts_archive('2026')  # Use 2026 since we have that

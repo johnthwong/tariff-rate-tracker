@@ -189,7 +189,7 @@ aggregate_by_product_country <- function(expanded_data) {
 # =============================================================================
 
 if (sys.nframe() == 0) {
-  setwd('C:/Users/ji252/Documents/GitHub/tariff_rate_tracker')
+  setwd('C:/Users/ji252/Documents/GitHub/tariff-rate-tracker')
 
   # Load authority data
   authority_data <- readRDS('data/processed/authority_data.rds')

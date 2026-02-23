@@ -305,6 +305,6 @@ run_all_diagnostics <- function(
 # =============================================================================
 
 if (sys.nframe() == 0) {
-  setwd('C:/Users/ji252/Documents/GitHub/tariff_rate_tracker')
+  setwd('C:/Users/ji252/Documents/GitHub/tariff-rate-tracker')
   run_all_diagnostics()
 }

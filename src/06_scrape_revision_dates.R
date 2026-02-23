@@ -192,7 +192,7 @@ resolve_json_path <- function(revision, archive_dir = 'data/hts_archives', year 
 # =============================================================================
 
 if (sys.nframe() == 0) {
-  setwd('C:/Users/ji252/Documents/GitHub/tariff_rate_tracker')
+  setwd('C:/Users/ji252/Documents/GitHub/tariff-rate-tracker')
 
   # Try scraping first
   scraped <- scrape_usitc_revision_dates()

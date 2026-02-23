@@ -345,7 +345,7 @@ write_tariff_model_export <- function(rate_data, authority_data, export_date = S
 
   other_params_yaml <- list(
     usmca_auto_rebate = 0.025,
-    notes = paste('Auto-generated from tariff_rate_tracker on', export_date)
+    notes = paste('Auto-generated from tariff-rate-tracker on', export_date)
   )
 
   write_yaml(other_params_yaml, file.path(export_dir, 'other_params.yaml'))
@@ -361,7 +361,7 @@ write_tariff_model_export <- function(rate_data, authority_data, export_date = S
 # =============================================================================
 
 if (sys.nframe() == 0) {
-  setwd('C:/Users/ji252/Documents/GitHub/tariff_rate_tracker')
+  setwd('C:/Users/ji252/Documents/GitHub/tariff-rate-tracker')
 
   # Load data
   rate_data <- readRDS('data/processed/rate_data.rds')

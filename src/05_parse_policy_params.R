@@ -704,7 +704,7 @@ extract_usmca_eligibility <- function(hts_raw) {
 # =============================================================================
 
 if (sys.nframe() == 0) {
-  setwd('C:/Users/ji252/Documents/GitHub/tariff_rate_tracker')
+  setwd('C:/Users/ji252/Documents/GitHub/tariff-rate-tracker')
 
   # Load country lookup
   country_lookup <- build_country_lookup('resources/census_codes.csv')

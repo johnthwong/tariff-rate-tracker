@@ -175,7 +175,7 @@ compare_scenarios <- function(rates, scenario_a, scenario_b, scenarios_path = 'c
 # =============================================================================
 
 if (sys.nframe() == 0) {
-  setwd('C:/Users/ji252/Documents/GitHub/tariff_rate_tracker')
+  setwd('C:/Users/ji252/Documents/GitHub/tariff-rate-tracker')
 
   # Load latest snapshot or time series
   ts_path <- 'data/timeseries/rate_timeseries.rds'

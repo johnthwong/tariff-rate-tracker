@@ -293,7 +293,7 @@ compare_chapter99 <- function(old_ch99, new_ch99) {
 # =============================================================================
 
 if (sys.nframe() == 0) {
-  setwd('C:/Users/ji252/Documents/GitHub/tariff_rate_tracker')
+  setwd('C:/Users/ji252/Documents/GitHub/tariff-rate-tracker')
 
   # Parse the most recent revision (has all entries)
   ch99_rev32 <- parse_chapter99('data/hts_archives/hts_2025_rev_32.json')

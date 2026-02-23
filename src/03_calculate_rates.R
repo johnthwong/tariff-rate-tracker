@@ -756,7 +756,7 @@ calculate_rates_for_revision <- function(
 # =============================================================================
 
 if (sys.nframe() == 0) {
-  setwd('C:/Users/ji252/Documents/GitHub/tariff_rate_tracker')
+  setwd('C:/Users/ji252/Documents/GitHub/tariff-rate-tracker')
 
   # Load data
   ch99_data <- readRDS('data/processed/chapter99_rates.rds')

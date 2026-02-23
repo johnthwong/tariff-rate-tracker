@@ -286,7 +286,7 @@ calculate_rates_v3 <- function(products, tpc_path, ieepa_path, usmca_path) {
 # =============================================================================
 
 if (sys.nframe() == 0) {
-  setwd('C:/Users/ji252/Documents/GitHub/tariff_rate_tracker')
+  setwd('C:/Users/ji252/Documents/GitHub/tariff-rate-tracker')
 
   products <- read_csv('data/processed/products_raw.csv',
                        col_types = cols(.default = col_character()))

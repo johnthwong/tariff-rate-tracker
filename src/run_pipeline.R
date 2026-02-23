@@ -1,12 +1,13 @@
 # =============================================================================
-# Tariff Rate Tracker v2 - Main Pipeline
+# Tariff Rate Tracker v2 - Single-Revision Pipeline
 # =============================================================================
 #
-# Orchestrates the full tariff rate calculation and validation pipeline:
+# Orchestrates the full tariff rate calculation for a single HTS revision:
 #   1. Parse Chapter 99 entries (rates and country applicability)
 #   2. Parse products (base rates and Ch99 footnote references)
-#   3. Calculate total rates by HTS10 × country
-#   4. Validate against TPC data
+#   3. Extract policy parameters (IEEPA reciprocal, fentanyl, 232, USMCA)
+#   4. Calculate total rates by HTS10 x country (including blanket tariffs)
+#   5. Validate against TPC data
 #
 # Usage:
 #   Rscript src/run_pipeline.R [options]
@@ -19,6 +20,16 @@
 # =============================================================================
 
 library(tidyverse)
+library(jsonlite)
+
+# Source pipeline components
+source('src/helpers.R')
+source('src/01_parse_chapter99.R')
+source('src/02_parse_products.R')
+source('src/03_calculate_rates.R')
+source('src/05_parse_policy_params.R')
+source('src/04_validate_tpc.R')
+source('src/06_scrape_revision_dates.R')
 
 # =============================================================================
 # Pipeline Configuration
@@ -33,6 +44,7 @@ CONFIG <- list(
   # Files
   census_codes_file = 'resources/census_codes.csv',
   tpc_data_file = 'data/tpc/tariff_by_flow_day.csv',
+  revision_dates_file = 'config/revision_dates.csv',
 
   # Default revision
   default_revision = 'rev_32',
@@ -41,100 +53,111 @@ CONFIG <- list(
 
 
 # =============================================================================
-# Pipeline Steps
+# Main Pipeline
 # =============================================================================
 
-#' Run Step 1: Parse Chapter 99
-run_step1_parse_chapter99 <- function(revision, config) {
-  message('\n' , strrep('=', 60))
-  message('STEP 1: Parse Chapter 99 Entries')
-  message(strrep('=', 60), '\n')
+run_full_pipeline <- function(revision = NULL, skip_parse = FALSE, skip_validate = FALSE) {
+  start_time <- Sys.time()
 
-  source('src/01_parse_chapter99.R', local = TRUE)
+  config <- CONFIG
 
-  json_path <- file.path(config$hts_archive_dir, paste0('hts_2025_', revision, '.json'))
+  # Default revision
+  if (is.null(revision)) revision <- config$default_revision
 
-  ch99_data <- parse_chapter99(json_path)
-
-  # Save
-  output_path <- file.path(config$processed_dir, 'chapter99_rates.rds')
-  saveRDS(ch99_data, output_path)
-  message('\nSaved: ', output_path)
-
-  # Also parse baseline for comparison
-  baseline_path <- file.path(config$hts_archive_dir, paste0('hts_2025_', config$baseline_revision, '.json'))
-  if (file.exists(baseline_path)) {
-    ch99_baseline <- parse_chapter99(baseline_path)
-    saveRDS(ch99_baseline, file.path(config$processed_dir, 'chapter99_rates_baseline.rds'))
-
-    # Report changes
-    changes <- compare_chapter99(ch99_baseline, ch99_data)
-    message('\nChanges from baseline:')
-    message('  Added entries: ', changes$n_added)
-    message('  Removed entries: ', changes$n_removed)
-    message('  Rate changes: ', changes$n_rate_changes)
-  }
-
-  return(ch99_data)
-}
-
-
-#' Run Step 2: Parse Products
-run_step2_parse_products <- function(revision, config) {
   message('\n', strrep('=', 60))
-  message('STEP 2: Parse Product Data')
+  message('TARIFF RATE TRACKER v2 - Pipeline')
+  message(strrep('=', 60))
+  message('Revision: ', revision)
+  message('Started: ', start_time)
   message(strrep('=', 60), '\n')
 
-  source('src/02_parse_products.R', local = TRUE)
+  # Ensure directories exist
+  ensure_dir(config$processed_dir)
+  ensure_dir(config$output_dir)
+  ensure_dir(file.path(config$output_dir, 'validation'))
 
-  json_path <- file.path(config$hts_archive_dir, paste0('hts_2025_', revision, '.json'))
-  products <- parse_products(json_path)
-
-  # Save
-  output_path <- file.path(config$processed_dir, paste0('products_', revision, '.rds'))
-  saveRDS(products, output_path)
-  message('\nSaved: ', output_path)
-
-  # Also parse baseline
-  baseline_path <- file.path(config$hts_archive_dir, paste0('hts_2025_', config$baseline_revision, '.json'))
-  if (file.exists(baseline_path)) {
-    products_baseline <- parse_products(baseline_path)
-    saveRDS(products_baseline, file.path(config$processed_dir, 'products_baseline.rds'))
-
-    # Report changes
-    changes <- compare_products(products_baseline, products)
-    message('\nChanges from baseline:')
-    message('  Added products: ', changes$n_added)
-    message('  Removed products: ', changes$n_removed)
-    message('  Ch99 ref changes: ', changes$n_ref_changes)
-  }
-
-  return(products)
-}
-
-
-#' Run Step 3: Calculate Rates
-run_step3_calculate_rates <- function(products, ch99_data, config) {
-  message('\n', strrep('=', 60))
-  message('STEP 3: Calculate Tariff Rates')
-  message(strrep('=', 60), '\n')
-
-  source('src/03_calculate_rates.R', local = TRUE)
-
-  # Load country codes
+  # ---- Load shared resources ----
   census_codes <- read_csv(config$census_codes_file, col_types = cols(.default = col_character()))
   countries <- census_codes$Code
+  country_lookup <- build_country_lookup(config$census_codes_file)
+  rev_dates <- load_revision_dates(config$revision_dates_file)
+
+  rev_info <- rev_dates %>% filter(revision == !!revision)
+  if (nrow(rev_info) == 0) {
+    stop('Revision not found in revision_dates.csv: ', revision)
+  }
+  eff_date <- rev_info$effective_date
+  tpc_date <- rev_info$tpc_date
+
+  message('Effective date: ', eff_date)
+  message('Countries: ', length(countries))
+
+  # ---- Resolve JSON path ----
+  json_path <- resolve_json_path(revision, config$hts_archive_dir)
+
+  # ---- Step 1: Parse Chapter 99 ----
+  if (skip_parse) {
+    message('\nSkipping parse steps, loading cached data...')
+    ch99_data <- readRDS(file.path(config$processed_dir, 'chapter99_rates.rds'))
+    products <- readRDS(file.path(config$processed_dir, paste0('products_', revision, '.rds')))
+    hts_raw <- fromJSON(json_path, simplifyDataFrame = FALSE)
+  } else {
+    message('\n', strrep('=', 60))
+    message('STEP 1: Parse Chapter 99 Entries')
+    message(strrep('=', 60), '\n')
+
+    ch99_data <- parse_chapter99(json_path)
+    saveRDS(ch99_data, file.path(config$processed_dir, 'chapter99_rates.rds'))
+
+    # Compare to baseline
+    baseline_path <- file.path(config$hts_archive_dir,
+                               paste0('hts_2025_', config$baseline_revision, '.json'))
+    if (file.exists(baseline_path)) {
+      ch99_baseline <- parse_chapter99(baseline_path)
+      changes <- compare_chapter99(ch99_baseline, ch99_data)
+      message('\nChanges from baseline: +', changes$n_added, ' entries, -',
+              changes$n_removed, ', ', changes$n_rate_changes, ' rate changes')
+    }
+
+    # ---- Step 2: Parse Products ----
+    message('\n', strrep('=', 60))
+    message('STEP 2: Parse Product Data')
+    message(strrep('=', 60), '\n')
+
+    products <- parse_products(json_path)
+    saveRDS(products, file.path(config$processed_dir, paste0('products_', revision, '.rds')))
+
+    # Load raw JSON for policy parameter extraction
+    message('\nLoading raw JSON for policy parameter extraction...')
+    hts_raw <- fromJSON(json_path, simplifyDataFrame = FALSE)
+  }
+
+  # ---- Step 3: Extract Policy Parameters ----
+  message('\n', strrep('=', 60))
+  message('STEP 3: Extract Policy Parameters')
+  message(strrep('=', 60), '\n')
+
+  ieepa_rates <- extract_ieepa_rates(hts_raw, country_lookup)
+  fentanyl_rates <- extract_ieepa_fentanyl_rates(hts_raw, country_lookup)
+  s232_rates <- extract_section232_rates(ch99_data)
+  usmca <- extract_usmca_eligibility(hts_raw)
+
+  # ---- Step 4: Calculate Rates ----
+  message('\n', strrep('=', 60))
+  message('STEP 4: Calculate Tariff Rates')
+  message(strrep('=', 60), '\n')
 
   message('Calculating rates for ', length(countries), ' countries...')
 
-  rates <- calculate_rates_fast(products, ch99_data, countries)
+  rates <- calculate_rates_for_revision(
+    products, ch99_data, ieepa_rates, usmca,
+    countries, revision, eff_date,
+    s232_rates = s232_rates,
+    fentanyl_rates = fentanyl_rates
+  )
 
   # Save
-  output_path <- file.path(config$processed_dir, 'rates_current.rds')
-  saveRDS(rates, output_path)
-  message('\nSaved: ', output_path)
-
-  # Also save CSV
+  saveRDS(rates, file.path(config$processed_dir, 'rates_current.rds'))
   write_csv(rates, file.path(config$processed_dir, 'rates_current.csv'))
 
   # Summary
@@ -150,76 +173,25 @@ run_step3_calculate_rates <- function(products, ch99_data, config) {
     ) %>%
     filter(n > 100) %>%
     arrange(desc(mean_additional)) %>%
-    head(10) %>%
+    head(15) %>%
     print()
 
-  return(rates)
-}
-
-
-#' Run Step 4: Validate Against TPC
-run_step4_validate <- function(rates, config) {
-  message('\n', strrep('=', 60))
-  message('STEP 4: Validate Against TPC')
-  message(strrep('=', 60), '\n')
-
-  source('src/04_validate_tpc.R', local = TRUE)
-
-  census_codes <- read_csv(config$census_codes_file, col_types = cols(.default = col_character()))
-
-  validation <- run_validation(
-    our_rates = rates,
-    tpc_path = config$tpc_data_file,
-    census_codes = census_codes,
-    output_dir = file.path(config$output_dir, 'validation')
-  )
-
-  return(validation)
-}
-
-
-# =============================================================================
-# Main Pipeline
-# =============================================================================
-
-run_full_pipeline <- function(revision = NULL, skip_parse = FALSE, skip_validate = FALSE) {
-  start_time <- Sys.time()
-
-  message('\n', strrep('=', 60))
-  message('TARIFF RATE TRACKER v2 - Pipeline')
-  message(strrep('=', 60))
-  message('Started: ', start_time)
-  message(strrep('=', 60), '\n')
-
-  config <- CONFIG
-
-  # Default revision
-  if (is.null(revision)) revision <- config$default_revision
-
-  # Ensure directories exist
-  if (!dir.exists(config$processed_dir)) dir.create(config$processed_dir, recursive = TRUE)
-  if (!dir.exists(config$output_dir)) dir.create(config$output_dir, recursive = TRUE)
-
-  # Step 1 & 2: Parse data (or load cached)
-  if (skip_parse) {
-    message('Skipping parse steps, loading cached data...')
-    ch99_data <- readRDS(file.path(config$processed_dir, 'chapter99_rates.rds'))
-    products <- readRDS(file.path(config$processed_dir, paste0('products_', revision, '.rds')))
-  } else {
-    ch99_data <- run_step1_parse_chapter99(revision, config)
-    products <- run_step2_parse_products(revision, config)
-  }
-
-  # Step 3: Calculate rates
-  rates <- run_step3_calculate_rates(products, ch99_data, config)
-
-  # Step 4: Validate (optional)
+  # ---- Step 5: Validate Against TPC ----
   validation <- NULL
   if (!skip_validate && file.exists(config$tpc_data_file)) {
-    validation <- run_step4_validate(rates, config)
+    message('\n', strrep('=', 60))
+    message('STEP 5: Validate Against TPC')
+    message(strrep('=', 60), '\n')
+
+    validation <- run_validation(
+      our_rates = rates,
+      tpc_path = config$tpc_data_file,
+      census_codes = census_codes,
+      output_dir = file.path(config$output_dir, 'validation')
+    )
   }
 
-  # Summary
+  # ---- Summary ----
   end_time <- Sys.time()
   elapsed <- round(difftime(end_time, start_time, units = 'mins'), 1)
 

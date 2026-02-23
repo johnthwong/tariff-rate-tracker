@@ -185,7 +185,7 @@ get_new_ch99_timeline <- function(results) {
 # =============================================================================
 
 if (sys.nframe() == 0) {
-  setwd('C:/Users/ji252/Documents/GitHub/tariff_rate_tracker')
+  setwd('C:/Users/ji252/Documents/GitHub/tariff-rate-tracker')
 
   # Run comparisons
   results <- compare_all_revisions(
