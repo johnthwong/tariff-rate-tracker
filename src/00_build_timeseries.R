@@ -28,12 +28,13 @@ library(jsonlite)
 
 # Source pipeline components
 source('src/helpers.R')
-source('src/01_parse_chapter99.R')
-source('src/02_parse_products.R')
-source('src/03_calculate_rates.R')
+source('src/01_scrape_revision_dates.R')
+source('src/02_download_hts.R')
+source('src/03_parse_chapter99.R')
+source('src/04_parse_products.R')
 source('src/05_parse_policy_params.R')
-source('src/04_validate_tpc.R')
-source('src/06_scrape_revision_dates.R')
+source('src/06_calculate_rates.R')
+source('src/07_validate_tpc.R')
 
 
 # =============================================================================

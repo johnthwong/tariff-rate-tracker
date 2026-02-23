@@ -1,5 +1,5 @@
 # =============================================================================
-# Step 08: Diagnostics
+# Step 09: Diagnostics
 # =============================================================================
 #
 # Diagnostic reports for the tariff rate time series:
@@ -33,7 +33,7 @@ CTY_CHINA <- '5700'
 report_301_coverage_gap <- function(our_rates, tpc_path, census_codes, target_date = NULL) {
   message('\n=== Section 301 Coverage Gap Analysis ===\n')
 
-  source('src/04_validate_tpc.R', local = TRUE)
+  source('src/07_validate_tpc.R', local = TRUE)
 
   name_to_code <- create_country_name_map(census_codes)
   tpc_data <- load_tpc_data(tpc_path, name_to_code)

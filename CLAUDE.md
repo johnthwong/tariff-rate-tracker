@@ -31,22 +31,26 @@ All snapshots -> rate_timeseries.rds
 ```
 
 **Active Pipeline (v2 timeseries):**
-1. `00_build_timeseries.R`: Main orchestrator (iterates revisions)
-2. `01_parse_chapter99.R`: Extract Ch99 entries (rates, authority, countries)
-3. `02_parse_products.R`: Extract product lines (base rates, footnote refs)
-4. `03_calculate_rates.R`: Join products to authorities, apply stacking
-5. `04_validate_tpc.R`: TPC benchmark comparison
-6. `05_parse_policy_params.R`: Extract IEEPA, fentanyl, 232, USMCA from JSON
-7. `06_scrape_revision_dates.R`: Revision date metadata
-8. `07_apply_scenarios.R`: Counterfactual scenarios (zero out authorities)
-9. `08_diagnostics.R`: Debugging and validation utilities
+- `helpers.R`: Shared utilities (rate parsing, HTS codes, revision/archive helpers)
+- `00_build_timeseries.R`: Multi-revision orchestrator (iterates revisions)
+- `run_pipeline.R`: Single-revision orchestrator
+1. `01_scrape_revision_dates.R`: Scrape USITC for revision effective dates
+2. `02_download_hts.R`: Download missing HTS JSON archives from USITC
+3. `03_parse_chapter99.R`: Extract Ch99 entries (rates, authority, countries)
+4. `04_parse_products.R`: Extract product lines (base rates, footnote refs)
+5. `05_parse_policy_params.R`: Extract IEEPA, fentanyl, 232, USMCA from JSON
+6. `06_calculate_rates.R`: Join products to authorities, apply stacking
+7. `07_validate_tpc.R`: TPC benchmark comparison
+8. `08_apply_scenarios.R`: Counterfactual scenarios (zero out authorities)
+9. `09_diagnostics.R`: Debugging and validation utilities
+10. `10_weighted_etr.R`: Import-weighted effective tariff rates
 
 **Key Configuration:**
 - `config/revision_dates.csv`: revision -> effective_date -> tpc_date mapping
 - `config/scenarios.yaml`: Counterfactual scenario definitions
 
 **Legacy (v1, config-driven):**
-- `run_daily.R`, `01_ingest_hts.R` through `05_write_outputs.R`
+- `v1_run_daily.R`, `v1_ingest_hts.R` through `v1_write_outputs.R`
 - `config/authority_mapping.yaml`, `config/country_rules.yaml`
 
 ## Stacking Rules

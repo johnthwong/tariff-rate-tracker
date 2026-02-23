@@ -223,3 +223,79 @@ ensure_dir <- function(path) {
   }
   return(path)
 }
+
+
+# =============================================================================
+# Revision / Archive Helpers
+# =============================================================================
+
+#' Load revision dates from config CSV
+#'
+#' @param csv_path Path to revision_dates.csv
+#' @return Tibble with revision, effective_date, tpc_date
+load_revision_dates <- function(csv_path = 'config/revision_dates.csv') {
+  if (!file.exists(csv_path)) {
+    stop('Revision dates CSV not found: ', csv_path,
+         '\nRun scraper or create manually.')
+  }
+
+  dates <- read_csv(csv_path, col_types = cols(
+    revision = col_character(),
+    effective_date = col_date(),
+    tpc_date = col_date()
+  ))
+
+  # Validate
+  stopifnot(all(!is.na(dates$revision)))
+  stopifnot(all(!is.na(dates$effective_date)))
+  stopifnot(!any(duplicated(dates$revision)))
+
+  # Sort by effective_date
+  dates <- dates %>% arrange(effective_date)
+
+  message('Loaded ', nrow(dates), ' revision dates from ', csv_path)
+  message('  Date range: ', min(dates$effective_date), ' to ', max(dates$effective_date))
+  message('  TPC validation dates: ', sum(!is.na(dates$tpc_date)))
+
+  return(dates)
+}
+
+
+#' List available HTS JSON archives
+#'
+#' Scans the archive directory and returns revision identifiers.
+#'
+#' @param archive_dir Path to HTS JSON archive directory
+#' @param year Year prefix (default: 2025)
+#' @return Character vector of revision identifiers
+list_available_revisions <- function(archive_dir = 'data/hts_archives', year = 2025) {
+  files <- list.files(archive_dir, pattern = paste0('hts_', year, '.*\\.json$'))
+
+  # Extract revision from filename: hts_2025_rev_32.json -> rev_32, hts_2025_basic.json -> basic
+  revisions <- str_match(files, paste0('hts_', year, '_(.+)\\.json'))[, 2]
+  revisions <- revisions[!is.na(revisions)]
+
+  return(revisions)
+}
+
+
+#' Resolve JSON path for a revision
+#'
+#' @param revision Revision identifier (e.g., 'basic', 'rev_1')
+#' @param archive_dir HTS archive directory
+#' @param year HTS year (default: 2025)
+#' @return Full file path to JSON
+resolve_json_path <- function(revision, archive_dir = 'data/hts_archives', year = 2025) {
+  # Handle 2026_basic special case
+  if (grepl('^2026', revision)) {
+    path <- file.path(archive_dir, paste0('hts_', revision, '.json'))
+  } else {
+    path <- file.path(archive_dir, paste0('hts_', year, '_', revision, '.json'))
+  }
+
+  if (!file.exists(path)) {
+    stop('HTS JSON not found: ', path)
+  }
+
+  return(path)
+}
