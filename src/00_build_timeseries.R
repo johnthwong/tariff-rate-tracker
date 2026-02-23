@@ -321,7 +321,7 @@ print_timeseries_summary <- function(timeseries_path = 'data/timeseries/rate_tim
 # =============================================================================
 
 if (sys.nframe() == 0) {
-  setwd('C:/Users/ji252/Documents/GitHub/tariff_rate_tracker')
+  setwd('C:/Users/ji252/Documents/GitHub/tariff-rate-tracker')
 
   # Parse command line arguments
   args <- commandArgs(trailingOnly = TRUE)

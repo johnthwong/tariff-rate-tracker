@@ -22,44 +22,44 @@ library(jsonlite)
 # EU-27 member state Census codes (for expanding "European Union" entries)
 EU27_CODES <- c(
   '4330',  # Austria
-  '4211',  # Belgium
-  '4840',  # Bulgaria
-  '4760',  # Croatia
-  '5010',  # Cyprus
+  '4231',  # Belgium
+  '4870',  # Bulgaria
+  '4791',  # Croatia
+  '4910',  # Cyprus
   '4351',  # Czech Republic
   '4099',  # Denmark
-  '4723',  # Estonia
-  '4011',  # Finland
+  '4470',  # Estonia
+  '4050',  # Finland
   '4279',  # France
   '4280',  # Germany
-  '4430',  # Greece
+  '4840',  # Greece
   '4370',  # Hungary
   '4190',  # Ireland
   '4759',  # Italy
-  '4724',  # Latvia
-  '4725',  # Lithuania
-  '4420',  # Luxembourg
-  '4810',  # Malta
+  '4490',  # Latvia
+  '4510',  # Lithuania
+  '4239',  # Luxembourg
+  '4730',  # Malta
   '4210',  # Netherlands
   '4550',  # Poland
   '4710',  # Portugal
-  '4580',  # Romania
-  '4740',  # Slovakia
-  '4781',  # Slovenia
-  '4699',  # Spain
+  '4850',  # Romania
+  '4359',  # Slovakia
+  '4792',  # Slovenia
+  '4700',  # Spain
   '4010'   # Sweden
 )
 
 EU27_NAMES <- c(
-  '4330' = 'Austria', '4211' = 'Belgium', '4840' = 'Bulgaria',
-  '4760' = 'Croatia', '5010' = 'Cyprus', '4351' = 'Czech Republic',
-  '4099' = 'Denmark', '4723' = 'Estonia', '4011' = 'Finland',
-  '4279' = 'France', '4280' = 'Germany', '4430' = 'Greece',
+  '4330' = 'Austria', '4231' = 'Belgium', '4870' = 'Bulgaria',
+  '4791' = 'Croatia', '4910' = 'Cyprus', '4351' = 'Czech Republic',
+  '4099' = 'Denmark', '4470' = 'Estonia', '4050' = 'Finland',
+  '4279' = 'France', '4280' = 'Germany', '4840' = 'Greece',
   '4370' = 'Hungary', '4190' = 'Ireland', '4759' = 'Italy',
-  '4724' = 'Latvia', '4725' = 'Lithuania', '4420' = 'Luxembourg',
-  '4810' = 'Malta', '4210' = 'Netherlands', '4550' = 'Poland',
-  '4710' = 'Portugal', '4580' = 'Romania', '4740' = 'Slovakia',
-  '4781' = 'Slovenia', '4699' = 'Spain', '4010' = 'Sweden'
+  '4490' = 'Latvia', '4510' = 'Lithuania', '4239' = 'Luxembourg',
+  '4730' = 'Malta', '4210' = 'Netherlands', '4550' = 'Poland',
+  '4710' = 'Portugal', '4850' = 'Romania', '4359' = 'Slovakia',
+  '4792' = 'Slovenia', '4700' = 'Spain', '4010' = 'Sweden'
 )
 
 # =============================================================================

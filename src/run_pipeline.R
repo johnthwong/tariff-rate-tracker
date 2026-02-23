@@ -245,7 +245,7 @@ run_full_pipeline <- function(revision = NULL, skip_parse = FALSE, skip_validate
 # =============================================================================
 
 if (sys.nframe() == 0) {
-  setwd('C:/Users/ji252/Documents/GitHub/tariff_rate_tracker')
+  setwd('C:/Users/ji252/Documents/GitHub/tariff-rate-tracker')
 
   # Parse command line arguments
   args <- commandArgs(trailingOnly = TRUE)
