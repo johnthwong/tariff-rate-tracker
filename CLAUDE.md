@@ -29,6 +29,12 @@ Rscript src/quality_report.R
 
 # Diagnostics (saves to output/diagnostics/)
 Rscript src/09_diagnostics.R
+
+# Daily rate series (saves to output/daily/)
+Rscript src/11_daily_series.R
+
+# Import-weighted ETRs (requires built timeseries; saves to output/etr/)
+Rscript src/10_weighted_etr.R
 ```
 
 ## Architecture
@@ -36,7 +42,9 @@ Rscript src/09_diagnostics.R
 ```
 For each HTS revision (basic, rev_1, ..., rev_32, 2026_basic):
   JSON -> Parse Ch99 -> Parse Products -> Extract Policy Params -> Calculate Rates -> Snapshot
-All snapshots -> rate_timeseries.rds
+All snapshots -> rate_timeseries.rds (with valid_from/valid_until intervals)
+rate_timeseries.rds -> daily aggregates (11_daily_series.R)
+rate_timeseries.rds -> import-weighted ETRs (10_weighted_etr.R via get_rates_at_date())
 ```
 
 **Active Pipeline (v2 timeseries):**
@@ -56,7 +64,8 @@ All snapshots -> rate_timeseries.rds
 7. `07_validate_tpc.R`: TPC benchmark comparison
 8. `08_apply_scenarios.R`: Counterfactual scenarios (zero out authorities)
 9. `09_diagnostics.R`: Debugging and validation utilities
-10. `10_weighted_etr.R`: Import-weighted effective tariff rates
+10. `10_weighted_etr.R`: Import-weighted effective tariff rates (uses timeseries via `get_rates_at_date()`)
+11. `11_daily_series.R`: Daily rate series, point-in-time queries, daily aggregates
 
 **Key Configuration:**
 - `config/policy_params.yaml`: All policy constants (country codes, authority ranges, 232 chapters, floor rates, 301 rates, etc.)
@@ -64,11 +73,12 @@ All snapshots -> rate_timeseries.rds
 - `config/scenarios.yaml`: Counterfactual scenario definitions
 
 **Shared Infrastructure:**
-- `RATE_SCHEMA` in helpers.R: Canonical column order for rate output
+- `RATE_SCHEMA` in helpers.R: Canonical column order for rate output (includes `valid_from`/`valid_until`)
 - `enforce_rate_schema()`: Ensures all rate dataframes have consistent columns
 - `apply_stacking_rules()`: Single vectorized implementation of tariff stacking
 - `classify_authority()`: Unified Ch99 authority classifier
 - `load_policy_params()`: Reads config/policy_params.yaml, unpacks convenience fields
+- `get_rates_at_date(ts, date)`: Point-in-time rate query (in 11_daily_series.R) — preferred way to get rates at any date
 
 **Legacy (v1, config-driven):**
 - `v1_run_daily.R`, `v1_ingest_hts.R` through `v1_write_outputs.R`

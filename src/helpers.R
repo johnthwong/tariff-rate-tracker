@@ -371,7 +371,8 @@ RATE_SCHEMA <- c(
   'hts10', 'country', 'base_rate',
   'rate_232', 'rate_301', 'rate_ieepa_recip', 'rate_ieepa_fent', 'rate_other',
   'total_additional', 'total_rate',
-  'usmca_eligible', 'revision', 'effective_date'
+  'usmca_eligible', 'revision', 'effective_date',
+  'valid_from', 'valid_until'
 )
 
 #' Ensure a rates data frame conforms to the canonical schema
@@ -389,7 +390,8 @@ enforce_rate_schema <- function(df) {
     rate_ieepa_recip = 0, rate_ieepa_fent = 0, rate_other = 0,
     total_additional = 0, total_rate = 0,
     usmca_eligible = FALSE, revision = NA_character_,
-    effective_date = as.Date(NA)
+    effective_date = as.Date(NA),
+    valid_from = as.Date(NA), valid_until = as.Date(NA)
   )
 
   for (col in RATE_SCHEMA) {

@@ -267,95 +267,38 @@ aggregate_tpc <- function(tpc_weighted, imports_gtap) {
 
 
 # =============================================================================
-# Rate Calculation
+# Net Authority Decomposition
 # =============================================================================
 
-#' Compute tariff rates for all import flows at a given policy date
+#' Compute net authority contributions from snapshot rate columns
 #'
-#' @param flows Tibble with hs10, cty_code, imports (plus joined rate components)
-#' @param date Character date string (YYYY-MM-DD)
-#' @param china_ieepa Numeric China IEEPA reciprocal rate
-#' @return flows with total_rate column added
-compute_rates_for_date <- function(flows, date, china_ieepa) {
-  flows %>%
+#' Derives net_232, net_ieepa, net_fentanyl, net_301 from the timeseries
+#' rate columns using the same stacking logic as 06_calculate_rates.R.
+#' Net contributions sum to total_additional.
+#'
+#' @param df Data frame with rate_232, rate_301, rate_ieepa_recip,
+#'   rate_ieepa_fent, country columns
+#' @return df with net_232, net_ieepa, net_fentanyl, net_301 added
+compute_net_authority_contributions <- function(df) {
+  df %>%
     mutate(
-      # --- Date-dependent policy flags ---
-      fentanyl_phase1 = date >= '2025-02-04',
-      fentanyl_phase2 = date >= '2025-03-04',
-      ieepa_active    = date >= '2025-04-09',
-      phase2_active   = date >= '2025-08-07',
-      s232_increase   = date >= '2025-07-01',
-
-      # --- Fentanyl ---
-      # China: +10% Feb 4 (9903.01.20), +10% Mar 4 (9903.01.24)
-      # CA/MX: +25% Feb 4
-      fent_rate = case_when(
-        cty_code == CTY_CHINA & fentanyl_phase2 ~ 0.20,
-        cty_code == CTY_CHINA & fentanyl_phase1 ~ 0.10,
-        cty_code %in% c(CTY_CANADA, CTY_MEXICO) & fentanyl_phase1 ~ 0.25,
-        TRUE ~ 0
-      ),
-
-      # --- Section 232 ---
-      s232_rate = case_when(
-        !is_232 ~ 0,
-        s232_increase ~ 0.50,
-        TRUE ~ 0.25
-      ),
-
-      # --- IEEPA reciprocal ---
-      ieepa_rate = case_when(
-        !ieepa_active ~ 0,
-        cty_code == CTY_CHINA ~ china_ieepa,
-        # After Phase 2: use country-specific rates
-        phase2_active & is_eu ~ pmax(0, EU_FLOOR_RATE - coalesce(base_rate, 0)),
-        phase2_active & is_floor ~ pmax(0, FLOOR_RATE - coalesce(base_rate, 0)),
-        phase2_active & !is.na(ieepa_surcharge) ~ ieepa_surcharge,
-        phase2_active ~ 0.10,  # Default for unlisted countries
-        TRUE ~ 0.10  # Phase 1 baseline (Apr-Aug)
-      ),
-
-      # --- CA/MX reciprocal ---
-      ieepa_rate_camx = case_when(
-        cty_code == CTY_CANADA & date >= '2025-10-01' ~ 0.10,
-        TRUE ~ 0
-      ),
-
-      # --- USMCA exemption ---
-      usmca_factor = ifelse(
-        usmca_eligible & cty_code %in% c(CTY_CANADA, CTY_MEXICO), 0, 1
-      ),
-
-      # --- Total rate (stacking rules) ---
-      total_rate = case_when(
-        cty_code == CTY_CHINA ~
-          pmax(s232_rate, ieepa_rate) + fent_rate + s301_rate,
-        cty_code %in% c(CTY_CANADA, CTY_MEXICO) ~
-          s232_rate + (ieepa_rate_camx + fent_rate) * usmca_factor,
-        s232_rate > 0 ~ s232_rate,
-        TRUE ~ ieepa_rate + fent_rate
-      ),
-
-      # --- Net authority contributions (sum to total_rate) ---
+      # China: max(232, recip) means 232 only contributes the excess over recip
+      # Others: 232 is exclusive with recip (whichever is active)
       net_ieepa = case_when(
-        cty_code == CTY_CHINA ~ ieepa_rate,
-        cty_code %in% c(CTY_CANADA, CTY_MEXICO) ~ ieepa_rate_camx * usmca_factor,
-        s232_rate > 0 ~ 0,
-        TRUE ~ ieepa_rate
+        country == CTY_CHINA ~ rate_ieepa_recip,
+        country %in% c(CTY_CANADA, CTY_MEXICO) ~ 0,
+        rate_232 > 0 ~ 0,
+        TRUE ~ rate_ieepa_recip
       ),
       net_232 = case_when(
-        cty_code == CTY_CHINA ~ pmax(0, s232_rate - ieepa_rate),
-        cty_code %in% c(CTY_CANADA, CTY_MEXICO) ~ s232_rate,
-        s232_rate > 0 ~ s232_rate,
+        country == CTY_CHINA ~ pmax(0, rate_232 - rate_ieepa_recip),
+        country %in% c(CTY_CANADA, CTY_MEXICO) ~ rate_232,
+        rate_232 > 0 ~ rate_232,
         TRUE ~ 0
       ),
-      net_fentanyl = case_when(
-        cty_code == CTY_CHINA ~ fent_rate,
-        cty_code %in% c(CTY_CANADA, CTY_MEXICO) ~ fent_rate * usmca_factor,
-        TRUE ~ 0
-      ),
+      net_fentanyl = rate_ieepa_fent,
       net_301 = case_when(
-        cty_code == CTY_CHINA ~ s301_rate,
+        country == CTY_CHINA ~ rate_301,
         TRUE ~ 0
       )
     )
@@ -367,36 +310,50 @@ compute_rates_for_date <- function(flows, date, china_ieepa) {
 # =============================================================================
 
 compute_weighted_etrs <- function(data) {
-  message('\nBuilding flow-level rate components...')
+  message('\nLoading rate timeseries...')
 
-  # Build the base flows table (HS10 x country) with all rate components joined
+  ts_path <- here('data', 'timeseries', 'rate_timeseries.rds')
+  if (!file.exists(ts_path)) {
+    stop('Timeseries not found: ', ts_path,
+         '\nRun: Rscript src/00_build_timeseries.R')
+  }
+  ts <- readRDS(ts_path)
+  message('  Timeseries: ', nrow(ts), ' rows, ', n_distinct(ts$revision), ' revisions')
+
+  if (!'valid_from' %in% names(ts)) {
+    stop('Timeseries missing valid_from/valid_until columns.',
+         '\nRebuild with: Rscript src/00_build_timeseries.R')
+  }
+
+  # Build flows table (imports + partner mapping)
   flows <- data$imports_agg %>%
-    left_join(data$products %>% select(hs10, base_rate), by = 'hs10') %>%
-    left_join(data$s301_by_product, by = 'hs10') %>%
-    left_join(data$ieepa_surcharge, by = 'cty_code') %>%
-    left_join(data$usmca %>% select(hs10, usmca_eligible), by = 'hs10') %>%
     left_join(data$partners %>% select(cty_code, partner), by = 'cty_code') %>%
-    mutate(
-      base_rate = coalesce(base_rate, 0),
-      s301_rate = coalesce(s301_rate, 0),
-      usmca_eligible = coalesce(usmca_eligible, FALSE),
-      partner = coalesce(partner, 'row'),
-      is_232 = substr(hs10, 1, 2) %in% SECTION_232_CHAPTERS,
-      is_eu = partner == 'eu',
-      is_floor = cty_code %in% FLOOR_COUNTRIES
-    )
+    mutate(partner = coalesce(partner, 'row'))
 
   message('  Flow-level rows: ', nrow(flows))
   message('  Import coverage: $', round(sum(flows$imports) / 1e9, 1), 'B')
 
-  # Compute rates for each policy date
-  message('\nComputing rates across ', nrow(POLICY_DATES), ' policy dates...')
+  # Query rates from timeseries for each policy date
+  message('\nQuerying rates across ', nrow(POLICY_DATES), ' policy dates...')
 
   results <- POLICY_DATES %>%
     pmap_dfr(function(date, label) {
-      rated <- compute_rates_for_date(flows, date, data$china_ieepa)
-      rated$date <- date
-      rated$label <- label
+      snapshot <- get_rates_at_date(ts, date)
+
+      # Compute net authority contributions from snapshot rate columns
+      snapshot_net <- snapshot %>%
+        compute_net_authority_contributions() %>%
+        select(hts10, country, total_rate = total_additional,
+               net_232, net_ieepa, net_fentanyl, net_301)
+
+      # Join snapshot rates with import flows
+      rated <- flows %>%
+        inner_join(
+          snapshot_net,
+          by = c('hs10' = 'hts10', 'cty_code' = 'country')
+        ) %>%
+        mutate(date = date, label = label)
+
       rated %>% select(hs10, cty_code, partner, imports, date, label,
                         total_rate, net_232, net_ieepa, net_fentanyl, net_301)
     })
@@ -690,6 +647,7 @@ plot_etrs <- function(etrs, tpc_etrs, output_dir) {
 if (sys.nframe() == 0) {
   library(here)
   source(here('src', 'helpers.R'))
+  source(here('src', '11_daily_series.R'))
 
   data <- load_data(
     products_path = 'data/processed/products_raw.csv',

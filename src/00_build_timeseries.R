@@ -287,6 +287,23 @@ build_full_timeseries <- function(
   timeseries <- timeseries %>%
     arrange(effective_date, revision, country, hts10)
 
+  # Add temporal intervals (valid_from / valid_until) from revision ordering
+  rev_intervals <- rev_dates %>%
+    filter(revision %in% unique(timeseries$revision)) %>%
+    arrange(effective_date) %>%
+    mutate(
+      valid_from = effective_date,
+      valid_until = lead(effective_date) - 1
+    ) %>%
+    mutate(valid_until = if_else(is.na(valid_until), as.Date('2026-12-31'), valid_until)) %>%
+    select(revision, valid_from, valid_until)
+
+  timeseries <- timeseries %>%
+    select(-any_of(c('valid_from', 'valid_until'))) %>%
+    left_join(rev_intervals, by = 'revision')
+
+  message('  Added interval columns: valid_from / valid_until')
+
   ts_path <- file.path(output_dir, 'rate_timeseries.rds')
   saveRDS(timeseries, ts_path)
   message('Saved time series: ', ts_path)
