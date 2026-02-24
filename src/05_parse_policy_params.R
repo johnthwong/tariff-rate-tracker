@@ -287,7 +287,7 @@ extract_ieepa_rates <- function(hts_raw, country_lookup) {
     phase <- if (grepl('^9903\\.01\\.', ch99_code)) 'phase1_apr9' else 'phase2_aug7'
 
     # Check if terminated
-    terminated <- grepl('provision terminated', description, ignore.case = TRUE)
+    terminated <- grepl('provision terminated|provision suspended', description, ignore.case = TRUE)
 
     # Extract countries
     country_names <- extract_countries_from_description(description)
@@ -359,8 +359,11 @@ extract_ieepa_rates <- function(hts_raw, country_lookup) {
   # retains the suspended entries at their original rates, so we detect the
   # baseline and cap Phase 1 rates accordingly.
   #
-  # 9903.01.63 (China/HK/Macau) was NOT paused — its rate was modified
-  # (125% → 34%) rather than suspended. We exempt it from capping.
+  # 9903.01.63 (China/HK/Macau): In early revisions, was NOT paused — its
+  # rate was modified (125% → 34%) rather than suspended, so it's exempt
+  # from capping. Post-Geneva (rev_17+), 9903.01.63 is marked as suspended
+  # in the HTS JSON ("[Compiler's note: provision suspended.]"). When
+  # suspended, China falls back to the universal baseline (10%).
   baseline_item <- Filter(function(x) {
     (x$htsno %||% '') == '9903.01.25'
   }, hts_raw)
@@ -375,10 +378,15 @@ extract_ieepa_rates <- function(hts_raw, country_lookup) {
               round(universal_baseline * 100), '%')
 
       # Cap Phase 1 country-specific entries at baseline, except China entry
-      # 9903.01.63 is China/HK/Macau — exempt from the 90-day pause
+      # 9903.01.63 is China/HK/Macau — exempt from the 90-day pause UNLESS
+      # it has been suspended (post-Geneva trade deal, May 2025). When
+      # suspended, China falls back to the universal baseline like everyone else.
       china_entry <- '9903.01.63'
+      china_suspended <- any(
+        results$ch99_code == china_entry & results$terminated
+      )
       phase1_cappable <- results$phase == 'phase1_apr9' &
-        results$ch99_code != china_entry &
+        (results$ch99_code != china_entry | china_suspended) &
         !is.na(results$rate) &
         results$rate > universal_baseline
 

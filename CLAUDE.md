@@ -90,7 +90,7 @@ Mutual exclusion between 232 and IEEPA reciprocal (aligned with Tariff-ETRs):
 
 ```r
 # China with 232:    232 + fentanyl + 301 + s122 + other
-# China without 232: reciprocal + fentanyl + 301 + s122 + other
+# China without 232: reciprocal + fentanyl + 301 + s122 + other  (10% recip + 10% fent post-Geneva)
 # Others with 232:   232 + s122 + other              (fentanyl does NOT stack on 232)
 # Others without 232: reciprocal + fentanyl + s122 + other
 

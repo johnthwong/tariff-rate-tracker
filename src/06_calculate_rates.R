@@ -346,13 +346,12 @@ calculate_rates_for_revision <- function(
   # 2b. Apply IEEPA fentanyl/initial rates as blanket tariff
   #     9903.01.01-24: Mexico (+25%), Canada (+35%), China (+10%)
   #     These STACK with reciprocal tariffs for CA/MX.
-  #     China/HK are EXCLUDED: their 9903.90.xx footnote rates already
-  #     incorporate fentanyl (adding it would double-count ~10pp).
+  #     China/HK included: fentanyl (9903.01.20/24) is NOT captured via
+  #     product footnotes for China. The 9903.90.xx entries are Russia only.
   has_fentanyl <- !is.null(fentanyl_rates) && nrow(fentanyl_rates) > 0
 
   if (has_fentanyl) {
     fent_lookup <- fentanyl_rates %>%
-      filter(!(census_code %in% c(CTY_CHINA, CTY_HK))) %>%
       select(census_code, fent_rate = rate)
 
     # Apply fentanyl to existing rows
