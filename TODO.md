@@ -2,13 +2,8 @@
 
 ## High Priority
 
-### 1. Scrape US Note 20/21/31 product lists
-~5,000 China products are defined by US Note product lists but lack individual footnote references to 9903.88-89.xx/9903.91.xx entries. Parsing these product lists from the USITC HTS General Notes would close the remaining ~22K product-country 301 gap.
-
-- **US Note 20**: Original Section 301 lists (Lists 1-4)
-- **US Note 21**: List 4A (additional products)
-- **US Note 31**: Biden acceleration (Lists b-j with phased effective dates)
-- Source: HTS General Notes or USITC online subchapter notes
+### ~~1. Scrape US Note 20/21/31 product lists~~ (Implemented)
+See Done section.
 
 ## Medium Priority
 
@@ -19,12 +14,8 @@ Build a verified timeline of policy changes mapped to HTS revisions. Currently `
 - Building a daily rate dataset with proper interpolation between revision points
 - Documenting when Phase 1 terminated, Phase 2 started, 232 increased, etc.
 
-### 3. 2026 HTS revision naming convention
-The pipeline handles `2026_basic` as a special case but has no support for `2026_rev_1`, `2026_rev_2`, etc. Before 2026 revisions appear:
-
-- Update `resolve_json_path()` and `list_available_revisions()` to handle 2026 naming
-- Add logic to `update_pipeline.R` to detect and download 2026 revisions
-- Ensure `revision_dates.csv` format accommodates the year prefix
+### ~~3. 2026 HTS revision naming convention~~ (Implemented)
+See Done section.
 
 ### 4. EU floor rate residual (~4pp systematic)
 EU countries show 35-42% exact match with ~4pp mean excess. The floor formula `max(0, 15% - base_rate)` is correct, but residual discrepancies remain. Possible causes: TPC using slightly different floor mechanics, base rate parsing differences, or passthrough classification.
@@ -42,14 +33,8 @@ Our USMCA flag (from HTS `special` field "S"/"S+") disagrees with TPC for ~5,700
 
 Almost exactly symmetric, suggesting a systematic classification difference rather than random noise. TPC likely uses a different USMCA eligibility source or methodology.
 
-### 7. CA/MX fentanyl product-level carve-outs (~1,765 products)
-We apply blanket fentanyl (35% CA via 9903.01.10, 25% MX via 9903.01.01) to all products. But HTS has lower rates for specific product categories:
-
-- **9903.01.13** (CA): Crude oil, natural gas, critical minerals → +10% (not +35%)
-- **9903.01.15** (CA): Potash → +10%
-- **9903.01.04** (MX): Energy products → lower rate
-
-~915 CA and ~850 MX products show TPC rates in the 0-10% range, consistent with these carve-outs. Fix: differentiate fentanyl rates by product category in `extract_ieepa_fentanyl_rates()` instead of taking first entry per country.
+### ~~7. CA/MX fentanyl product-level carve-outs~~ (Implemented)
+See Done section.
 
 ## Low Priority / Future
 
@@ -103,3 +88,12 @@ Both countries had country-specific Executive Order entries in 9903.01.76-89 (ou
 Fentanyl was being multiplied by `nonmetal_share` (which is 0 for base 232 products), effectively zeroing it out. Fentanyl is a separate IEEPA authority that applies to full customs value regardless of 232 status. Changed `apply_stacking_rules()` in `helpers.R` to add `rate_ieepa_fent` directly instead of scaling by `nonmetal_share`. Mexico 232 exact match: ~5% → 80.2%. Canada 232: 0.2% (remaining gap is CA fentanyl 35% vs TPC 25%, see analysis below).
 
 **CA 232 fentanyl rate discrepancy (not a bug)**: Our CA fentanyl = 35% (from 9903.01.10 in HTS JSON), producing 60% for 232 products (25%+35%). TPC shows 50% (25%+25%). TPC updated non-232 CA products from 25% to 35% (between July and October 2025 dates) but appears not to have updated 232 products. Our rate is correct per the HTS source data.
+
+### ~~CA/MX fentanyl product-level carve-outs~~ (Implemented)
+Product-specific fentanyl carve-outs for CA (energy/minerals +10%, potash +10%) and MX (potash +10%). `extract_ieepa_fentanyl_rates()` now returns all entries with `entry_type` column ('general' vs 'carveout'). Product lists in `resources/fentanyl_carveout_products.csv` (308 HTS8 prefixes sourced from Tariff-ETRs config). Step 3 in `calculate_rates_for_revision()` applies carve-out rates to matching products, falling back to the general blanket rate. Expected impact: ~915 CA and ~850 MX products drop from 35%/25% to 10%.
+
+### ~~2026 HTS revision naming convention~~ (Implemented)
+Added `parse_revision_id()` helper in `helpers.R` that extracts year + revision type from any revision ID (e.g., `'2026_rev_3'` -> `year=2026, rev='rev_3'`; `'rev_32'` -> `year=2025, rev='rev_32'`). Replaced hardcoded 2025/2026 year checks in `resolve_json_path()`, `build_download_url()`, `download_missing_revisions()`, `build_full_timeseries()`, `run_update()`, and `01_scrape_revision_dates.R` cross-reference. All year scanning is now dynamic — derived from `revision_dates.csv` entries. Supports `2026_rev_1`, `2027_basic`, etc. without code changes.
+
+### ~~US Note 20/31 product lists~~ (Implemented)
+New script `src/12_scrape_us_notes.R` downloads Chapter 99 PDF from USITC, finds "Heading 9903.XX.XX applies to" anchors, extracts HTS subheading codes from each product list section. Covers Note 20 (Lists 1-3 + 4A: 9903.88.01/.02/.03/.15) and Note 31 (Biden acceleration: 9903.91.01-.11). Note 21 doesn't exist as a separate note — List 4A modifications are embedded in Note 20 subdivision (u). Parser found 10,587 codes with 10,132 matching existing CSV (strong validation), adding 296 new entries (mostly List 3). Run with `Rscript src/12_scrape_us_notes.R` (or `--dry-run` to preview). Requires `pdftools` package.

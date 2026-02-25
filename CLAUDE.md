@@ -35,6 +35,10 @@ Rscript src/11_daily_series.R
 
 # Import-weighted ETRs (requires built timeseries; saves to output/etr/)
 Rscript src/10_weighted_etr.R
+
+# Parse US Note 301 product lists from Chapter 99 PDF
+Rscript src/12_scrape_us_notes.R
+Rscript src/12_scrape_us_notes.R --dry-run    # Report without writing
 ```
 
 ## Architecture
@@ -66,6 +70,7 @@ rate_timeseries.rds -> import-weighted ETRs (10_weighted_etr.R via get_rates_at_
 9. `09_diagnostics.R`: Debugging and validation utilities
 10. `10_weighted_etr.R`: Import-weighted effective tariff rates (uses timeseries via `get_rates_at_date()`)
 11. `11_daily_series.R`: Daily rate series, point-in-time queries, daily aggregates
+12. `12_scrape_us_notes.R`: Parse US Note 20/21/31 product lists from Chapter 99 PDF
 
 **Key Configuration:**
 - `config/policy_params.yaml`: All policy constants (country codes, authority ranges, 232 chapters, floor rates, 301 rates, etc.)
@@ -80,6 +85,7 @@ rate_timeseries.rds -> import-weighted ETRs (10_weighted_etr.R via get_rates_at_
 - `load_policy_params()`: Reads config/policy_params.yaml, unpacks convenience fields
 - `load_232_derivative_products()`: Reads derivative product list from resources/
 - `load_metal_content()`: Computes per-product metal shares (flat/CBO/BEA methods)
+- `parse_revision_id()`: Extracts year + revision type from any revision ID (e.g., '2026_rev_3' -> year=2026, rev='rev_3')
 - `get_rates_at_date(ts, date)`: Point-in-time rate query (in 11_daily_series.R) — preferred way to get rates at any date
 
 **Legacy (v1, config-driven):**
@@ -91,15 +97,15 @@ rate_timeseries.rds -> import-weighted ETRs (10_weighted_etr.R via get_rates_at_
 Mutual exclusion between 232 and IEEPA reciprocal (aligned with Tariff-ETRs):
 
 ```r
-# China with 232:    232 + recip*nonmetal + fentanyl + 301 + s122 + other
+# China with 232:    232 + recip*nonmetal + fentanyl + 301 + s122*nonmetal + other
 # China without 232: reciprocal + fentanyl + 301 + s122 + other  (10% recip + 10% fent post-Geneva)
-# Others with 232:   232 + recip*nonmetal + fentanyl + s122 + other
+# Others with 232:   232 + (recip + fentanyl + s122)*nonmetal + other
 # Others without 232: reciprocal + fentanyl + s122 + other
 
 # USMCA (CA/MX): binary exemption — eligible products get IEEPA/fentanyl zeroed out
 ```
 
-Key: 232 takes precedence over IEEPA reciprocal. For base 232 products (metal_share = 1.0), nonmetal_share = 0, preserving the mutual exclusion. For derivative 232 products (metal_share < 1.0), IEEPA reciprocal applies to the non-metal portion of customs value. Fentanyl stacks on 232 for all countries (separate IEEPA authority, applies to full customs value).
+Key: 232 takes precedence over IEEPA reciprocal. For base 232 products (metal_share = 1.0), nonmetal_share = 0, preserving full mutual exclusion. For derivative 232 products (metal_share < 1.0), non-232 authorities apply to the non-metal portion. China exception: fentanyl stacks at full value (separate IEEPA authority) regardless of 232 status.
 
 ## Section 232 Coverage
 
@@ -117,13 +123,28 @@ Key: 232 takes precedence over IEEPA reciprocal. For base 232 products (metal_sh
 
 ## Section 301 Product Coverage
 
-~10,400 HTS8 product codes covered by Section 301 tariffs on China (Lists 1-4A + Biden modifications).
-List in `resources/s301_product_lists.csv`. Sourced from USITC "China Tariffs" reference document
-(hts.usitc.gov, last updated January 1, 2026). Applied as blanket tariff for China (country 5700) in
-`06_calculate_rates.R` step 3b, mirroring the Section 232 blanket pattern.
+~10,400+ HTS8 product codes covered by Section 301 tariffs on China (Lists 1-4A + Biden modifications).
+List in `resources/s301_product_lists.csv`. Two sources:
+1. USITC "China Tariffs" reference document (hts.usitc.gov, ~10,400 codes)
+2. US Notes 20/21/31 from Chapter 99 PDF (`12_scrape_us_notes.R`, ~additional codes from Note text)
+
+Applied as blanket tariff for China (country 5700) in `06_calculate_rates.R` step 3b, mirroring the
+Section 232 blanket pattern.
 
 Known limitation: Some 9903.89.xx exclusions reference US Note product lists (not footnotes) and are
 not captured — excluded products may incorrectly receive the base 301 rate.
+
+## IEEPA Fentanyl Product Carve-outs
+
+Fentanyl rates (9903.01.01-24) have product-specific carve-outs with lower rates:
+- 9903.01.13 (CA): Energy, critical minerals → +10% (vs general +35%)
+- 9903.01.15 (CA): Potash → +10% (vs general +35%)
+- 9903.01.05 (MX): Potash → +10% (vs general +25%)
+
+Product lists in `resources/fentanyl_carveout_products.csv` (308 HTS8 prefixes, sourced from Tariff-ETRs).
+Applied in `06_calculate_rates.R` step 3: products matching carve-out HTS8 get the carve-out rate;
+all others get the general blanket rate. `extract_ieepa_fentanyl_rates()` returns all entries with
+`entry_type` column ('general' vs 'carveout').
 
 ## IEEPA Product Exemptions
 

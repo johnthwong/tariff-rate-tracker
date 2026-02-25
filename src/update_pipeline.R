@@ -89,10 +89,15 @@ run_update <- function(
   rev_dates <- load_revision_dates(revision_dates_path)
   all_revisions <- rev_dates$revision
 
-  available <- list_available_revisions(archive_dir)
-  available_2026 <- list_available_revisions(archive_dir, year = 2026)
-  if (length(available_2026) > 0) {
-    available <- c(available, paste0('2026_', available_2026))
+  years_needed <- unique(map_int(all_revisions, ~ parse_revision_id(.)$year))
+
+  available <- character()
+  for (yr in years_needed) {
+    yr_revisions <- list_available_revisions(archive_dir, year = yr)
+    if (yr != 2025) {
+      yr_revisions <- paste0(yr, '_', yr_revisions)
+    }
+    available <- c(available, yr_revisions)
   }
 
   revisions_available <- all_revisions[all_revisions %in% available]

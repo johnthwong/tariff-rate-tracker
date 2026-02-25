@@ -290,6 +290,26 @@ load_policy_params <- function(yaml_path = here('config', 'policy_params.yaml'))
 # Revision / Archive Helpers
 # =============================================================================
 
+#' Parse a revision identifier into year and revision type
+#'
+#' Handles both year-prefixed and plain formats:
+#'   '2026_rev_3'  -> list(year=2026, rev='rev_3')
+#'   '2026_basic'  -> list(year=2026, rev='basic')
+#'   'rev_32'      -> list(year=2025, rev='rev_32')
+#'   'basic'       -> list(year=2025, rev='basic')
+#'
+#' @param revision Character revision identifier
+#' @return List with year (integer) and rev (character) components
+parse_revision_id <- function(revision) {
+  if (grepl('^[0-9]{4}_', revision)) {
+    year <- as.integer(substr(revision, 1, 4))
+    rev <- sub('^[0-9]{4}_', '', revision)
+    return(list(year = year, rev = rev))
+  }
+  return(list(year = 2025L, rev = revision))
+}
+
+
 #' Load revision dates from config CSV
 #'
 #' @param csv_path Path to revision_dates.csv
@@ -347,12 +367,8 @@ list_available_revisions <- function(archive_dir = here('data', 'hts_archives'),
 #' @param year HTS year (default: 2025)
 #' @return Full file path to JSON
 resolve_json_path <- function(revision, archive_dir = here('data', 'hts_archives'), year = 2025) {
-  # Handle 2026_basic special case
-  if (grepl('^2026', revision)) {
-    path <- file.path(archive_dir, paste0('hts_', revision, '.json'))
-  } else {
-    path <- file.path(archive_dir, paste0('hts_', year, '_', revision, '.json'))
-  }
+  parsed <- parse_revision_id(revision)
+  path <- file.path(archive_dir, paste0('hts_', parsed$year, '_', parsed$rev, '.json'))
 
   if (!file.exists(path)) {
     stop('HTS JSON not found: ', path)
@@ -461,24 +477,25 @@ apply_stacking_rules <- function(df, cty_china = '5700') {
 
   df %>%
     mutate(
-      # For derivative 232 products (metal_share < 1.0), IEEPA reciprocal/fentanyl
+      # For derivative 232 products (metal_share < 1.0), non-232 IEEPA authorities
       # apply to the non-metal portion. For base 232 products (metal_share = 1.0),
-      # nonmetal_share = 0 so behavior is unchanged from before.
+      # nonmetal_share = 0 so behavior is unchanged (full mutual exclusion).
       nonmetal_share = if_else(rate_232 > 0 & metal_share < 1.0, 1 - metal_share, 0),
       total_additional = case_when(
-        # China with 232: 232 + recip*nonmetal + fentanyl + 301 + s122 + other
+        # China with 232: 232 + recip*nonmetal + fentanyl + 301 + s122*nonmetal + other
+        # Fentanyl stacks at full value (separate IEEPA authority for China).
+        # Reciprocal and S122 apply only to non-metal portion.
         country == cty_china & rate_232 > 0 ~
-          rate_232 + rate_ieepa_recip * nonmetal_share + rate_ieepa_fent + rate_301 + rate_s122 + rate_other,
+          rate_232 + rate_ieepa_recip * nonmetal_share + rate_ieepa_fent + rate_301 + rate_s122 * nonmetal_share + rate_other,
 
         # China without 232: reciprocal + fentanyl + 301 + s122 + other
         country == cty_china ~
           rate_ieepa_recip + rate_ieepa_fent + rate_301 + rate_s122 + rate_other,
 
-        # Others with 232: 232 + recip*nonmetal + fentanyl + s122 + other
-        # Fentanyl stacks on 232 (separate IEEPA authority, applies to full value).
-        # IEEPA reciprocal is mutually exclusive with 232 (applies to nonmetal only).
+        # Others with 232: 232 + (recip + fentanyl + s122)*nonmetal + other
+        # All non-232 IEEPA authorities apply to non-metal portion only.
         rate_232 > 0 ~
-          rate_232 + rate_ieepa_recip * nonmetal_share + rate_ieepa_fent + rate_s122 + rate_other,
+          rate_232 + (rate_ieepa_recip + rate_ieepa_fent + rate_s122) * nonmetal_share + rate_other,
 
         # Others without 232: reciprocal + fentanyl + s122 + other
         TRUE ~ rate_ieepa_recip + rate_ieepa_fent + rate_s122 + rate_other
@@ -657,6 +674,32 @@ load_232_derivative_products <- function(path = here('resources', 's232_derivati
 
   message('  Loaded ', nrow(products), ' Section 232 derivative product prefixes')
   return(products)
+}
+
+
+#' Load fentanyl carve-out product lists
+#'
+#' Product-specific fentanyl rate carve-outs: energy/critical minerals (CA) and
+#' potash (CA/MX) receive a lower fentanyl rate than the general blanket.
+#' Product lists sourced from Tariff-ETRs config (US Note 2 subdivisions).
+#'
+#' @param path Path to fentanyl_carveout_products.csv
+#' @return Tibble with hts8, ch99_code, category columns (or NULL if file missing)
+load_fentanyl_carveouts <- function(path = here('resources', 'fentanyl_carveout_products.csv')) {
+  if (!file.exists(path)) {
+    message('  Fentanyl carve-out products file not found: ', path)
+    return(NULL)
+  }
+
+  carveouts <- read_csv(path, col_types = cols(
+    hts8 = col_character(),
+    ch99_code = col_character(),
+    category = col_character()
+  ))
+
+  message('  Loaded ', nrow(carveouts), ' fentanyl carve-out product prefixes (',
+          n_distinct(carveouts$category), ' categories)')
+  return(carveouts)
 }
 
 

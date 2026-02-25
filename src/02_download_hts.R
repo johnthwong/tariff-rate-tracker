@@ -27,17 +27,15 @@ library(tidyverse)
 #' @return Character URL
 build_download_url <- function(revision, year = 2025) {
   base_url <- 'https://hts.usitc.gov/reststop/getJSON'
+  parsed <- parse_revision_id(revision)
+  yr <- parsed$year
+  rev <- parsed$rev
 
-  if (revision == 'basic') {
-    # Basic edition: no revision suffix
-    url <- paste0(base_url, '?year=', year)
-  } else if (grepl('^rev_', revision)) {
-    # Numbered revision: extract number
-    rev_num <- gsub('rev_', '', revision)
-    url <- paste0(base_url, '?year=', year, '&revision=', rev_num)
-  } else if (grepl('^2026', revision)) {
-    # 2026 edition
-    url <- paste0(base_url, '?year=2026')
+  if (rev == 'basic') {
+    url <- paste0(base_url, '?year=', yr)
+  } else if (grepl('^rev_', rev)) {
+    rev_num <- gsub('rev_', '', rev)
+    url <- paste0(base_url, '?year=', yr, '&revision=', rev_num)
   } else {
     stop('Unknown revision format: ', revision)
   }
@@ -118,14 +116,16 @@ download_missing_revisions <- function(
   rev_dates <- load_revision_dates(revision_dates_path)
   expected <- rev_dates$revision
 
-  # Check local inventory
-  available <- list_available_revisions(archive_dir, year)
+  # Check local inventory across all years present in expected revisions
+  years_needed <- unique(map_int(expected, ~ parse_revision_id(.)$year))
 
-  # Also check 2026 if any expected revisions start with 2026
-  expected_2026 <- expected[grepl('^2026', expected)]
-  if (length(expected_2026) > 0) {
-    available_2026 <- list_available_revisions(archive_dir, year = 2026)
-    available <- c(available, paste0('2026_', available_2026))
+  available <- character()
+  for (yr in years_needed) {
+    yr_revisions <- list_available_revisions(archive_dir, year = yr)
+    if (yr != 2025) {
+      yr_revisions <- paste0(yr, '_', yr_revisions)
+    }
+    available <- c(available, yr_revisions)
   }
 
   missing <- setdiff(expected, available)
@@ -156,11 +156,8 @@ download_missing_revisions <- function(
 
     url <- build_download_url(rev, year)
 
-    if (grepl('^2026', rev)) {
-      dest <- file.path(archive_dir, paste0('hts_', rev, '.json'))
-    } else {
-      dest <- file.path(archive_dir, paste0('hts_', year, '_', rev, '.json'))
-    }
+    parsed <- parse_revision_id(rev)
+    dest <- file.path(archive_dir, paste0('hts_', parsed$year, '_', parsed$rev, '.json'))
 
     success <- download_hts_json(url, dest)
     results$status[i] <- if (success) 'downloaded' else 'failed'

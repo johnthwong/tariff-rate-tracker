@@ -135,10 +135,19 @@ if (sys.nframe() == 0) {
   }
 
   # Cross-reference with available JSON files
-  available <- list_available_revisions()
+  years_in_csv <- unique(map_int(dates$revision, ~ parse_revision_id(.)$year))
+
+  available <- character()
+  for (yr in years_in_csv) {
+    yr_revisions <- list_available_revisions(year = yr)
+    if (yr != 2025) {
+      yr_revisions <- paste0(yr, '_', yr_revisions)
+    }
+    available <- c(available, yr_revisions)
+  }
   in_csv <- dates$revision
 
-  missing_json <- setdiff(in_csv, c(available, '2026_basic'))
+  missing_json <- setdiff(in_csv, available)
   missing_csv <- setdiff(available, in_csv)
 
   if (length(missing_json) > 0) {
