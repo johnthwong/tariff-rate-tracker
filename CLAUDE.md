@@ -73,11 +73,13 @@ rate_timeseries.rds -> import-weighted ETRs (10_weighted_etr.R via get_rates_at_
 - `config/scenarios.yaml`: Counterfactual scenario definitions
 
 **Shared Infrastructure:**
-- `RATE_SCHEMA` in helpers.R: Canonical column order for rate output (includes `valid_from`/`valid_until`)
+- `RATE_SCHEMA` in helpers.R: Canonical column order for rate output (includes `metal_share`, `valid_from`/`valid_until`)
 - `enforce_rate_schema()`: Ensures all rate dataframes have consistent columns
 - `apply_stacking_rules()`: Single vectorized implementation of tariff stacking
 - `classify_authority()`: Unified Ch99 authority classifier
 - `load_policy_params()`: Reads config/policy_params.yaml, unpacks convenience fields
+- `load_232_derivative_products()`: Reads derivative product list from resources/
+- `load_metal_content()`: Computes per-product metal shares (flat/CBO/BEA methods)
 - `get_rates_at_date(ts, date)`: Point-in-time rate query (in 11_daily_series.R) — preferred way to get rates at any date
 
 **Legacy (v1, config-driven):**
@@ -89,15 +91,15 @@ rate_timeseries.rds -> import-weighted ETRs (10_weighted_etr.R via get_rates_at_
 Mutual exclusion between 232 and IEEPA reciprocal (aligned with Tariff-ETRs):
 
 ```r
-# China with 232:    232 + fentanyl + 301 + s122 + other
+# China with 232:    232 + recip*nonmetal + fentanyl + 301 + s122 + other
 # China without 232: reciprocal + fentanyl + 301 + s122 + other  (10% recip + 10% fent post-Geneva)
-# Others with 232:   232 + s122 + other              (fentanyl does NOT stack on 232)
+# Others with 232:   232 + (recip + fent)*nonmetal + s122 + other
 # Others without 232: reciprocal + fentanyl + s122 + other
 
 # USMCA (CA/MX): binary exemption — eligible products get IEEPA/fentanyl zeroed out
 ```
 
-Key: 232 takes precedence over IEEPA reciprocal. Fentanyl only stacks on 232 for China.
+Key: 232 takes precedence over IEEPA reciprocal. For base 232 products (metal_share = 1.0), nonmetal_share = 0, preserving the mutual exclusion. For derivative 232 products (metal_share < 1.0), IEEPA reciprocal/fentanyl apply to the non-metal portion of customs value.
 
 ## Section 232 Coverage
 
@@ -105,7 +107,13 @@ Key: 232 takes precedence over IEEPA reciprocal. Fentanyl only stacks on 232 for
 - Aluminum: chapter 76 (blanket via 9903.85)
 - Autos: heading 8703 + light trucks (blanket via 9903.94, config prefixes)
 - Copper: headings 7406-7419 (config prefixes)
-- Derivatives: captured via product footnote mechanism (not blanket)
+- Derivatives: ~130 aluminum-containing articles outside ch76 (blanket via 9903.85.04/.07/.08)
+  - Product list in `resources/s232_derivative_products.csv` (sourced from Tariff-ETRs config)
+  - Tariff applies only to the metal content portion of customs value
+  - Metal content share configurable: flat (default 50%), CBO (product-level buckets), BEA (future)
+  - Config: `metal_content` block in `config/policy_params.yaml`
+  - CBO files in `resources/cbo/` (alst_deriv_h.csv, alst_deriv_l.csv, copper.csv)
+  - Product list should be re-derived from US Note 19 when USITC API provides US Notes data
 
 ## Section 301 Product Coverage
 

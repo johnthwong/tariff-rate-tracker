@@ -582,6 +582,22 @@ extract_section232_rates <- function(ch99_data) {
     aluminum_exempt <- character(0)
   }
 
+  # --- Aluminum derivatives (9903.85.04/.07/.08) ---
+  # These entries cover aluminum-containing articles outside chapter 76.
+  # Extract derivative rate for use in 06_calculate_rates.R step 3a.
+  alum_deriv <- aluminum_entries %>%
+    filter(ch99_code %in% c('9903.85.04', '9903.85.07', '9903.85.08'))
+  derivative_rate <- if (nrow(alum_deriv) > 0) max(alum_deriv$rate) else aluminum_rate
+  derivative_exempt <- if (nrow(alum_deriv) > 0) {
+    unique(unlist(alum_deriv$exempt_countries))
+  } else {
+    aluminum_exempt
+  }
+  if (derivative_rate > 0) {
+    message('  Aluminum derivative 232: ', round(derivative_rate * 100),
+            '% (', nrow(alum_deriv), ' Ch99 entries)')
+  }
+
   # --- Autos (9903.94) ---
   s232_auto <- ch99_data %>%
     filter(grepl('^9903\\.94', ch99_code), !is.na(rate))
@@ -623,9 +639,11 @@ extract_section232_rates <- function(ch99_data) {
     steel_rate = steel_rate,
     aluminum_rate = aluminum_rate,
     auto_rate = auto_rate,
+    derivative_rate = derivative_rate,
     steel_exempt = steel_exempt,
     aluminum_exempt = aluminum_exempt,
     auto_exempt = auto_exempt,
+    derivative_exempt = derivative_exempt,
     has_232 = has_232
   ))
 }

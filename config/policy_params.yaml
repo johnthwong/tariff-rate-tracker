@@ -153,6 +153,28 @@ section_301_products:
   resource_file: 'resources/s301_product_lists.csv'
   country: '5700'
 
+# --- Section 232 derivative products ---
+# Aluminum-containing articles outside chapter 76 (US Note 19 subdivisions i/j/k)
+# covered by 9903.85.04/.07/.08. Product list not extractable from HTS JSON.
+section_232_derivatives:
+  resource_file: 'resources/s232_derivative_products.csv'
+  default_rate: 0.25    # same as base aluminum rate
+
+# --- Metal content shares for 232 derivatives ---
+# The tariff on derivative products applies only to the metal content portion
+# of customs value. Three methods for estimating metal share:
+#   flat: uniform share for all derivatives (default 50%, matches TPC)
+#   cbo:  product-level buckets from CBO files (high=0.75, low=0.25, copper=0.90)
+#   bea:  sector-level shares from BEA I-O tables (future)
+metal_content:
+  method: 'flat'         # 'flat', 'cbo', or 'bea'
+  flat_share: 0.50       # default 50% to match TPC
+  primary_chapters: ['72', '73', '76']  # products in these chapters = 100% metal
+  # CBO method params (used when method = 'cbo'):
+  # cbo_high_share: 0.75
+  # cbo_low_share: 0.25
+  # cbo_copper_share: 0.90
+
 # --- Validation thresholds ---
 validation_thresholds:
   exact: 0.005

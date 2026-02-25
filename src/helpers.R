@@ -370,6 +370,7 @@ resolve_json_path <- function(revision, archive_dir = here('data', 'hts_archives
 RATE_SCHEMA <- c(
   'hts10', 'country', 'base_rate',
   'rate_232', 'rate_301', 'rate_ieepa_recip', 'rate_ieepa_fent', 'rate_s122', 'rate_other',
+  'metal_share',
   'total_additional', 'total_rate',
   'usmca_eligible', 'revision', 'effective_date',
   'valid_from', 'valid_until'
@@ -388,6 +389,7 @@ enforce_rate_schema <- function(df) {
     hts10 = NA_character_, country = NA_character_,
     base_rate = 0, rate_232 = 0, rate_301 = 0,
     rate_ieepa_recip = 0, rate_ieepa_fent = 0, rate_s122 = 0, rate_other = 0,
+    metal_share = 1.0,
     total_additional = 0, total_rate = 0,
     usmca_eligible = FALSE, revision = NA_character_,
     effective_date = as.Date(NA),
@@ -426,19 +428,22 @@ enforce_rate_schema <- function(df) {
 #'
 #' Implements mutual-exclusion stacking (aligned with Tariff-ETRs):
 #'
-#'   China (232 > 0):  232 + fentanyl + 301 + s122 + other
+#'   China (232 > 0):  232 + recip*nonmetal + fentanyl + 301 + s122 + other
 #'   China (no 232):   reciprocal + fentanyl + 301 + s122 + other
-#'   Others (232 > 0): 232 + s122 + other         (no fentanyl on 232)
+#'   Others (232 > 0): 232 + (recip + fent)*nonmetal + s122 + other
 #'   Others (no 232):  reciprocal + fentanyl + s122 + other
 #'
 #' Key rules:
 #'   - 232 and IEEPA reciprocal are mutually exclusive (232 takes precedence)
+#'   - For derivative 232 products (metal_share < 1.0), IEEPA applies to
+#'     the non-metal portion of customs value
 #'   - Fentanyl stacks on everything for China, but NOT on 232 for others
+#'     (except on the non-metal portion of derivative products)
 #'   - Section 301 only applies to China
 #'   - Section 122 stacks on everything
 #'
 #' @param df Data frame with rate_232, rate_301, rate_ieepa_recip,
-#'   rate_ieepa_fent, rate_s122, rate_other, country columns
+#'   rate_ieepa_fent, rate_s122, rate_other, metal_share, country columns
 #' @param cty_china Census code for China (default: '5700')
 #' @return df with total_additional and total_rate recomputed
 apply_stacking_rules <- function(df, cty_china = '5700') {
@@ -450,25 +455,36 @@ apply_stacking_rules <- function(df, cty_china = '5700') {
     df$rate_s122[is.na(df$rate_s122)] <- 0
   }
 
+  # Ensure metal_share exists (default 1.0 = full metal, no nonmetal portion)
+  if (!'metal_share' %in% names(df)) {
+    df$metal_share <- 1.0
+  }
+
   df %>%
     mutate(
+      # For derivative 232 products (metal_share < 1.0), IEEPA reciprocal/fentanyl
+      # apply to the non-metal portion. For base 232 products (metal_share = 1.0),
+      # nonmetal_share = 0 so behavior is unchanged from before.
+      nonmetal_share = if_else(rate_232 > 0 & metal_share < 1.0, 1 - metal_share, 0),
       total_additional = case_when(
-        # China with 232: 232 + fentanyl + 301 + s122 + other
+        # China with 232: 232 + recip*nonmetal + fentanyl + 301 + s122 + other
         country == cty_china & rate_232 > 0 ~
-          rate_232 + rate_ieepa_fent + rate_301 + rate_s122 + rate_other,
+          rate_232 + rate_ieepa_recip * nonmetal_share + rate_ieepa_fent + rate_301 + rate_s122 + rate_other,
 
         # China without 232: reciprocal + fentanyl + 301 + s122 + other
         country == cty_china ~
           rate_ieepa_recip + rate_ieepa_fent + rate_301 + rate_s122 + rate_other,
 
-        # Others with 232: just 232 + s122 + other (fentanyl does NOT stack on 232)
-        rate_232 > 0 ~ rate_232 + rate_s122 + rate_other,
+        # Others with 232: 232 + (recip + fent)*nonmetal + s122 + other
+        rate_232 > 0 ~
+          rate_232 + (rate_ieepa_recip + rate_ieepa_fent) * nonmetal_share + rate_s122 + rate_other,
 
         # Others without 232: reciprocal + fentanyl + s122 + other
         TRUE ~ rate_ieepa_recip + rate_ieepa_fent + rate_s122 + rate_other
       ),
       total_rate = base_rate + total_additional
-    )
+    ) %>%
+    select(-nonmetal_share)
 }
 
 
@@ -559,4 +575,142 @@ is_valid_hts10 <- function(hts_code) {
 
   clean <- gsub('\\.', '', hts_code)
   nchar(clean) == 10 && grepl('^[0-9]+$', clean)
+}
+
+
+# =============================================================================
+# Section 232 Derivative Products
+# =============================================================================
+
+#' Load Section 232 derivative product list
+#'
+#' Reads the derivative product CSV (aluminum-containing articles outside ch76
+#' covered by 9903.85.04/.07/.08). These products are defined by US Note 19
+#' subdivisions i/j/k and cannot be extracted from HTS JSON.
+#'
+#' @param path Path to s232_derivative_products.csv
+#' @return Tibble with hts_prefix, ch99_code, derivative_type; or NULL if missing
+load_232_derivative_products <- function(path = here('resources', 's232_derivative_products.csv')) {
+  if (!file.exists(path)) {
+    message('  232 derivative products file not found: ', path)
+    return(NULL)
+  }
+
+  products <- read_csv(path, col_types = cols(
+    hts_prefix = col_character(),
+    ch99_code = col_character(),
+    derivative_type = col_character()
+  ))
+
+  message('  Loaded ', nrow(products), ' Section 232 derivative product prefixes')
+  return(products)
+}
+
+
+#' Load metal content shares for Section 232 derivative products
+#'
+#' For derivative 232 products, the tariff applies only to the metal content
+#' portion of customs value. This function returns per-product metal shares.
+#'
+#' Three methods:
+#'   flat: All derivative products get metal_share = flat_share (default 0.50)
+#'   cbo:  Product-level buckets from resources/cbo/ files
+#'         (high=0.75, low=0.25, copper=0.90)
+#'   bea:  Sector-level shares from BEA I-O tables (future)
+#'
+#' Products in primary_chapters (72, 73, 76) always get metal_share = 1.0.
+#' Non-derivative products outside primary chapters get metal_share = 1.0
+#' (no metal adjustment — they don't have 232 rates).
+#'
+#' @param metal_cfg Metal content config list from policy_params.yaml
+#' @param hts10_codes Character vector of HTS10 codes to compute shares for
+#' @param derivative_hts10 Character vector of HTS10 codes identified as 232
+#'   derivatives. Only these products receive metal_share < 1.0.
+#' @return Tibble with hts10 and metal_share columns
+load_metal_content <- function(metal_cfg = NULL, hts10_codes = character(0),
+                               derivative_hts10 = character(0)) {
+  if (length(hts10_codes) == 0) {
+    return(tibble(hts10 = character(), metal_share = numeric()))
+  }
+
+  method <- if (!is.null(metal_cfg)) metal_cfg$method %||% 'flat' else 'flat'
+  flat_share <- if (!is.null(metal_cfg)) metal_cfg$flat_share %||% 0.50 else 0.50
+  primary_chapters <- if (!is.null(metal_cfg)) unlist(metal_cfg$primary_chapters) else c('72', '73', '76')
+
+  # Start with all products at metal_share = 1.0 (full metal / no adjustment)
+  result <- tibble(hts10 = hts10_codes, metal_share = 1.0)
+
+  # Flag derivative products — only these get metal_share < 1.0
+  is_derivative <- result$hts10 %in% derivative_hts10
+
+  if (sum(is_derivative) == 0) {
+    message('  Metal content: no derivative products to adjust')
+    return(result)
+  }
+
+  if (method == 'flat') {
+    result$metal_share[is_derivative] <- flat_share
+    message('  Metal content: flat method (', round(flat_share * 100),
+            '% for ', sum(is_derivative), ' derivatives)')
+
+  } else if (method == 'cbo') {
+    cbo_high_share <- if (!is.null(metal_cfg)) metal_cfg$cbo_high_share %||% 0.75 else 0.75
+    cbo_low_share <- if (!is.null(metal_cfg)) metal_cfg$cbo_low_share %||% 0.25 else 0.25
+    cbo_copper_share <- if (!is.null(metal_cfg)) metal_cfg$cbo_copper_share %||% 0.90 else 0.90
+
+    # Load CBO bucket files
+    cbo_dir <- here('resources', 'cbo')
+    high_path <- file.path(cbo_dir, 'alst_deriv_h.csv')
+    low_path <- file.path(cbo_dir, 'alst_deriv_l.csv')
+    copper_path <- file.path(cbo_dir, 'copper.csv')
+
+    cbo_shares <- tibble(hts10 = character(), metal_share = numeric())
+
+    if (file.exists(copper_path)) {
+      copper <- read_csv(copper_path, col_types = cols(I_COMMODITY = col_character()))
+      cbo_shares <- bind_rows(cbo_shares,
+        tibble(hts10 = copper$I_COMMODITY, metal_share = cbo_copper_share))
+    }
+    if (file.exists(high_path)) {
+      high <- read_csv(high_path, col_types = cols(I_COMMODITY = col_character()))
+      cbo_shares <- bind_rows(cbo_shares,
+        tibble(hts10 = high$I_COMMODITY, metal_share = cbo_high_share))
+    }
+    if (file.exists(low_path)) {
+      low <- read_csv(low_path, col_types = cols(I_COMMODITY = col_character()))
+      cbo_shares <- bind_rows(cbo_shares,
+        tibble(hts10 = low$I_COMMODITY, metal_share = cbo_low_share))
+    }
+
+    # Priority: copper > high > low (first match kept)
+    cbo_shares <- cbo_shares %>%
+      distinct(hts10, .keep_all = TRUE)
+
+    # Only apply CBO shares to derivative products
+    result <- result %>%
+      left_join(cbo_shares %>% rename(cbo_share = metal_share), by = 'hts10') %>%
+      mutate(
+        metal_share = case_when(
+          !is_derivative ~ 1.0,               # non-derivatives stay at 1.0
+          !is.na(cbo_share) ~ cbo_share,      # CBO match for derivatives
+          TRUE ~ flat_share                    # fallback to flat for unmatched derivatives
+        )
+      ) %>%
+      select(-cbo_share)
+
+    n_cbo <- sum(!is.na(cbo_shares$hts10[cbo_shares$hts10 %in% derivative_hts10]))
+    message('  Metal content: CBO method (', n_cbo, ' of ', sum(is_derivative),
+            ' derivatives matched; high=', cbo_high_share, ', low=', cbo_low_share,
+            ', copper=', cbo_copper_share, ')')
+
+  } else if (method == 'bea') {
+    message('  Metal content: BEA method not yet implemented, using flat fallback')
+    result$metal_share[is_derivative] <- flat_share
+
+  } else {
+    warning('Unknown metal_content method: ', method, '. Using flat fallback.')
+    result$metal_share[is_derivative] <- flat_share
+  }
+
+  return(result)
 }
