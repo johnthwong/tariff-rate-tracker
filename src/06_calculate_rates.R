@@ -505,30 +505,88 @@ calculate_rates_for_revision <- function(
     rates <- rates %>% mutate(rate_ieepa_recip = 0)
   }
 
-  # 3. Apply IEEPA fentanyl/initial rates as blanket tariff
+  # 3. Apply IEEPA fentanyl/initial rates with product-level carve-outs
   #    9903.01.01-24: Mexico (+25%), Canada (+35%), China (+10%)
   #    These STACK with reciprocal tariffs for CA/MX.
   #    China/HK included: fentanyl (9903.01.20/24) is NOT captured via
   #    product footnotes for China. The 9903.90.xx entries are Russia only.
+  #
+  #    Carve-outs: Certain product categories receive a lower fentanyl rate:
+  #      - 9903.01.13 (CA): Energy, minerals, critical minerals → +10%
+  #      - 9903.01.15 (CA): Potash → +10%
+  #      - 9903.01.05 (MX): Potash → +10%
+  #    Product lists from resources/fentanyl_carveout_products.csv.
   has_fentanyl <- !is.null(fentanyl_rates) && nrow(fentanyl_rates) > 0
 
   if (has_fentanyl) {
-    fent_lookup <- fentanyl_rates %>%
+    # Separate general (blanket) and carve-out entries.
+    # Some countries have multiple general entries (e.g., China 9903.01.20 and
+    # 9903.01.24) — take first per country to avoid row multiplication in joins.
+    general_fent <- fentanyl_rates %>%
+      filter(entry_type == 'general') %>%
+      arrange(ch99_code) %>%
+      distinct(census_code, .keep_all = TRUE) %>%
       select(census_code, fent_rate = rate)
 
-    # Apply fentanyl to existing rows
-    rates <- rates %>%
-      left_join(fent_lookup, by = c('country' = 'census_code')) %>%
-      mutate(rate_ieepa_fent = coalesce(fent_rate, 0)) %>%
-      select(-fent_rate)
+    carveout_fent <- fentanyl_rates %>%
+      filter(entry_type == 'carveout') %>%
+      select(ch99_code, census_code, carveout_rate = rate)
+
+    # Load carve-out product lists and build lookup (once, reused below)
+    carveout_products <- load_fentanyl_carveouts()
+    has_carveouts <- !is.null(carveout_products) && nrow(carveout_fent) > 0
+
+    carveout_lookup <- NULL
+    if (has_carveouts) {
+      # HTS8 × country → carve-out rate (join product list to parsed ch99 entries)
+      carveout_lookup <- carveout_products %>%
+        inner_join(carveout_fent, by = 'ch99_code') %>%
+        distinct(hts8, census_code, .keep_all = TRUE) %>%
+        select(hts8, census_code, carveout_rate)
+    }
+
+    # Apply fentanyl to existing rows: general rate with carve-out overrides
+    if (has_carveouts) {
+      rates <- rates %>%
+        mutate(.hts8 = substr(hts10, 1, 8)) %>%
+        left_join(general_fent, by = c('country' = 'census_code')) %>%
+        left_join(carveout_lookup,
+                  by = c('.hts8' = 'hts8', 'country' = 'census_code')) %>%
+        mutate(
+          rate_ieepa_fent = coalesce(carveout_rate, fent_rate, 0)
+        ) %>%
+        select(-fent_rate, -carveout_rate, -.hts8)
+
+      n_carveout <- sum(rates$rate_ieepa_fent > 0 &
+                        rates$rate_ieepa_fent < max(general_fent$fent_rate, na.rm = TRUE))
+      message('  Fentanyl carve-outs applied: ', n_carveout, ' product-country pairs')
+    } else {
+      rates <- rates %>%
+        left_join(general_fent, by = c('country' = 'census_code')) %>%
+        mutate(rate_ieepa_fent = coalesce(fent_rate, 0)) %>%
+        select(-fent_rate)
+    }
 
     # Add fentanyl-only rows for products not yet in rates
-    fent_country_rates <- fent_lookup %>%
+    # (uses general rate; carve-outs applied in the next block)
+    fent_country_rates <- general_fent %>%
       rename(country = census_code, blanket_rate = fent_rate) %>%
       filter(country %in% countries)
     all_product_hts10 <- products$hts10
     rates <- add_blanket_pairs(rates, products, all_product_hts10, fent_country_rates,
                                'rate_ieepa_fent', 'fentanyl-only duties')
+
+    # Apply carve-outs to newly added rows (blanket_pairs got the general rate)
+    if (has_carveouts) {
+      rates <- rates %>%
+        mutate(.hts8 = substr(hts10, 1, 8)) %>%
+        left_join(carveout_lookup,
+                  by = c('.hts8' = 'hts8', 'country' = 'census_code')) %>%
+        mutate(
+          rate_ieepa_fent = if_else(!is.na(carveout_rate), carveout_rate, rate_ieepa_fent)
+        ) %>%
+        select(-carveout_rate, -.hts8)
+    }
 
     n_with_fent <- sum(rates$rate_ieepa_fent > 0)
     message('  With IEEPA fentanyl: ', n_with_fent)

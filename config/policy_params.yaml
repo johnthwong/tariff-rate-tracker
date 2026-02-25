@@ -175,6 +175,17 @@ metal_content:
   # cbo_low_share: 0.25
   # cbo_copper_share: 0.90
 
+# --- Fentanyl product carve-outs ---
+# Product-specific fentanyl rate carve-outs for CA/MX.
+# These entries in 9903.01.01-24 assign a lower rate to specific product
+# categories instead of the general blanket rate:
+#   9903.01.13 (CA): Energy, minerals, critical minerals → +10% (vs +35%)
+#   9903.01.15 (CA): Potash → +10% (vs +35%)
+#   9903.01.05 (MX): Potash → +10% (vs +25%)
+# Product lists sourced from Tariff-ETRs config (US Note 2 subdivisions).
+fentanyl_carveouts:
+  resource_file: 'resources/fentanyl_carveout_products.csv'
+
 # --- Countries excluded from TPC validation ---
 # These countries have legitimate IEEPA entries in the HTS JSON, but TPC
 # doesn't model them. Excluded from validation comparisons to avoid

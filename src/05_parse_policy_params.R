@@ -447,7 +447,11 @@ extract_ieepa_rates <- function(hts_raw, country_lookup) {
 #'
 #' @param hts_raw Parsed HTS JSON (list)
 #' @param country_lookup Named vector from build_country_lookup()
-#' @return Tibble with ch99_code, rate, country_name, census_code
+#' @return Tibble with ch99_code, rate, country_name, census_code, entry_type.
+#'   entry_type is 'general' for the blanket rate per country (applies to most
+#'   products), or 'carveout' for product-specific lower/higher rates (e.g.,
+#'   energy/minerals, potash). The general entry is identified by "Except for
+#'   products described in" language in the description.
 extract_ieepa_fentanyl_rates <- function(hts_raw, country_lookup) {
   message('Extracting IEEPA fentanyl/initial rates...')
 
@@ -463,7 +467,8 @@ extract_ieepa_fentanyl_rates <- function(hts_raw, country_lookup) {
     message('  No fentanyl entries — returning empty tibble')
     return(tibble(
       ch99_code = character(), rate = numeric(),
-      country_name = character(), census_code = character()
+      country_name = character(), census_code = character(),
+      entry_type = character()
     ))
   }
 
@@ -476,14 +481,35 @@ extract_ieepa_fentanyl_rates <- function(hts_raw, country_lookup) {
     # Only surcharge rates ("+X%")
     surcharge_match <- str_match(general, '\\+\\s*([0-9.]+)%')
     if (is.na(surcharge_match[1, 2])) {
-      return(NULL)  # Skip exclusion entries
+      return(NULL)  # Skip exclusion entries (donations, informational materials, USMCA)
     }
 
     rate <- as.numeric(surcharge_match[1, 2]) / 100
 
-    # Extract country from description
+    # Detect general vs carveout: general entries say "Except for products described in"
+    is_general <- grepl('Except for products described in', description, ignore.case = TRUE)
+
+    # Extract country from description; fall back to ch99_code range if
+    # description doesn't mention a country (e.g., 9903.01.13 lists product
+    # categories for CA energy without saying "Canada").
     country_names <- extract_countries_from_description(description)
-    if (length(country_names) == 0) return(NULL)
+
+    if (length(country_names) == 0) {
+      # Infer country from ch99_code block structure:
+      #   9903.01.01-09 → Mexico
+      #   9903.01.10-19 → Canada
+      #   9903.01.20-24 → China/Hong Kong
+      suffix <- as.integer(sub('^9903\\.01\\.', '', ch99_code))
+      inferred_country <- case_when(
+        suffix >= 1L  & suffix <= 9L  ~ 'Mexico',
+        suffix >= 10L & suffix <= 19L ~ 'Canada',
+        suffix >= 20L & suffix <= 24L ~ 'China',
+        TRUE ~ NA_character_
+      )
+      if (is.na(inferred_country)) return(NULL)
+      country_names <- inferred_country
+      message('    Inferred country for ', ch99_code, ': ', inferred_country)
+    }
 
     matched <- match_countries(country_names, country_lookup)
 
@@ -491,7 +517,8 @@ extract_ieepa_fentanyl_rates <- function(hts_raw, country_lookup) {
       ch99_code = ch99_code,
       rate = rate,
       country_name = matched$country_name,
-      census_code = matched$census_code
+      census_code = matched$census_code,
+      entry_type = if_else(is_general, 'general', 'carveout')
     )
   })
 
@@ -499,36 +526,23 @@ extract_ieepa_fentanyl_rates <- function(hts_raw, country_lookup) {
     message('  No fentanyl entries with rates parsed')
     return(tibble(
       ch99_code = character(), rate = numeric(),
-      country_name = character(), census_code = character()
+      country_name = character(), census_code = character(),
+      entry_type = character()
     ))
   }
 
   # Drop unmatched countries
   results <- results %>% filter(!is.na(census_code))
 
-  # For countries with multiple entries, take the FIRST entry (by ch99_code).
-  # The first entry in each country block is the general rate (applies to most
-  # products), with subsequent entries being exceptions (product-specific lower
-  # rates or anti-transshipment penalties). For blanket application, the general
-  # entry is appropriate.
-  country_fent <- results %>%
-    group_by(census_code) %>%
-    arrange(ch99_code) %>%
-    summarise(
-      rate = first(rate),
-      ch99_code = first(ch99_code),
-      country_name = first(country_name),
-      .groups = 'drop'
-    )
-
-  message('  Fentanyl rates by country:')
-  for (i in seq_len(nrow(country_fent))) {
-    message('    ', country_fent$country_name[i], ' (',
-            country_fent$census_code[i], '): ',
-            round(country_fent$rate[i] * 100), '%')
+  message('  Fentanyl rates parsed:')
+  for (i in seq_len(nrow(results))) {
+    message('    ', results$ch99_code[i], ' ',
+            results$country_name[i], ' (',
+            results$census_code[i], '): ',
+            round(results$rate[i] * 100), '% [', results$entry_type[i], ']')
   }
 
-  return(country_fent)
+  return(results)
 }
 
 
