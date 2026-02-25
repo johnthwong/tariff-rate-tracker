@@ -32,28 +32,44 @@ EU countries show 35-42% exact match with ~4pp mean excess. The floor formula `m
 ### 5. Switzerland IEEPA over-application (+24pp)
 Our rate 39%, TPC 13.6% for 5,543 products. Switzerland has a +39% surcharge (9903.02.58) but TPC shows much lower. May be a rate reduction not yet reflected in our revision data, or different TPC methodology. Not a floor/surcharge selection issue — Switzerland genuinely has only surcharge entries.
 
-### 6. CA/MX non-USMCA stacking (~1,700 products)
-TPC shows 50%, we show 25% for non-USMCA Canada/Mexico products. Fentanyl (35% CA, 25% MX) should stack with IEEPA reciprocal. Our stacking may be zeroing out fentanyl when USMCA doesn't apply.
+### 6. USMCA classification mismatch (~2,855 products per direction)
+Our USMCA flag (from HTS `special` field "S"/"S+") disagrees with TPC for ~5,700 CA/MX products:
+
+| Direction | CA | MX | Our rate | TPC rate |
+|-----------|-----|-----|----------|----------|
+| We say USMCA, TPC says tariffed | 1,590 | 1,264 | 0% | ~18% |
+| We say non-USMCA, TPC says free | 1,330 | 1,525 | 35%/25% | 0% |
+
+Almost exactly symmetric, suggesting a systematic classification difference rather than random noise. TPC likely uses a different USMCA eligibility source or methodology.
+
+### 7. CA/MX fentanyl product-level carve-outs (~1,765 products)
+We apply blanket fentanyl (35% CA via 9903.01.10, 25% MX via 9903.01.01) to all products. But HTS has lower rates for specific product categories:
+
+- **9903.01.13** (CA): Crude oil, natural gas, critical minerals → +10% (not +35%)
+- **9903.01.15** (CA): Potash → +10%
+- **9903.01.04** (MX): Energy products → lower rate
+
+~915 CA and ~850 MX products show TPC rates in the 0-10% range, consistent with these carve-outs. Fix: differentiate fentanyl rates by product category in `extract_ieepa_fentanyl_rates()` instead of taking first entry per country.
 
 ## Low Priority / Future
 
-### 7. USMCA utilization rate adjustment
+### 8. USMCA utilization rate adjustment
 USMCA eligibility is binary (from HTS `special` field). A utilization-rate adjustment would improve accuracy for Canada/Mexico. Requires external data on USMCA claim rates by product.
 
-### 8. Clean up legacy v1 pipeline
+### 9. Clean up legacy v1 pipeline
 The v1 pipeline files (prefixed `v1_*`) are superseded by the v2 timeseries pipeline. Consider:
 
 - Removing entirely if no longer referenced
 - Removing `config/authority_mapping.yaml` and `config/country_rules.yaml` (v1 only)
 
-### 9. Counterfactual scenario validation
+### 10. Counterfactual scenario validation
 `08_apply_scenarios.R` exists but hasn't been tested against the full timeseries. Verify:
 
 - `apply_scenario(ts, 'baseline')` equals raw rates
 - `apply_scenario(ts, 'no_ieepa')` zeros IEEPA columns
 - Scenario totals are internally consistent after re-stacking
 
-### 10. Automated HTS revision detection
+### 11. Automated HTS revision detection
 Currently new revisions are manually downloaded and added to `config/revision_dates.csv`. Consider:
 
 - Scraping `hts.usitc.gov` for new revision notifications
@@ -82,3 +98,8 @@ Both countries had country-specific Executive Order entries in 9903.01.76-89 (ou
 
 ### ~~Section 301 blanket coverage~~ (Implemented)
 ~10,400 HTS8 product codes now applied as blanket tariff for China, closing most of the 301 product gap.
+
+### ~~232+fentanyl stacking for CA/MX~~ (Fixed)
+Fentanyl was being multiplied by `nonmetal_share` (which is 0 for base 232 products), effectively zeroing it out. Fentanyl is a separate IEEPA authority that applies to full customs value regardless of 232 status. Changed `apply_stacking_rules()` in `helpers.R` to add `rate_ieepa_fent` directly instead of scaling by `nonmetal_share`. Mexico 232 exact match: ~5% → 80.2%. Canada 232: 0.2% (remaining gap is CA fentanyl 35% vs TPC 25%, see analysis below).
+
+**CA 232 fentanyl rate discrepancy (not a bug)**: Our CA fentanyl = 35% (from 9903.01.10 in HTS JSON), producing 60% for 232 products (25%+35%). TPC shows 50% (25%+25%). TPC updated non-232 CA products from 25% to 35% (between July and October 2025 dates) but appears not to have updated 232 products. Our rate is correct per the HTS source data.
