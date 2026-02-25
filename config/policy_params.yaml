@@ -175,6 +175,17 @@ metal_content:
   # cbo_low_share: 0.25
   # cbo_copper_share: 0.90
 
+# --- Countries excluded from TPC validation ---
+# These countries have legitimate IEEPA entries in the HTS JSON, but TPC
+# doesn't model them. Excluded from validation comparisons to avoid
+# false-positive discrepancies (~95K product-country pairs).
+tpc_excluded_countries:
+  - '5020'   # Syria
+  - '4641'   # Moldova
+  - '5530'   # Laos
+  - '3720'   # Falkland Islands
+  - '7660'   # DR Congo
+
 # --- Validation thresholds ---
 validation_thresholds:
   exact: 0.005

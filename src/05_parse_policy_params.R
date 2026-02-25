@@ -286,8 +286,20 @@ extract_ieepa_rates <- function(hts_raw, country_lookup) {
     # Determine phase
     phase <- if (grepl('^9903\\.01\\.', ch99_code)) 'phase1_apr9' else 'phase2_aug7'
 
-    # Check if terminated
+    # Check if terminated/suspended
     terminated <- grepl('provision terminated|provision suspended', description, ignore.case = TRUE)
+
+    # Robust secondary check: handle encoding/format variations
+    # (e.g., non-breaking spaces, smart quotes in "[Compiler's note: provision suspended.]")
+    if (!terminated) {
+      terminated <- grepl('\\[Compiler.*suspended', description, ignore.case = TRUE)
+    }
+
+    # Diagnostic: log China entry's suspension status
+    if (ch99_code == '9903.01.63') {
+      message('  [Diagnostic] 9903.01.63 (China): terminated=', terminated,
+              ', description tail: "...', substr(description, max(1, nchar(description) - 60), nchar(description)), '"')
+    }
 
     # Extract countries
     country_names <- extract_countries_from_description(description)

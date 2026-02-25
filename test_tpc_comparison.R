@@ -25,6 +25,13 @@ tpc_data <- load_tpc_data(here('data', 'tpc', 'tariff_by_flow_day.csv'), name_to
 tpc_dates <- unique(tpc_data$date)
 cat('\nTPC dates available:', paste(tpc_dates, collapse = ', '), '\n')
 
+# Load TPC-excluded countries (legitimate IEEPA entries TPC doesn't model)
+pp <- load_policy_params()
+tpc_excluded <- pp$tpc_excluded_countries %||% character(0)
+if (length(tpc_excluded) > 0) {
+  cat('\nExcluding', length(tpc_excluded), 'phantom IEEPA countries from TPC comparison\n')
+}
+
 # ---- Process each TPC revision ----
 all_comparisons <- list()
 
@@ -64,6 +71,12 @@ for (i in seq_len(nrow(tpc_map))) {
     select(hts10, country, base_rate, rate_232, rate_301,
            rate_ieepa_recip, rate_ieepa_fent, rate_other,
            total_additional)
+
+  # Exclude phantom IEEPA countries from both sides
+  if (length(tpc_excluded) > 0) {
+    our_rates <- our_rates %>% filter(!country %in% tpc_excluded)
+    tpc_at_date <- tpc_at_date %>% filter(!country %in% tpc_excluded)
+  }
 
   comparison <- tpc_at_date %>%
     inner_join(our_rates, by = c('hts10', 'country')) %>%

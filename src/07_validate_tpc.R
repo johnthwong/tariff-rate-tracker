@@ -121,10 +121,18 @@ load_tpc_data <- function(tpc_path, name_to_code) {
 compare_to_tpc <- function(our_rates, tpc_data, target_date, baseline_rates = NULL) {
   message('Comparing to TPC for date: ', target_date)
 
+  # Exclude phantom IEEPA countries from comparison
+  pp <- tryCatch(load_policy_params(), error = function(e) NULL)
+  tpc_excluded <- if (!is.null(pp)) pp$tpc_excluded_countries %||% character(0) else character(0)
+
   # Filter TPC to target date
   tpc_date <- tpc_data %>%
     filter(date == target_date) %>%
     select(hts10, country = country_code, tpc_rate_change)
+
+  if (length(tpc_excluded) > 0) {
+    tpc_date <- tpc_date %>% filter(!country %in% tpc_excluded)
+  }
 
   # Calculate our rate change from baseline
   if (!is.null(baseline_rates)) {
@@ -143,6 +151,11 @@ compare_to_tpc <- function(our_rates, tpc_data, target_date, baseline_rates = NU
     # Assume baseline is zero
     our_changes <- our_rates %>%
       select(hts10, country, our_rate_change = total_additional)
+  }
+
+  # Exclude phantom IEEPA countries from our side as well (full_join)
+  if (length(tpc_excluded) > 0) {
+    our_changes <- our_changes %>% filter(!country %in% tpc_excluded)
   }
 
   # Join and compare
@@ -276,10 +289,19 @@ validate_revision_against_tpc <- function(revision_rates, tpc_path, tpc_date, ce
     ))
   }
 
+  # Exclude phantom IEEPA countries from comparison
+  pp <- tryCatch(load_policy_params(), error = function(e) NULL)
+  tpc_excluded <- if (!is.null(pp)) pp$tpc_excluded_countries %||% character(0) else character(0)
+
   # Our rates: use total_additional as the rate change from zero baseline
   our_rates <- revision_rates %>%
     select(hts10, country, total_additional,
            rate_232, rate_301, rate_ieepa_recip, rate_ieepa_fent, rate_other)
+
+  if (length(tpc_excluded) > 0) {
+    our_rates <- our_rates %>% filter(!country %in% tpc_excluded)
+    tpc_date_data <- tpc_date_data %>% filter(!country %in% tpc_excluded)
+  }
 
   # Join and compare
   comparison <- tpc_date_data %>%
