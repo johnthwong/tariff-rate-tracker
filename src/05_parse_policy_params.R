@@ -238,8 +238,9 @@ extract_ieepa_rates <- function(hts_raw, country_lookup) {
   ieepa_items <- Filter(function(x) {
     htsno <- x$htsno %||% ''
     # Phase 1: 9903.01.43-75 (Liberation Day)
+    # Country-specific EOs: 9903.01.76-89 (Brazil EO 14323, India, etc.)
     # Phase 2: 9903.02.02-81 (August 7 reinstatement)
-    grepl('^9903\\.01\\.(4[3-9]|[5-7][0-9])$', htsno) ||
+    grepl('^9903\\.01\\.(4[3-9]|[5-8][0-9])$', htsno) ||
       grepl('^9903\\.02\\.([0-7][0-9]|8[01])$', htsno)
   }, hts_raw)
 
@@ -283,9 +284,6 @@ extract_ieepa_rates <- function(hts_raw, country_lookup) {
       }
     }
 
-    # Determine phase
-    phase <- if (grepl('^9903\\.01\\.', ch99_code)) 'phase1_apr9' else 'phase2_aug7'
-
     # Check if terminated/suspended
     terminated <- grepl('provision terminated|provision suspended', description, ignore.case = TRUE)
 
@@ -293,6 +291,19 @@ extract_ieepa_rates <- function(hts_raw, country_lookup) {
     # (e.g., non-breaking spaces, smart quotes in "[Compiler's note: provision suspended.]")
     if (!terminated) {
       terminated <- grepl('\\[Compiler.*suspended', description, ignore.case = TRUE)
+    }
+
+    # Determine phase
+    # 9903.01.43-75: Phase 1 (Liberation Day, Apr 9)
+    # 9903.01.76-89: Country-specific EOs (e.g., Brazil EO 14323, India) — stack with Phase 2
+    # 9903.02.xx: Phase 2 (Aug 7 reinstatement)
+    is_country_eo <- grepl('^9903\\.01\\.(7[6-9]|8[0-9])$', ch99_code) & !terminated
+    phase <- if (grepl('^9903\\.02\\.', ch99_code)) {
+      'phase2_aug7'
+    } else if (is_country_eo) {
+      'country_eo'
+    } else {
+      'phase1_apr9'
     }
 
     # Diagnostic: log China entry's suspension status

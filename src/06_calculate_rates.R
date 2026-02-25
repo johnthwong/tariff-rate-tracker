@@ -385,11 +385,14 @@ calculate_rates_for_revision <- function(
       filter(!is.na(census_code), !is.na(rate))
 
     if (nrow(active_ieepa) > 0) {
-      # Prefer Phase 2 over Phase 1 when both exist for a country
-      # (Phase 2 supersedes Phase 1 with updated rates)
+      # Phase 2 and country_eo entries stack ACROSS phases but NOT within a phase.
+      # Within a phase, the country-specific entry supersedes group entries.
+      # E.g., Brazil: +10% (Phase 2, 9903.02.09) + 40% (country_eo, 9903.01.77) = 50%
+      #       India:  +25% (Phase 2, 9903.02.26) + 25% (country_eo, 9903.01.84) = 50%
+      #       Tunisia: max(+15%, +25%) = 25% (both Phase 2, take highest)
       country_ieepa <- active_ieepa %>%
         mutate(
-          phase_priority = if_else(phase == 'phase2_aug7', 1L, 2L),
+          active_rank = if_else(phase %in% c('phase2_aug7', 'country_eo'), 1L, 2L),
           type_priority = case_when(
             rate_type == 'floor' ~ 1L,
             rate_type == 'surcharge' ~ 2L,
@@ -398,12 +401,45 @@ calculate_rates_for_revision <- function(
           )
         ) %>%
         group_by(census_code) %>%
-        arrange(phase_priority, type_priority, desc(rate)) %>%
+        filter(active_rank == min(active_rank)) %>%
+        ungroup() %>%
+        # Within each phase: pick the best entry (prefer floor, then highest rate)
+        group_by(census_code, phase) %>%
+        arrange(type_priority, desc(rate)) %>%
         summarise(
-          ieepa_country_rate = first(rate),
+          phase_rate = first(rate),
           ieepa_type = first(rate_type),
           .groups = 'drop'
+        ) %>%
+        # Across phases: sum (Phase 2 + country_eo stack)
+        group_by(census_code) %>%
+        summarise(
+          ieepa_country_rate = sum(phase_rate),
+          ieepa_type = first(ieepa_type),
+          .groups = 'drop'
         )
+
+      # Apply universal baseline to countries not in any IEEPA entry.
+      # 9903.01.25 (10%) applies to all countries; country-specific entries
+      # provide higher rates for listed countries.
+      # Exclude CA/MX: they have a separate fentanyl-only IEEPA regime and
+      # are explicitly excluded from reciprocal tariffs by executive order.
+      universal_baseline <- attr(ieepa_rates, 'universal_baseline')
+      pp <- load_policy_params()
+      recip_exempt <- c(pp$country_codes$CTY_CANADA, pp$country_codes$CTY_MEXICO)
+      if (!is.null(universal_baseline) && universal_baseline > 0) {
+        unlisted_countries <- setdiff(countries, c(country_ieepa$census_code, recip_exempt))
+        if (length(unlisted_countries) > 0) {
+          baseline_entries <- tibble(
+            census_code = unlisted_countries,
+            ieepa_country_rate = universal_baseline,
+            ieepa_type = 'surcharge'
+          )
+          country_ieepa <- bind_rows(country_ieepa, baseline_entries)
+          message('  Applied universal baseline (', round(universal_baseline * 100),
+                  '%) to ', length(unlisted_countries), ' unlisted countries')
+        }
+      }
 
       # Apply IEEPA reciprocal to ALL products for applicable countries
       # EXCEPT products on the exemption list (Annex A / US Note 2)
