@@ -42,6 +42,10 @@ Rscript src/13_revision_changelog.R
 # Parse US Note 301 product lists from Chapter 99 PDF
 Rscript src/12_scrape_us_notes.R
 Rscript src/12_scrape_us_notes.R --dry-run    # Report without writing
+
+# Parse floor country product exemptions from Chapter 99 PDF
+Rscript src/12_scrape_us_notes.R --floor-exemptions
+Rscript src/12_scrape_us_notes.R --all        # Both 301 + floor exemptions
 ```
 
 ## Architecture
@@ -90,6 +94,7 @@ rate_timeseries.rds -> import-weighted ETRs (10_weighted_etr.R via get_rates_at_
 - `classify_authority()`: Unified Ch99 authority classifier
 - `load_policy_params()`: Reads config/policy_params.yaml, unpacks convenience fields
 - `load_232_derivative_products()`: Reads derivative product list from resources/
+- `load_floor_exempt_products()`: Reads floor country product exemptions from resources/
 - `load_metal_content()`: Computes per-product metal shares (flat/CBO/BEA methods)
 - `parse_revision_id()`: Extracts year + revision type from any revision ID (e.g., '2026_rev_3' -> year=2026, rev='rev_3')
 - `get_rates_at_date(ts, date)`: Point-in-time rate query (in 11_daily_series.R) — preferred way to get rates at any date
@@ -152,6 +157,17 @@ all others get the general blanket rate. `extract_ieepa_fentanyl_rates()` return
 
 ~1,087 products exempt from IEEPA reciprocal (Annex A / US Note 2 subdivision (v)(iii)).
 List in `resources/ieepa_exempt_products.csv`. Not parseable from HTS JSON (US Notes text unavailable via API).
+
+## Floor Country Product Exemptions
+
+Products exempt from the 15% tariff floor for EU, Japan, S. Korea, Switzerland/Liechtenstein.
+Categories: PTAAP (agricultural/natural resources), civil aircraft, non-patented pharmaceuticals,
+particular articles. Defined in US Note 2 subdivisions (v)(xx)-(xxiv) and Note 3.
+List in `resources/floor_exempt_products.csv`, parsed from Chapter 99 PDF by
+`12_scrape_us_notes.R --floor-exemptions`. Applied in `06_calculate_rates.R` step 2:
+exempt products get `rate_ieepa_recip = 0` for their respective country groups.
+
+Country groups: `eu` (27 EU members), `japan`, `korea`, `swiss` (Switzerland + Liechtenstein).
 
 ## Census Country Codes
 

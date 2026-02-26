@@ -377,6 +377,12 @@ calculate_rates_for_revision <- function(
     message('  IEEPA exempt products loaded: ', length(ieepa_exempt_products))
   }
 
+  # Load floor country product exemptions (EU/Japan/Korea/Swiss)
+  # Products exempt from the 15% tariff floor — defined by US Note 2
+  # subdivisions (v)(xx)-(xxiv) and Note 3. These are distinct from the
+  # general IEEPA Annex A exemptions above.
+  floor_exempt_products <- load_floor_exempt_products()
+
   if (has_active_ieepa) {
     # Do NOT filter on 'terminated' — for a given revision, all IEEPA entries
     # present in the JSON were effective as of that revision. The "provision
@@ -427,6 +433,20 @@ calculate_rates_for_revision <- function(
       universal_baseline <- attr(ieepa_rates, 'universal_baseline')
       pp <- load_policy_params()
 
+      # Build country -> country_group mapping for floor exemption lookup
+      has_floor_exempts <- nrow(floor_exempt_products) > 0
+      if (has_floor_exempts) {
+        floor_country_group_map <- bind_rows(
+          tibble(country = pp$EU27_CODES, country_group = 'eu'),
+          tibble(country = pp$country_codes$CTY_JAPAN, country_group = 'japan'),
+          tibble(country = pp$country_codes$CTY_SKOREA, country_group = 'korea'),
+          tibble(country = c(pp$country_codes$CTY_SWITZERLAND,
+                             pp$country_codes$CTY_LIECHTENSTEIN), country_group = 'swiss')
+        )
+        message('  Floor country group map: ', nrow(floor_country_group_map), ' countries across ',
+                n_distinct(floor_country_group_map$country_group), ' groups')
+      }
+
       # Override surcharge -> floor for countries in floor_countries config,
       # but ONLY when the surcharge rate exceeds the floor rate. This avoids
       # overriding countries at baseline (10%) in pre-Phase-2 revisions.
@@ -462,14 +482,43 @@ calculate_rates_for_revision <- function(
 
       # Apply IEEPA reciprocal to ALL products for applicable countries
       # EXCEPT products on the exemption list (Annex A / US Note 2)
+      # and floor country product exemptions (EU/Swiss/Japan/Korea)
+
+      # Build floor exemption lookup: a set of "hts8|country_group" keys
+      if (has_floor_exempts) {
+        floor_exempt_keys <- floor_exempt_products %>%
+          select(hts8, country_group) %>%
+          distinct() %>%
+          mutate(key = paste0(hts8, '|', country_group)) %>%
+          pull(key)
+      } else {
+        floor_exempt_keys <- character(0)
+      }
+
       rates <- rates %>%
         left_join(
           country_ieepa %>% rename(country = census_code),
           by = 'country'
-        ) %>%
+        )
+
+      # Compute floor exemption flag via vectorized lookup
+      if (has_floor_exempts) {
+        rates <- rates %>%
+          left_join(floor_country_group_map, by = 'country') %>%
+          mutate(
+            floor_exempt = !is.na(country_group) &
+              paste0(substr(hts10, 1, 8), '|', country_group) %in% floor_exempt_keys
+          ) %>%
+          select(-country_group)
+      } else {
+        rates <- rates %>% mutate(floor_exempt = FALSE)
+      }
+
+      rates <- rates %>%
         mutate(
           rate_ieepa_recip = case_when(
-            hts10 %in% ieepa_exempt_products ~ 0,       # product-level exemption
+            hts10 %in% ieepa_exempt_products ~ 0,       # general IEEPA exemption (Annex A)
+            floor_exempt ~ 0,                             # floor country product exemption
             is.na(ieepa_country_rate) ~ 0,               # country not in IEEPA list
             ieepa_type == 'surcharge' ~ ieepa_country_rate,
             ieepa_type == 'floor' ~ pmax(0, ieepa_country_rate - base_rate),
@@ -477,7 +526,7 @@ calculate_rates_for_revision <- function(
             TRUE ~ 0
           )
         ) %>%
-        select(-ieepa_country_rate, -ieepa_type)
+        select(-ieepa_country_rate, -ieepa_type, -floor_exempt)
 
       # Also add IEEPA rows for products NOT currently in rates
       # (products with no other Ch99 duties but still subject to IEEPA)
@@ -499,17 +548,33 @@ calculate_rates_for_revision <- function(
         left_join(
           country_ieepa %>% rename(country = census_code),
           by = 'country'
-        ) %>%
+        )
+
+      # Apply floor exemption flag to new_pairs
+      if (has_floor_exempts) {
+        new_pairs <- new_pairs %>%
+          left_join(floor_country_group_map, by = 'country') %>%
+          mutate(
+            floor_exempt = !is.na(country_group) &
+              paste0(substr(hts10, 1, 8), '|', country_group) %in% floor_exempt_keys
+          ) %>%
+          select(-country_group)
+      } else {
+        new_pairs <- new_pairs %>% mutate(floor_exempt = FALSE)
+      }
+
+      new_pairs <- new_pairs %>%
         mutate(
           rate_232 = 0, rate_301 = 0, rate_ieepa_fent = 0, rate_other = 0,
           rate_ieepa_recip = case_when(
+            floor_exempt ~ 0,                             # floor country product exemption
             ieepa_type == 'surcharge' ~ ieepa_country_rate,
             ieepa_type == 'floor' ~ pmax(0, ieepa_country_rate - base_rate),
             TRUE ~ 0
           )
         ) %>%
         filter(rate_ieepa_recip > 0) %>%
-        select(-ieepa_country_rate, -ieepa_type)
+        select(-ieepa_country_rate, -ieepa_type, -floor_exempt)
 
       if (nrow(new_pairs) > 0) {
         message('  Adding ', nrow(new_pairs), ' product-country pairs for IEEPA-only duties')

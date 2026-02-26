@@ -7,12 +7,15 @@
 
 # --- Census country codes for key countries ---
 country_codes:
-  CTY_CHINA:  '5700'
-  CTY_CANADA: '1220'
-  CTY_MEXICO: '2010'
-  CTY_JAPAN:  '5880'
-  CTY_UK:     '4120'
-  CTY_HK:     '5820'
+  CTY_CHINA:         '5700'
+  CTY_CANADA:        '1220'
+  CTY_MEXICO:        '2010'
+  CTY_JAPAN:         '5880'
+  CTY_UK:            '4120'
+  CTY_HK:            '5820'
+  CTY_SKOREA:        '5800'
+  CTY_SWITZERLAND:   '4419'
+  CTY_LIECHTENSTEIN: '4411'
 
 # --- ISO to Census code mapping ---
 iso_to_census:

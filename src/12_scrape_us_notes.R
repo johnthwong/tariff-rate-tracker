@@ -2,17 +2,25 @@
 # Step 12: Parse US Note Product Lists from Chapter 99 PDF
 # =============================================================================
 #
-# Extracts Section 301 product lists from US Notes 20 and 31 in the USITC
-# Chapter 99 PDF. These notes enumerate HTS subheadings covered by
-# 9903.88.xx and 9903.91.xx entries that cannot be extracted from individual
-# HTS JSON footnotes.
+# Extracts product lists from US Notes in the USITC Chapter 99 PDF:
+#
+#   1. Section 301 product lists (US Notes 20/31):
+#      HTS subheadings covered by 9903.88.xx and 9903.91.xx entries.
+#
+#   2. Floor country product exemptions (US Note 2):
+#      Products exempt from the 15% tariff floor for EU, Japan, S. Korea,
+#      Switzerland/Liechtenstein. Categories: PTAAP (agricultural/natural
+#      resources), civil aircraft, non-patented pharmaceuticals.
 #
 # Downloads the Chapter 99 PDF from USITC, parses the text with pdftools,
-# and outputs updated resources/s301_product_lists.csv.
+# and outputs updated resources/s301_product_lists.csv and
+# resources/floor_exempt_products.csv.
 #
 # Usage:
-#   Rscript src/12_scrape_us_notes.R              # Full run
-#   Rscript src/12_scrape_us_notes.R --dry-run    # Report without writing
+#   Rscript src/12_scrape_us_notes.R                    # Section 301 only
+#   Rscript src/12_scrape_us_notes.R --floor-exemptions # Floor exemptions only
+#   Rscript src/12_scrape_us_notes.R --all              # Both
+#   Rscript src/12_scrape_us_notes.R --dry-run          # Report without writing
 #
 # Dependencies: pdftools
 #
@@ -52,6 +60,45 @@ CH99_TO_LIST <- tribble(
   '9903.91.08',  'biden_jan26',     31,     # Biden (Jan 2026)
   '9903.91.11',  'biden_25_jan25',  31,     # Biden 25% (Jan 2025)
 )
+
+
+# =============================================================================
+# Configuration: Floor country product exemptions
+# =============================================================================
+#
+# US Note 2 subdivisions (v)(xx)-(xxiv) define products exempt from the 15%
+# tariff floor for floor countries (EU, Japan, S. Korea, Switzerland,
+# Liechtenstein). These use a different anchor pattern than Section 301:
+#   "As provided in heading 9903.XX.XX" followed by product lists.
+#
+# Categories:
+#   ptaap        — Agricultural/natural resource products (PTAAP)
+#   particular   — Particular articles (incl. religious items)
+#   civil_aircraft — Civil aircraft and parts
+#   pharma       — Non-patented pharmaceuticals
+#
+# Country groups:
+#   eu    — EU-27 member states
+#   korea — South Korea
+#   swiss — Switzerland + Liechtenstein
+#   japan — Japan (civil aircraft only, via Note 3)
+#
+FLOOR_EXEMPTIONS <- tribble(
+  ~ch99_code,    ~category,         ~country_group,
+  '9903.02.74',  'ptaap',           'eu',
+  '9903.02.75',  'particular',      'eu',
+  '9903.02.76',  'civil_aircraft',  'eu',
+  '9903.02.77',  'pharma',          'eu',
+  '9903.02.81',  'civil_aircraft',  'korea',
+  '9903.02.84',  'ptaap',           'swiss',
+  '9903.02.85',  'civil_aircraft',  'swiss',
+  '9903.02.86',  'pharma',          'swiss',
+  '9903.96.02',  'civil_aircraft',  'japan',
+)
+
+# Japan/UK civil aircraft lists use inline format (semicolons) rather than
+# tabular format. These ch99 codes use Note 3 anchors rather than Note 2.
+INLINE_FLOOR_CODES <- c('9903.96.01', '9903.96.02')
 
 
 # =============================================================================
@@ -409,6 +456,255 @@ parse_us_note_products <- function(
 
 
 # =============================================================================
+# Floor Exemption Anchor Detection
+# =============================================================================
+
+#' Find floor exemption anchors in the PDF
+#'
+#' Floor exemption sections use "As provided in heading(s) 9903.XX.XX" anchors
+#' (different from Section 301's "Heading ... applies to" pattern).
+#' Swiss sections use plural: "As provided in headings 9903.02.84 and 9903.02.89"
+#' — both codes are extracted as separate anchors at the same position.
+#'
+#' @param pages Character vector of page texts
+#' @return Tibble with ch99_code, page, char_pos columns
+find_floor_exempt_anchors <- function(pages) {
+  anchors <- tibble(ch99_code = character(), page = integer(), char_pos = integer())
+
+  for (i in seq_along(pages)) {
+    # Pattern: "As provided in heading(s) 9903.XX.XX [and 9903.XX.XX]"
+    # Handles both singular "heading" and plural "headings" with optional second code
+    matches <- gregexpr(
+      '[Aa]s\\s+provided\\s+in\\s+headings?\\s+9903\\.[0-9]{2}\\.[0-9]{2}(?:\\s+and\\s+9903\\.[0-9]{2}\\.[0-9]{2})?',
+      pages[i]
+    )
+    if (matches[[1]][1] != -1) {
+      match_text <- regmatches(pages[i], matches)[[1]]
+      positions <- as.integer(matches[[1]])
+
+      for (j in seq_along(match_text)) {
+        # Extract ALL ch99 codes from this match (may be 1 or 2)
+        codes <- str_extract_all(match_text[j], '9903\\.[0-9]{2}\\.[0-9]{2}')[[1]]
+        for (code in codes) {
+          anchors <- bind_rows(anchors, tibble(
+            ch99_code = code,
+            page = i,
+            char_pos = positions[j]
+          ))
+        }
+      }
+    }
+  }
+
+  return(anchors)
+}
+
+
+#' Extract inline HTS codes (semicolon-separated) from note text
+#'
+#' Japan/UK civil aircraft lists use inline format:
+#'   "classifiable in subheadings 3917.21; 3917.22; ..."
+#' rather than tabular format.
+#'
+#' @param text Character string containing inline codes
+#' @return Character vector of HTS codes
+extract_inline_hts_codes <- function(text) {
+  # Split on semicolons and extract HTS patterns from each segment
+  segments <- str_split(text, ';')[[1]]
+  codes <- character()
+  for (seg in segments) {
+    seg_codes <- str_extract_all(seg, '[0-9]{4}\\.[0-9]{2}(?:\\.[0-9]{2,4})?')[[1]]
+    codes <- c(codes, seg_codes)
+  }
+  codes <- unique(codes)
+  # Apply same filters as extract_hts_codes
+  codes <- codes[!grepl('^99(01|02|03|04)\\.', codes)]
+  codes <- codes[!grepl('^(19|20)[0-9]{2}\\.', codes)]
+  codes <- codes[nchar(gsub('\\.', '', codes)) >= 6]
+  return(codes)
+}
+
+
+# =============================================================================
+# Floor Exemption Main Pipeline
+# =============================================================================
+
+#' Parse floor country product exemptions from US Note 2
+#'
+#' Extracts product lists that are exempt from the 15% tariff floor for
+#' EU, Japan, S. Korea, and Switzerland/Liechtenstein. These exemptions
+#' are defined in US Note 2, subdivisions (v)(xx)-(xxiv) and Note 3.
+#'
+#' @param pdf_path Path to Chapter 99 PDF (or NULL to download)
+#' @param output_csv Path to write floor_exempt_products.csv
+#' @param dry_run Report without writing
+#' @return Tibble of exempt products
+parse_floor_exempt_products <- function(
+  pdf_path = NULL,
+  output_csv = 'resources/floor_exempt_products.csv',
+  dry_run = FALSE
+) {
+  message('\n', strrep('=', 70))
+  message('FLOOR COUNTRY PRODUCT EXEMPTION PARSER')
+  message(strrep('=', 70))
+
+  # ---- Download PDF if needed ----
+  if (is.null(pdf_path)) {
+    pdf_path <- download_chapter99_pdf()
+  }
+  stopifnot(file.exists(pdf_path))
+
+  # ---- Extract text ----
+  pages <- extract_pdf_text(pdf_path)
+
+  # ---- Find floor exemption anchors ----
+  message('\nScanning for floor exemption anchors...')
+  floor_anchors <- find_floor_exempt_anchors(pages)
+  message('  Found ', nrow(floor_anchors), ' "As provided in heading" anchor(s)')
+
+  if (nrow(floor_anchors) > 0) {
+    message('  Anchors: ', paste(unique(floor_anchors$ch99_code), collapse = ', '))
+  }
+
+  # Also find "Heading ... applies to" anchors for boundary detection
+  std_anchors <- find_product_list_anchors(pages)
+
+  # Merge all anchors for boundary detection
+  all_anchors <- bind_rows(
+    floor_anchors %>% mutate(anchor_type = 'floor'),
+    std_anchors %>% mutate(anchor_type = 'standard')
+  ) %>%
+    arrange(page, char_pos)
+
+  # ---- Filter to target ch99 codes ----
+  target_codes <- FLOOR_EXEMPTIONS$ch99_code
+  matched_anchors <- floor_anchors %>%
+    filter(ch99_code %in% target_codes) %>%
+    # Take first occurrence of each code (avoid duplicates from repeated mentions)
+    group_by(ch99_code) %>%
+    arrange(page, char_pos) %>%
+    slice(1) %>%
+    ungroup() %>%
+    arrange(page, char_pos)
+
+  message('  Target anchors matched: ', nrow(matched_anchors), ' of ', length(target_codes))
+
+  if (nrow(matched_anchors) == 0) {
+    message('WARNING: No floor exemption anchors found.')
+    message('The PDF format may have changed. Check anchor patterns.')
+    return(invisible(NULL))
+  }
+
+  # Report missing codes
+  missing_codes <- setdiff(target_codes, matched_anchors$ch99_code)
+  if (length(missing_codes) > 0) {
+    message('  Missing anchors: ', paste(missing_codes, collapse = ', '))
+  }
+
+  # ---- Extract product lists ----
+  message('\nExtracting floor exemption product lists...')
+  all_parsed <- tibble(hts_code = character(), ch99_code = character())
+
+  for (i in seq_len(nrow(matched_anchors))) {
+    row <- matched_anchors[i, ]
+    is_inline <- row$ch99_code %in% INLINE_FLOOR_CODES
+
+    # Find the next anchor AFTER this one (from all anchors)
+    later <- all_anchors %>%
+      filter(page > row$page | (page == row$page & char_pos > row$char_pos))
+
+    if (nrow(later) > 0) {
+      next_anchor <- later[1, ]
+      end_page <- next_anchor$page
+      end_pos <- next_anchor$char_pos
+    } else {
+      # Last anchor — scan to end of Note area (limit to ~20 pages ahead)
+      end_page <- min(row$page + 20, length(pages))
+      end_pos <- nchar(pages[end_page])
+    }
+
+    # Extract codes using appropriate method
+    if (is_inline) {
+      # Inline format: concatenate text span and extract semicolon-separated codes
+      text_span <- ''
+      for (p in row$page:end_page) {
+        page_text <- pages[p]
+        if (p == row$page && p == end_page) {
+          page_text <- substring(page_text, row$char_pos, end_pos - 1)
+        } else if (p == row$page) {
+          page_text <- substring(page_text, row$char_pos)
+        } else if (p == end_page) {
+          page_text <- substring(page_text, 1, end_pos - 1)
+        }
+        text_span <- paste0(text_span, ' ', page_text)
+      }
+      codes <- extract_inline_hts_codes(text_span)
+    } else {
+      # Tabular format: reuse existing extraction
+      codes <- extract_product_list(pages, row$page, row$char_pos, end_page, end_pos)
+    }
+
+    # Look up category
+    exemption_info <- FLOOR_EXEMPTIONS %>%
+      filter(ch99_code == row$ch99_code)
+
+    if (length(codes) > 0) {
+      message('  ', row$ch99_code, ' [', exemption_info$category, '/',
+              exemption_info$country_group, ']: ', length(codes),
+              ' HTS codes (pages ', row$page, '-', end_page, ')',
+              if (is_inline) ' [inline]' else '')
+      all_parsed <- bind_rows(all_parsed, tibble(
+        hts_code = codes,
+        ch99_code = row$ch99_code
+      ))
+    } else {
+      message('  ', row$ch99_code, ' [', exemption_info$category, '/',
+              exemption_info$country_group, ']: no HTS codes found')
+    }
+  }
+
+  message('\nTotal HTS codes parsed: ', nrow(all_parsed))
+  message('  Unique HTS codes: ', n_distinct(all_parsed$hts_code))
+
+  if (nrow(all_parsed) == 0) {
+    message('WARNING: No HTS codes parsed. PDF format may have changed.')
+    return(invisible(NULL))
+  }
+
+  # ---- Normalize to 8-digit format and add metadata ----
+  result <- all_parsed %>%
+    left_join(
+      FLOOR_EXEMPTIONS %>% select(ch99_code, category, country_group),
+      by = 'ch99_code'
+    ) %>%
+    mutate(hts8 = normalize_to_hts8(hts_code)) %>%
+    select(hts8, category, country_group, ch99_code) %>%
+    distinct()
+
+  message('After normalization to HTS8: ', nrow(result), ' unique entries')
+
+  # ---- Summary by category and country group ----
+  message('\nBreakdown:')
+  summary_tbl <- result %>% count(country_group, category) %>% arrange(country_group, category)
+  for (j in seq_len(nrow(summary_tbl))) {
+    message('  ', summary_tbl$country_group[j], ' / ', summary_tbl$category[j],
+            ': ', summary_tbl$n[j], ' codes')
+  }
+
+  # ---- Write output ----
+  if (!dry_run) {
+    result <- result %>% arrange(hts8, country_group, ch99_code)
+    write_csv(result, output_csv)
+    message('\nWrote ', nrow(result), ' entries to ', output_csv)
+  } else {
+    message('\n[DRY RUN] Would write ', nrow(result), ' entries to ', output_csv)
+  }
+
+  return(invisible(result))
+}
+
+
+# =============================================================================
 # Main Execution
 # =============================================================================
 
@@ -419,6 +715,14 @@ if (sys.nframe() == 0) {
   # Parse command line arguments
   args <- commandArgs(trailingOnly = TRUE)
   dry_run <- '--dry-run' %in% args
+  do_floor <- '--floor-exemptions' %in% args
+  do_all <- '--all' %in% args
 
-  result <- parse_us_note_products(dry_run = dry_run)
+  if (do_floor || do_all) {
+    floor_result <- parse_floor_exempt_products(dry_run = dry_run)
+  }
+
+  if (!do_floor || do_all) {
+    result <- parse_us_note_products(dry_run = dry_run)
+  }
 }

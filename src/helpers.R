@@ -678,6 +678,29 @@ load_232_derivative_products <- function(path = here('resources', 's232_derivati
 }
 
 
+#' Load floor country product exemptions
+#'
+#' Products exempt from the 15% tariff floor for EU, Japan, S. Korea,
+#' Switzerland/Liechtenstein. Categories: PTAAP (agricultural/natural
+#' resources), civil aircraft, non-patented pharmaceuticals. Parsed from
+#' US Notes to Chapter 99 by 12_scrape_us_notes.R --floor-exemptions.
+#'
+#' @param path Path to floor_exempt_products.csv
+#' @return Tibble with hts8, category, country_group, ch99_code; or empty tibble if missing
+load_floor_exempt_products <- function(path = here('resources', 'floor_exempt_products.csv')) {
+  if (!file.exists(path)) {
+    message('  Floor exempt products file not found: ', path)
+    return(tibble(hts8 = character(), category = character(),
+                  country_group = character(), ch99_code = character()))
+  }
+
+  products <- read_csv(path, col_types = cols(.default = col_character()))
+  message('  Loaded ', nrow(products), ' floor exempt products (',
+          n_distinct(products$hts8), ' unique HTS8)')
+  return(products)
+}
+
+
 #' Load fentanyl carve-out product lists
 #'
 #' Product-specific fentanyl rate carve-outs: energy/critical minerals (CA) and
