@@ -36,6 +36,9 @@ Rscript src/11_daily_series.R
 # Import-weighted ETRs (requires built timeseries; saves to output/etr/)
 Rscript src/10_weighted_etr.R
 
+# Revision changelog (diffs Ch99 across all revisions; saves to output/changelog/)
+Rscript src/13_revision_changelog.R
+
 # Parse US Note 301 product lists from Chapter 99 PDF
 Rscript src/12_scrape_us_notes.R
 Rscript src/12_scrape_us_notes.R --dry-run    # Report without writing
@@ -71,12 +74,14 @@ rate_timeseries.rds -> import-weighted ETRs (10_weighted_etr.R via get_rates_at_
 10. `10_weighted_etr.R`: Import-weighted effective tariff rates (uses timeseries via `get_rates_at_date()`)
 11. `11_daily_series.R`: Daily rate series, point-in-time queries, daily aggregates
 12. `12_scrape_us_notes.R`: Parse US Note 20/21/31 product lists from Chapter 99 PDF
+13. `13_revision_changelog.R`: Diff Ch99 entries across all revisions, build policy timeline
 
 **Key Configuration:**
 - `config/policy_params.yaml`: All policy constants (country codes, authority ranges, 232 chapters, floor rates, 301 rates, etc.)
-- `config/revision_dates.csv`: revision -> effective_date -> tpc_date mapping
+- `config/revision_dates.csv`: revision -> effective_date -> tpc_date -> policy_event mapping
 - `config/scenarios.yaml`: Counterfactual scenario definitions
 - `docs/active_hts_changes.md`: Federal Register changes not yet in HTS JSON (manual overrides)
+- `docs/revision_changelog.md`: Verified timeline of Ch99 policy changes across all 35 revisions
 
 **Shared Infrastructure:**
 - `RATE_SCHEMA` in helpers.R: Canonical column order for rate output (includes `metal_share`, `valid_from`/`valid_until`)

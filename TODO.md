@@ -7,12 +7,8 @@ See Done section.
 
 ## Medium Priority
 
-### 2. Map dates of HTS revision updates
-Build a verified timeline of policy changes mapped to HTS revisions. Currently `config/revision_dates.csv` has effective dates but doesn't track *what changed* at each revision. Needed for:
-
-- Correct TPC comparison (currently rev_18 effective 2025-08-07 is paired with TPC date 2025-10-17, a 2+ month gap)
-- Building a daily rate dataset with proper interpolation between revision points
-- Documenting when Phase 1 terminated, Phase 2 started, 232 increased, etc.
+### ~~2. Map dates of HTS revision updates~~ (Implemented)
+See Done section.
 
 ### ~~3. 2026 HTS revision naming convention~~ (Implemented)
 See Done section.
@@ -23,15 +19,8 @@ EU countries show 35-42% exact match with ~4pp mean excess. The floor formula `m
 ### ~~5. Switzerland IEEPA over-application (+24pp)~~ (Fixed)
 See Done section.
 
-### 6. USMCA classification mismatch (~2,855 products per direction)
-Our USMCA flag (from HTS `special` field "S"/"S+") disagrees with TPC for ~5,700 CA/MX products:
-
-| Direction | CA | MX | Our rate | TPC rate |
-|-----------|-----|-----|----------|----------|
-| We say USMCA, TPC says tariffed | 1,590 | 1,264 | 0% | ~18% |
-| We say non-USMCA, TPC says free | 1,330 | 1,525 | 35%/25% | 0% |
-
-Almost exactly symmetric, suggesting a systematic classification difference rather than random noise. TPC likely uses a different USMCA eligibility source or methodology.
+### ~~6. USMCA classification mismatch~~ (Investigated — utilization rate issue)
+See Done section.
 
 ### ~~7. CA/MX fentanyl product-level carve-outs~~ (Implemented)
 See Done section.
@@ -39,7 +28,9 @@ See Done section.
 ## Low Priority / Future
 
 ### 8. USMCA utilization rate adjustment
-USMCA eligibility is binary (from HTS `special` field). A utilization-rate adjustment would improve accuracy for Canada/Mexico. Requires external data on USMCA claim rates by product.
+USMCA eligibility is binary (from HTS `special` field). Diagnostic confirms TPC uses **product-level utilization rates** — not binary eligibility. For products we mark as USMCA-eligible, TPC's implied utilization rates span 0-100% (median ~55% CA, ~44% MX). This means TPC charges `(1 - utilization_rate) * full_tariff` rather than 0% for USMCA products. The symmetric mismatch (~1,600 CA + 1,270 MX products Type 1; ~1,680 CA + 1,900 MX Type 2) is driven by this methodological difference.
+
+To implement: Requires external USMCA utilization data by HTS product (from CBP or USITC trade data). Would weight USMCA exemption by actual claim rates rather than binary on/off.
 
 ### 9. Clean up legacy v1 pipeline
 The v1 pipeline files (prefixed `v1_*`) are superseded by the v2 timeseries pipeline. Consider:
@@ -62,6 +53,18 @@ Currently new revisions are manually downloaded and added to `config/revision_da
 - Running incremental pipeline on detection
 
 ## Done
+
+### ~~Map dates of HTS revision updates~~ (Implemented)
+New script `src/13_revision_changelog.R` diffs Ch99 entries across all 35 consecutive revision pairs, detecting additions, removals, rate changes, and suspensions (via description text matching). Outputs `output/changelog/revision_diffs.csv` (467 diff entries) and `output/changelog/revision_summary.csv`. Comprehensive timeline documented in `docs/revision_changelog.md` with key milestones: Liberation Day (rev_7), Phase 1 pause (rev_9), Geneva Agreement (rev_12), 232 doubling (rev_14), Phase 2 (rev_18), floor country frameworks (rev_23/32/2026_basic). Added `policy_event` column to `config/revision_dates.csv` linking each revision to its policy change.
+
+### ~~USMCA classification mismatch~~ (Investigated)
+Diagnostic revealed two findings:
+
+1. **S+ parsing bug (165 products)**: `extract_usmca_eligibility()` only matched program codes from the first parenthesized group in the HTS `special` field. Products with `S+` in a secondary group (e.g., `"Free (BH,CL,...) See 9823.xx.xx (S+)"`) were missed. Fixed by using `str_extract_all()` to check all parenthesized groups. USMCA-eligible products: 4,787 → 4,952.
+
+2. **Utilization rate (main cause, ~5,700 products)**: TPC uses product-level USMCA utilization rates, not binary eligibility. For products we mark USMCA-eligible (rate = 0%), TPC charges a fraction of the full tariff: `TPC_rate = (1 - utilization_rate) * full_tariff`. Implied utilization rates span 0-100% (median ~55% CA, ~44% MX). The symmetric mismatch pattern (Type 1: we say 0%, TPC says ~18%; Type 2: we say 35/25%, TPC says 0%) is driven by this methodological difference. Our binary approach is correct per HTS data; improvement requires external USMCA claim rate data. See TODO #8.
+
+CA/MX exact match: 44.3% / 44.5% — primarily limited by the utilization rate issue.
 
 ### ~~Switzerland IEEPA over-application (+24pp)~~ (Fixed)
 Per [90 FR 59281](https://www.federalregister.gov/documents/2025/12/18/2025-23316) (FR Doc. 2025-23316, Dec 18, 2025): EO 14346 implements the US-Switzerland-Liechtenstein trade framework, effective Nov 14, 2025 (retroactive). Terminates 9903.02.36 (Liechtenstein +15% surcharge) and 9903.02.58 (Switzerland +39% surcharge). New entries 9903.02.82-91 establish a 15% floor structure matching EU/Japan/S. Korea pattern: products with base rate >= 15% get no additional duty; products with base rate < 15% are raised to 15%. Also exempts PTAAP agricultural/natural resources, civil aircraft, and non-patented pharmaceuticals.

@@ -735,12 +735,14 @@ extract_usmca_eligibility <- function(hts_raw) {
 
     special <- item$special %||% ''
 
-    # Extract program codes from parentheses
+    # Extract program codes from ALL parenthesized groups
+    # Some products have S/S+ in secondary groups, e.g.:
+    #   "Free (BH,CL,...) 5.1¢/liter (PA) See 9823.xx.xx (S+)"
     programs <- character(0)
-    programs_match <- str_extract(special, '\\(([^)]+)\\)')
-    if (!is.na(programs_match)) {
-      codes_text <- gsub('[()]', '', programs_match)
-      programs <- trimws(unlist(strsplit(codes_text, ',')))
+    all_matches <- str_extract_all(special, '\\(([^)]+)\\)')[[1]]
+    for (m in all_matches) {
+      codes_text <- gsub('[()]', '', m)
+      programs <- c(programs, trimws(unlist(strsplit(codes_text, ','))))
     }
 
     # Check for USMCA: "S" or "S+" in program codes
