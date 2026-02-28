@@ -1,16 +1,16 @@
 # Next Steps for Improving Tariff Rate Accuracy
 
-*Updated 2026-02-25 from TPC validation analysis of rev_32*
+*Updated 2026-02-28 from TPC validation analysis of rev_32*
 
 ## Current Validation Status (rev_32 → TPC 2025-11-17)
 
 | Metric | Value |
 |--------|-------|
-| Total comparisons | 312,710 |
-| Exact match (<0.5pp) | 60.5% |
-| Within 2pp | 61.5% |
-| Within 5pp | 65.9% |
-| Mean abs diff | 6.1 pp |
+| Total comparisons | 298,341 |
+| Exact match (<0.5pp) | 66.1% |
+| Within 2pp | 67.0% |
+| Within 5pp | 71.3% |
+| Mean abs diff | 4.9 pp |
 
 **CA/MX breakdown (rev_32):**
 
@@ -48,10 +48,10 @@
 
 ## Tier 2: Refinement (product-level accuracy)
 
-### 5. China 301 Biden + 232 Stacking (~550 products, -43pp)
-- **Gap**: TPC=93%, ours=50%
-- **Root cause**: Products subject to both Biden 301 (50%) and 232 (25%) where stacking should produce ~93%. Our stacking rules may not correctly combine all components for these products.
-- **Fix**: Check `apply_stacking_rules()` for China products with both rate_301 > 0 and rate_232 > 0.
+### 5. China+232 Reciprocal Stacking (~920 products, ~25pp gap)
+- **Gap**: TPC=85-92%, ours=60-67% for China steel/aluminum/copper (ch72-76)
+- **Root cause**: **TPC stacks IEEPA reciprocal on top of Section 232 unconditionally.** Our model applies mutual exclusion (232 takes precedence, recip × nonmetal_share = 0 for base 232 products). Confirmed: adding 25pp reciprocal to our rates produces near-zero residual vs TPC.
+- **Status**: **Methodological difference, not a bug.** Our approach follows the Tariff-ETRs legal authority structure. TPC sums all authorities without mutual exclusion. No fix planned — this is a documented analytical choice.
 
 ### 6. Section 301 Exclusions (9903.89.xx) -- 61 remaining products
 - **Gap**: 61 China products where TPC > us and our rate_301 = 0
@@ -87,4 +87,4 @@
 - **Phantom IEEPA countries**: Syria, Moldova, Laos, Falkland Islands, DR Congo excluded from TPC validation. Removes ~95K false-positive pairs.
 - **Section 232 derivative products**: ~130 aluminum-containing articles now covered with metal content scaling.
 - **Floor country IEEPA selection (Japan/S. Korea)**: Fixed tie-breaking to prefer floor over surcharge.
-- **Section 301 blanket coverage**: ~10,400 HTS8 product codes applied as blanket tariff for China.
+- **Section 301 blanket coverage and generation stacking**: Expanded from ~10,400 to ~11,000 unique HTS8 codes (~12,200 entries) by adding List 4B (9903.88.16, 1,519 products). Rate aggregation changed from `max()` to generation-based stacking (MAX within generation, SUM across). Added missing ch99 rates: 9903.91.06 (25%), 9903.91.07 (50%), 9903.91.08 (100%), 9903.92.10 (25%). Rev_32 overall improvement: 60.5% → 66.1% exact match; China: 72.4% exact.

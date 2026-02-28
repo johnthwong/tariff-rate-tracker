@@ -134,10 +134,14 @@ Key: 232 takes precedence over IEEPA reciprocal. For base 232 products (metal_sh
 
 ## Section 301 Product Coverage
 
-~10,400+ HTS8 product codes covered by Section 301 tariffs on China (Lists 1-4A + Biden modifications).
-List in `resources/s301_product_lists.csv`. Two sources:
+~11,000+ HTS8 product codes covered by Section 301 tariffs on China (Lists 1-4B + Biden modifications).
+List in `resources/s301_product_lists.csv` (~12,200 entries including dual-list products). Two sources:
 1. USITC "China Tariffs" reference document (hts.usitc.gov, ~10,400 codes)
-2. US Notes 20/21/31 from Chapter 99 PDF (`12_scrape_us_notes.R`, ~additional codes from Note text)
+2. US Notes 20/31 from Chapter 99 PDF (`12_scrape_us_notes.R`, Lists 1-4B + Biden headings)
+
+Rate aggregation uses generation-based stacking: MAX within generation (original Trump 9903.88.xx /
+Biden 9903.91-92.xx), SUM across generations. Products on both Trump List 3 (25%) and Biden (25%)
+get 50% total. Products on only one generation get that generation's rate.
 
 Applied as blanket tariff for China (country 5700) in `06_calculate_rates.R` step 3b, mirroring the
 Section 232 blanket pattern.

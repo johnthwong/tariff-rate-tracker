@@ -36,9 +36,10 @@ library(tidyverse)
 # Product lists in the PDF are identified by "Heading 9903.XX.XX applies to"
 # anchor text. This mapping assigns list labels for the output CSV.
 #
-# Note 20 (Original Section 301, Lists 1-4A):
+# Note 20 (Original Section 301, Lists 1-4B):
 #   Subdivisions (b), (d), (f) enumerate HTS8 codes for Lists 1-3.
 #   Subdivision (s) enumerates HTS8 codes for List 4A.
+#   Subdivision (u) enumerates HTS8 codes for List 4B (9903.88.16).
 #   9903.88.04 (List 3 reduced 7.5%) has no separate product enumeration
 #   — its products are a subset of 9903.88.03 with specific exclusions.
 #
@@ -51,6 +52,7 @@ CH99_TO_LIST <- tribble(
   '9903.88.02',  '2',               20,     # List 2 (25%)
   '9903.88.03',  '3',               20,     # List 3 (25%)
   '9903.88.15',  '4A',              20,     # List 4A (7.5%)
+  '9903.88.16',  '4B',              20,     # List 4B (15%)
   '9903.91.01',  'biden_25',        31,     # Biden 25%
   '9903.91.02',  'biden_50',        31,     # Biden 50%
   '9903.91.03',  'biden_100',       31,     # Biden 100%

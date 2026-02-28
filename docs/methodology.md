@@ -29,7 +29,7 @@ The system tracks six distinct tariff authorities that can stack on a single pro
 | Authority | Legal Basis | Scope | Rate Range |
 |-----------|------------|-------|------------|
 | **Section 232** | Trade Expansion Act | Steel (ch72-73), aluminum (ch76), autos (heading 8703), copper (headings 7406-7419), aluminum derivatives (~130 products) | 25% (50% for aluminum after mid-2025) |
-| **Section 301** | Trade Act of 1974 | ~10,400 HTS-8 products from China | 7.5%-100% by list |
+| **Section 301** | Trade Act of 1974 | ~11,000 HTS-8 products from China (Lists 1-4B + Biden) | 7.5%-100% by list |
 | **IEEPA Reciprocal** | International Emergency Economic Powers Act | All products for ~238 countries (blanket) | 10%-50% (surcharge or 15% floor) |
 | **IEEPA Fentanyl** | IEEPA | All products for Canada, Mexico, China/HK | 10%-40% (with product carve-outs) |
 | **Section 122** | Trade Act of 1974 | Limited | Variable |
@@ -51,7 +51,7 @@ Several categories of products are exempt from otherwise-blanket tariffs. These 
 |-----------|------|-------|--------|
 | General IEEPA exempt (Annex A) | `ieepa_exempt_products.csv` | ~1,087 HTS-10 | Zero IEEPA reciprocal for all countries |
 | Floor country product exemptions | `floor_exempt_products.csv` | ~1,697 HTS-8 across 4 country groups | Zero IEEPA reciprocal for EU/Japan/Korea/Swiss |
-| Section 301 product lists | `s301_product_lists.csv` | ~10,400 HTS-8 | Defines which products receive 301 duty |
+| Section 301 product lists | `s301_product_lists.csv` | ~12,200 entries (~11,000 HTS-8) | Defines which products receive 301 duty; generation-based stacking |
 | Section 232 derivatives | `s232_derivative_products.csv` | ~130 HTS prefixes | Defines aluminum articles outside ch76 |
 | Fentanyl carve-outs | `fentanyl_carveout_products.csv` | 308 HTS-8 | Lower fentanyl rate (10% vs 25-35%) |
 
@@ -79,6 +79,8 @@ Total rate = base_rate + total_additional
 ```
 
 For base Section 232 products (steel, aluminum, autos, copper), `metal_share = 1.0` and `nonmetal_share = 0`, so IEEPA is fully excluded. For derivative 232 products (aluminum-containing articles outside ch76), `metal_share = 0.50` (default), so IEEPA applies to the remaining 50%.
+
+Note: `rate_301` uses generation-based stacking — MAX within each generation (original Trump 9903.88.xx / Biden 9903.91-92.xx), SUM across generations. Products on both Trump and Biden lists receive both duties (e.g., 25% + 25% = 50%).
 
 USMCA exemption: For Canadian and Mexican products, IEEPA reciprocal and fentanyl rates are multiplied by `(1 - usmca_share)`, where `usmca_share` is the fraction of 2024 import value that entered under USMCA preference (Census RATE_PROV = 18). Shares are computed per-HTS10 x country from Census IMP_DETL.TXT fixed-width files by `src/compute_usmca_shares.R` and stored in `resources/usmca_product_shares.csv` (22,449 product-country pairs). Products not imported from CA/MX in 2024 retain full tariff (share = 0). Falls back to binary eligibility (S/S+ in HTS `special` field → zero rate) if Census SPI shares are unavailable. Section 232 is not affected by USMCA.
 
@@ -125,13 +127,13 @@ Point-in-time rate queries use interval encoding: each rate observation has `val
 
 Rates are compared at the HTS-10 x country level against TPC benchmark data at 5 snapshot dates corresponding to major policy events:
 
-| Revision | Policy Event | TPC Date | Exact Match | Mean Abs Diff |
-|----------|-------------|----------|-------------|---------------|
-| rev_6 | 232 Autos | 2025-03-17 | 47.3% | 7.7pp |
-| rev_10 | Liberation Day | 2025-04-17 | 83.4% | 2.5pp |
-| rev_17 | 232 Increase | 2025-07-17 | 75.1% | 4.0pp |
-| rev_18 | Phase 2 | 2025-10-17 | 56.9% | 6.8pp |
-| rev_32 | Floor Countries | 2025-11-17 | 63.6% | 5.5pp |
+| Revision | Policy Event | TPC Date | Exact Match | Within 2pp | Mean Abs Diff |
+|----------|-------------|----------|-------------|------------|---------------|
+| rev_6 | 232 Autos | 2025-03-17 | 61.4% | 61.6% | 5.0pp |
+| rev_10 | Liberation Day | 2025-04-17 | 86.4% | 86.4% | 2.0pp |
+| rev_17 | 232 Increase | 2025-07-17 | 77.1% | 77.5% | 3.4pp |
+| rev_18 | Phase 2 | 2025-10-17 | 61.0% | 61.8% | 5.8pp |
+| rev_32 | Floor Countries | 2025-11-17 | 66.1% | 67.0% | 4.9pp |
 
 Best-matching countries (rev_32): Madagascar 94%, Bangladesh 94%, Tunisia 92%, Nepal 91%, Pakistan 89%.
 
@@ -157,17 +159,17 @@ For products where we apply the full 15% floor, TPC assigns rates spanning 1-14%
 
 EU products subject to Section 232 have poor TPC match rates, suggesting EU-specific 232 exemption or exclusion patterns not captured in our methodology. Separate from the floor rate issue.
 
-### 4. Section 301 Coverage Gap (~5,000 China products)
+### 4. China+232 Reciprocal Stacking (~920 products, ~25pp gap)
 
-**Impact**: ~16K China products with ~25pp shortfall vs TPC
+**Impact**: China metal chapters (72-76) at 1.2% exact match, -24pp mean diff
 
-Some Section 301 products are defined by US Note 20/21 product lists referenced only in the note text, not via product footnotes. Our parser (`12_scrape_us_notes.R`) has extracted most of these, but ~5,000 remain uncovered. These products incorrectly receive 0% Section 301 rate instead of 7.5-25%.
+TPC stacks IEEPA reciprocal on top of Section 232 for China products (e.g., 232(25%) + recip(25%) + fent(10%) + 301(25%) = 85%). Our model applies mutual exclusion per Tariff-ETRs methodology: Section 232 takes precedence over IEEPA reciprocal for base 232 products (`nonmetal_share = 0`), so reciprocal contributes 0pp. This is a fundamental methodological difference — our approach follows the legal authority structure, TPC sums all authorities unconditionally. Confirmed via statistical analysis: adding 25pp reciprocal to our China+232 rates produces near-zero residual vs TPC.
 
 ### 5. China IEEPA Reciprocal Rate
 
-**Impact**: China 79.6% exact match at rev_32
+**Impact**: China 72.4% exact match at rev_32
 
-The statutory IEEPA reciprocal rate for China is 34% (from 9903.01.63). TPC shows ~20%, likely reflecting the May 2025 US-China bilateral agreement. Our system correctly tracks the suspension marker in the HTS JSON; the remaining discrepancy reflects timing differences in how the bilateral agreement is encoded.
+The statutory IEEPA reciprocal rate for China is 34% (from 9903.01.63). TPC shows ~25%, likely reflecting the May 2025 US-China bilateral agreement. Our system correctly tracks the suspension marker in the HTS JSON; the remaining discrepancy reflects timing differences in how the bilateral agreement is encoded.
 
 ### 6. Pre-Phase 2 Revision Mismatch (rev_6)
 

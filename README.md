@@ -4,7 +4,7 @@ An R-based system for constructing statutory U.S. tariff rates at the HTS-10 x c
 
 ## Status
 
-**In development.** The pipeline processes 34 HTS JSON archives (basic + revisions 1-32 + 2026 basic) to build per-revision rate snapshots and a combined time series. All rates are derived from HTS source data -- no external rate inputs. Current validation against TPC benchmark data shows 81% exact match at rev_10 (post-Liberation Day), declining to 52% at rev_32. Best-matching countries (surcharge IEEPA) hit 80-94%. See [Validation Status](#validation-status) and [Known Issues](#known-issues).
+**In development.** The pipeline processes 34 HTS JSON archives (basic + revisions 1-32 + 2026 basic) to build per-revision rate snapshots and a combined time series. All rates are derived from HTS source data -- no external rate inputs. Current validation against TPC benchmark data shows 86% exact match at rev_10 (post-Liberation Day), 66% at rev_32. Best-matching countries (surcharge IEEPA) hit 87-94%. See [Validation Status](#validation-status) and [Known Issues](#known-issues).
 
 ## How It Works
 
@@ -149,18 +149,18 @@ Each snapshot/timeseries row contains:
 
 Each authority has a different mechanism for linking Ch99 entries to products:
 
-#### Section 301 -- Footnote references (partial coverage)
+#### Section 301 -- Footnote references + blanket product lists
 
 | Ch99 Range | HTS Note | Linkage | Products |
 |-----------|----------|---------|----------|
-| 9903.86-88.xx | US Note 20 | Product footnotes "See 9903.88.xx" | ~7,200 via footnotes |
-| 9903.89.xx | US Note 21 | Description-defined (List 4A) | 0 with footnotes; ~5,000 in US Note list |
-| 9903.91.xx | US Note 31 | Product footnotes | ~382 (Biden acceleration) |
-| 9903.92.xx | US Note 31 | Product footnotes | ~20 (crane duties) |
+| 9903.86-88.xx | US Note 20 | Footnotes + blanket product list (Lists 1-4B) | ~10,200 via `s301_product_lists.csv` |
+| 9903.89.xx | US Note 21 | Description-defined (List 4A exclusions) | Exclusion list (not yet captured) |
+| 9903.91.xx | US Note 31 | Footnotes + blanket product list (Biden acceleration) | ~390 via `s301_product_lists.csv` |
+| 9903.92.xx | US Note 31 | Footnotes + blanket product list (crane duties) | ~20 via `s301_product_lists.csv` |
 
-**Extraction:** `03_parse_chapter99.R` parses each 9903.xx.xx entry's `general` field for the rate and `description` for country scope. `04_parse_products.R` extracts footnote references from each product's `footnotes` field. `06_calculate_rates.R` joins on the Ch99 code.
+**Extraction:** `03_parse_chapter99.R` parses each 9903.xx.xx entry's `general` field for the rate and `description` for country scope. `12_scrape_us_notes.R` parses the Chapter 99 PDF to extract product lists from US Notes 20 and 31, outputting `resources/s301_product_lists.csv` (~12,200 entries across ~11,000 unique HTS8 codes). `06_calculate_rates.R` applies these as a blanket tariff for China, using generation-based rate stacking: MAX within generation (original Trump 9903.88.xx / Biden 9903.91-92.xx), SUM across generations.
 
-**Gap:** Products defined by US Note 20/21 product lists (~5,000) are not captured because those products lack direct footnote references to Ch99 entries. The linkage is implicit via the Note.
+**Gap:** Some 9903.89.xx exclusions reference US Note product lists and are not captured — excluded products may incorrectly receive the base 301 rate.
 
 #### Section 232 -- Chapter/heading-based identification
 
@@ -306,7 +306,7 @@ Where `nonmetal_share = 1 - metal_share` when `rate_232 > 0` and `metal_share < 
 - `resources/hs10_gtap_crosswalk.csv`: 18,700-row crosswalk from HTS-10 to GTAP sectors.
 - `resources/country_partner_mapping.csv`: 50-row mapping from Census codes to partner aggregation.
 - `resources/ieepa_exempt_products.csv`: 1,087 HTS-10 codes exempt from IEEPA reciprocal (Annex A / US Note 2 subdivision (v)(iii)). Derived from Tariff-ETRs config.
-- `resources/s301_product_lists.csv`: 10,400 HTS-8 codes covered by Section 301 tariffs on China. Sourced from USITC "China Tariffs" reference document.
+- `resources/s301_product_lists.csv`: ~12,200 entries (~11,000 unique HTS-8 codes) covered by Section 301 tariffs on China (Lists 1-4B + Biden modifications). Sourced from USITC "China Tariffs" reference document and US Notes 20/31 PDF parsing via `12_scrape_us_notes.R`. Products on multiple lists have separate entries per ch99 code for generation-based rate stacking.
 - `resources/s232_derivative_products.csv`: ~129 aluminum-containing derivative product prefixes (from US Note 19 via Tariff-ETRs config).
 - `resources/cbo/`: CBO metal content bucket files for derivative products (high/low aluminum, copper).
 
@@ -316,32 +316,34 @@ Comparison of timeseries pipeline output against TPC benchmark, matched by revis
 
 | Revision | TPC Date | N Comparisons | Exact (<0.5pp) | Within 2pp | Mean Abs Diff | Mean Diff |
 |----------|----------|---------------|----------------|------------|---------------|-----------|
-| rev_6 | 2025-03-17 | 62,205 | 47.3% | 48.3% | 7.8 pp | +0.1 pp |
-| rev_10 | 2025-04-17 | 242,245 | 80.8% | 81.1% | 3.0 pp | +0.7 pp |
-| rev_17 | 2025-07-17 | 241,640 | 71.2% | 71.5% | 4.8 pp | -1.2 pp |
-| rev_18 | 2025-10-17 | 268,867 | 50.0% | 51.0% | 8.0 pp | -1.6 pp |
-| rev_32 | 2025-11-17 | 268,742 | 52.0% | 53.3% | 8.1 pp | -0.2 pp |
+| rev_6 | 2025-03-17 | 62,205 | 61.4% | 61.6% | 5.0 pp | -1.5 pp |
+| rev_10 | 2025-04-17 | 300,126 | 86.4% | 86.4% | 2.0 pp | +0.4 pp |
+| rev_17 | 2025-07-17 | 299,211 | 77.1% | 77.5% | 3.4 pp | -1.3 pp |
+| rev_18 | 2025-10-17 | 298,368 | 61.0% | 61.8% | 5.8 pp | -1.9 pp |
+| rev_32 | 2025-11-17 | 298,341 | 66.1% | 67.0% | 4.9 pp | -0.2 pp |
 
 Regenerate with: `Rscript test_tpc_comparison.R`
 
-**Best-matching countries** (rev_32): Madagascar 94%, Bangladesh 94%, Tunisia 92%, Pakistan 89%, Mauritius 89%, Sri Lanka 87%, Afghanistan 86%, Cambodia 84%, Indonesia 84%, Nicaragua 83%.
-
-**Worst-matching countries** (rev_32): Switzerland 0.1%, Brunei 0%, Belarus 0%, Laos 0%, DR Congo 0%.
+**Best-matching countries** (rev_32): Madagascar 94%, Bangladesh 94%, Tunisia 92%, Nepal 91%, Pakistan 89%, Mauritius 89%, Armenia 88%, Morocco 87%, Kenya 87%, Sri Lanka 87%.
 
 **Discrepancy patterns** (rev_32):
-- **We are higher than TPC** (27.9% of products, mean +14.1pp): Mostly IEEPA reciprocal for countries where our rate exceeds TPC's. Includes 68K products with IEEPA recip > 0.
-- **TPC is higher than us** (18.8% of products, mean -22pp): ~25K products with shortfall near 25pp -- consistent with missing Section 301 coverage. ~2,066 China products where TPC > us.
-- **China match**: At rev_32, China exact match is 79.7%. Mean rate ours (39.1%) vs TPC (41.7%), diff -2.6pp.
+- **We are higher than TPC** (19.9% of products, mean +11.8pp): Mostly IEEPA reciprocal for countries where our rate exceeds TPC's. Includes 57K products with IEEPA recip > 0.
+- **TPC is higher than us** (13.1% of products, mean -19.6pp): ~16K products with shortfall near 25pp. ~2,031 China products where TPC > us (mean -23pp).
+- **China match**: At rev_32, China exact match is 72.4%. Mean rate ours (40.2%) vs TPC (41.7%), diff -1.5pp.
 
-Key remaining gap sources: (1) **Phantom IEEPA countries** (~95K false positive pairs for countries like Brunei, Laos, DR Congo where TPC shows 0%); (2) **China IEEPA rate discrepancy** (34% statutory vs ~20% TPC, reflecting the Geneva deal); (3) **India/Brazil rate extraction** (under-applying IEEPA rates).
+Key remaining gap sources: (1) **China+232 reciprocal stacking** (~920 steel/aluminum products; TPC stacks IEEPA reciprocal on top of 232, we apply mutual exclusion per Tariff-ETRs); (2) **EU/Japan/Korea floor residual** (~4pp systematic excess); (3) **USMCA classification mismatch** (~5,700 CA/MX products).
 
 ## Known Issues
 
-### 1. Section 301 coverage gap (~5,000 China products)
+### 1. China+232 reciprocal stacking (~920 products, ~25pp gap)
 
-Section 301 tariffs on China are defined by US Note 20 (original lists), US Note 21 (List 4A), and US Note 31 (Biden acceleration). The HTS encodes this via description references ("articles the product of China, as provided for in U.S. note 20") rather than per-product footnotes. Our parser captures products that have direct footnote references to 9903.88.xx/9903.91.xx entries (~7,200 products) but misses products defined only by the US Note product lists (~5,000 additional products). This is the single largest TPC gap source.
+For China products subject to Section 232 (steel ch72-73, aluminum ch76, copper ch74), TPC stacks the IEEPA reciprocal tariff on top of 232 (e.g., 232(25%) + recip(25%) + fent(10%) + 301(25%) = 85%). Our model applies mutual exclusion per Tariff-ETRs methodology: 232 takes precedence over IEEPA reciprocal for base 232 products, so recip contributes 0pp. This is a fundamental methodological difference, not a data gap. Our approach follows the legal structure (Section 232 and IEEPA are separate authorities), while TPC appears to sum all authorities unconditionally.
 
-### 2. China's IEEPA reciprocal rate discrepancy with TPC
+### 2. Section 301 exclusions (9903.89.xx)
+
+Some 9903.89.xx exclusions reference US Note product lists and are not captured — excluded products may incorrectly receive the base 301 rate. Low impact (~61 products).
+
+### 3. China's IEEPA reciprocal rate discrepancy with TPC
 
 China's IEEPA reciprocal is parsed from 9903.01.63 (Phase 1, +34%). TPC data implies a 25% rate. The discrepancy likely reflects the May 2025 US-China bilateral agreement that reduced the effective rate. The HTS Rev 32 still encodes the pre-negotiation statutory rate.
 
@@ -354,6 +356,10 @@ EU, Japan, and South Korea use a floor rate structure (15% minimum). Japan and S
 USMCA eligibility from the HTS `special` field gives a binary flag. In practice, not all trade in an eligible product claims USMCA preference. A utilization-rate adjustment would improve accuracy for Canada/Mexico.
 
 ## Resolved Issues
+
+### Section 301 coverage gap (Fixed)
+
+Section 301 product lists expanded from ~10,400 to ~11,000 unique HTS8 codes (~12,200 entries) by adding List 4B (9903.88.16, 1,519 products) from the Chapter 99 PDF. Rate aggregation changed from `max()` to generation-based stacking: MAX within each generation (original Trump 9903.88.xx / Biden 9903.91-92.xx), SUM across generations. This correctly handles products on both Trump and Biden lists (e.g., Trump List 3 at 25% + Biden at 25% = 50% total). Missing ch99 rate entries added: 9903.91.06 (25%), 9903.91.07 (50%), 9903.91.08 (100%), 9903.92.10 (25%).
 
 ### Section 232 derivative products (Fixed)
 
