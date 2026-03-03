@@ -5,6 +5,11 @@ library(here)
 
 source(here('src', '00_build_timeseries.R'))
 
+# ---- CLI args ----
+args <- commandArgs(trailingOnly = TRUE)
+stacking_method <- if ('--tpc-stacking' %in% args) 'tpc_additive' else 'mutual_exclusion'
+cat('Stacking method:', stacking_method, '\n')
+
 # ---- Config ----
 tpc_revisions <- c('rev_6', 'rev_10', 'rev_17', 'rev_18', 'rev_32')
 
@@ -59,7 +64,8 @@ for (i in seq_len(nrow(tpc_map))) {
     products, ch99_data, ieepa_rates, usmca,
     countries, rev_id, eff_date,
     s232_rates = s232_rates,
-    fentanyl_rates = fentanyl_rates
+    fentanyl_rates = fentanyl_rates,
+    stacking_method = stacking_method
   )
 
   # Compare to TPC
@@ -269,6 +275,63 @@ for (j in seq_along(floor_countries)) {
         'mean diff: ', round(mean(cty_data$diff) * 100, 1), 'pp\n', sep = '')
   }
 }
+
+# ---- Duty-free IEEPA breakdown ----
+cat('\n--- Duty-Free IEEPA Breakdown (latest revision) ---\n\n')
+
+# Products with 0% MFN base rate where we charge IEEPA reciprocal but TPC doesn't
+duty_free_diverge <- latest %>%
+  filter(base_rate < 0.001, rate_ieepa_recip > 0, diff > 0.005)
+
+cat('Duty-free products where we > TPC: ', nrow(duty_free_diverge), '\n')
+cat('  As % of total comparisons: ', round(100 * nrow(duty_free_diverge) / nrow(latest), 1), '%\n')
+
+if (nrow(duty_free_diverge) > 0) {
+  cat('  Top chapters:\n')
+  df_chapters <- duty_free_diverge %>%
+    mutate(chapter = substr(hts10, 1, 2)) %>%
+    count(chapter, name = 'n_products') %>%
+    arrange(desc(n_products)) %>%
+    head(10)
+  print(df_chapters)
+}
+
+# Simulated match rate if duty-free excluded
+n_current_match <- sum(latest$match_exact)
+n_simulated_match <- n_current_match + nrow(duty_free_diverge)
+cat('\nSimulated match rate if duty_free_treatment = nonzero_base_only:\n')
+cat('  Current:   ', round(100 * n_current_match / nrow(latest), 1), '%\n')
+cat('  Simulated: ', round(100 * n_simulated_match / nrow(latest), 1), '%\n')
+cat('  Gain:      +', round(100 * nrow(duty_free_diverge) / nrow(latest), 1), 'pp\n')
+
+# ---- Per-country-group summary for floor countries ----
+cat('\n--- Floor Country Groups (latest revision) ---\n\n')
+
+floor_group_summary <- latest %>%
+  filter(country %in% pp$FLOOR_COUNTRIES) %>%
+  mutate(
+    country_group = case_when(
+      country %in% pp$EU27_CODES ~ 'EU-27',
+      country == pp$country_codes$CTY_JAPAN ~ 'Japan',
+      country == pp$country_codes$CTY_SKOREA ~ 'S. Korea',
+      country %in% c(pp$country_codes$CTY_SWITZERLAND,
+                      pp$country_codes$CTY_LIECHTENSTEIN) ~ 'Swiss/Liecht.',
+      TRUE ~ 'Other'
+    )
+  ) %>%
+  group_by(country_group) %>%
+  summarise(
+    n = n(),
+    pct_exact = round(mean(match_exact) * 100, 1),
+    pct_2pp = round(mean(match_2pp) * 100, 1),
+    mean_diff = round(mean(diff) * 100, 2),
+    n_duty_free_gap = sum(base_rate < 0.001 & rate_ieepa_recip > 0 & diff > 0.005),
+    .groups = 'drop'
+  ) %>%
+  arrange(desc(n))
+
+print(floor_group_summary)
+write_csv(floor_group_summary, file.path(val_dir, 'tpc_floor_group_summary.csv'))
 
 # ---- Save validation metadata ----
 validation_metadata <- list(

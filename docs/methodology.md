@@ -13,7 +13,7 @@ The system produces ~4.5 million product-country rate observations per revision 
 | Source | Description | Coverage |
 |--------|-------------|----------|
 | **USITC HTS JSON** | Official tariff schedule; base MFN rates, Chapter 99 additional duties, product footnotes, special program codes | 34 revisions (basic through 2026_basic), ~35,500 items per revision |
-| **USITC Chapter 99 PDF** | US Notes text enumerating product lists for Section 301, floor country exemptions | 767 pages; parsed by `12_scrape_us_notes.R` |
+| **USITC Chapter 99 PDF** | US Notes text enumerating product lists for Section 301, floor country exemptions | 767 pages; parsed by `03_scrape_us_notes.R` |
 | **Census 2024 Import Data** | Import values by HTS-10 x country x GTAP sector | ~$2.9 trillion total; used for ETR weighting |
 | **Tariff-ETRs USMCA Shares** | GTAP sector-level USMCA utilization fractions for CA/MX | 47 GTAP sectors; used for weighted USMCA exemption |
 | **TPC Benchmark** | HTS-10 x country tariff rates at 5 snapshot dates | ~339K rows; validation only |

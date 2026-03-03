@@ -28,24 +28,29 @@ Rscript test_tpc_comparison.R
 Rscript src/quality_report.R
 
 # Diagnostics (saves to output/diagnostics/)
-Rscript src/09_diagnostics.R
+Rscript src/10_diagnostics.R
 
 # Daily rate series (saves to output/daily/)
-Rscript src/11_daily_series.R
+Rscript src/12_daily_series.R
 
 # Import-weighted ETRs (requires built timeseries; saves to output/etr/)
-Rscript src/10_weighted_etr.R
+Rscript src/11_weighted_etr.R
 
 # Revision changelog (diffs Ch99 across all revisions; saves to output/changelog/)
 Rscript src/13_revision_changelog.R
 
 # Parse US Note 301 product lists from Chapter 99 PDF
-Rscript src/12_scrape_us_notes.R
-Rscript src/12_scrape_us_notes.R --dry-run    # Report without writing
+Rscript src/03_scrape_us_notes.R
+Rscript src/03_scrape_us_notes.R --dry-run    # Report without writing
 
 # Parse floor country product exemptions from Chapter 99 PDF
-Rscript src/12_scrape_us_notes.R --floor-exemptions
-Rscript src/12_scrape_us_notes.R --all        # Both 301 + floor exemptions
+Rscript src/03_scrape_us_notes.R --floor-exemptions
+Rscript src/03_scrape_us_notes.R --all        # Both 301 + floor exemptions
+
+# Per-revision Chapter 99 PDF operations
+Rscript src/03_scrape_us_notes.R --download-pdfs [--dry-run]  # Download all revision PDFs
+Rscript src/03_scrape_us_notes.R --revision rev_18            # Parse floor exemptions for one revision
+Rscript src/03_scrape_us_notes.R --all-revisions [--dry-run]  # Parse all revisions from rev_18+
 ```
 
 ## Architecture
@@ -54,8 +59,8 @@ Rscript src/12_scrape_us_notes.R --all        # Both 301 + floor exemptions
 For each HTS revision (basic, rev_1, ..., rev_32, 2026_basic):
   JSON -> Parse Ch99 -> Parse Products -> Extract Policy Params -> Calculate Rates -> Snapshot
 All snapshots -> rate_timeseries.rds (with valid_from/valid_until intervals)
-rate_timeseries.rds -> daily aggregates (11_daily_series.R)
-rate_timeseries.rds -> import-weighted ETRs (10_weighted_etr.R via get_rates_at_date())
+rate_timeseries.rds -> daily aggregates (12_daily_series.R)
+rate_timeseries.rds -> import-weighted ETRs (11_weighted_etr.R via get_rates_at_date())
 ```
 
 **Active Pipeline (v2 timeseries):**
@@ -68,16 +73,16 @@ rate_timeseries.rds -> import-weighted ETRs (10_weighted_etr.R via get_rates_at_
 
 1. `01_scrape_revision_dates.R`: Scrape USITC for revision effective dates
 2. `02_download_hts.R`: Download missing HTS JSON archives from USITC
-3. `03_parse_chapter99.R`: Extract Ch99 entries (rates, authority, countries)
-4. `04_parse_products.R`: Extract product lines (base rates, footnote refs)
-5. `05_parse_policy_params.R`: Extract IEEPA, fentanyl, 232, USMCA from JSON
-6. `06_calculate_rates.R`: Join products to authorities, apply stacking
-7. `07_validate_tpc.R`: TPC benchmark comparison
-8. `08_apply_scenarios.R`: Counterfactual scenarios (zero out authorities)
-9. `09_diagnostics.R`: Debugging and validation utilities
-10. `10_weighted_etr.R`: Import-weighted effective tariff rates (uses timeseries via `get_rates_at_date()`)
-11. `11_daily_series.R`: Daily rate series, point-in-time queries, daily aggregates
-12. `12_scrape_us_notes.R`: Parse US Note 20/21/31 product lists from Chapter 99 PDF
+3. `03_scrape_us_notes.R`: Parse US Note 20/21/31 product lists and floor exemptions from Chapter 99 PDF
+4. `04_parse_chapter99.R`: Extract Ch99 entries (rates, authority, countries)
+5. `05_parse_products.R`: Extract product lines (base rates, footnote refs)
+6. `06_parse_policy_params.R`: Extract IEEPA, fentanyl, 232, USMCA from JSON
+7. `07_calculate_rates.R`: Join products to authorities, apply stacking
+8. `08_validate_tpc.R`: TPC benchmark comparison
+9. `09_apply_scenarios.R`: Counterfactual scenarios (zero out authorities)
+10. `10_diagnostics.R`: Debugging and validation utilities
+11. `11_weighted_etr.R`: Import-weighted effective tariff rates (uses timeseries via `get_rates_at_date()`)
+12. `12_daily_series.R`: Daily rate series, point-in-time queries, daily aggregates
 13. `13_revision_changelog.R`: Diff Ch99 entries across all revisions, build policy timeline
 
 **Key Configuration:**
@@ -94,11 +99,11 @@ rate_timeseries.rds -> import-weighted ETRs (10_weighted_etr.R via get_rates_at_
 - `classify_authority()`: Unified Ch99 authority classifier
 - `load_policy_params()`: Reads config/policy_params.yaml, unpacks convenience fields
 - `load_232_derivative_products()`: Reads derivative product list from resources/
-- `load_floor_exempt_products()`: Reads floor country product exemptions from resources/
+- `load_floor_exempt_products()`: Reads floor country product exemptions from resources/ (static); `load_revision_floor_exemptions()` for per-revision
 - `load_usmca_product_shares()`: Reads per-HTS10 x country USMCA utilization shares from Census SPI data
 - `load_metal_content()`: Computes per-product metal shares (flat/CBO/BEA methods)
 - `parse_revision_id()`: Extracts year + revision type from any revision ID (e.g., '2026_rev_3' -> year=2026, rev='rev_3')
-- `get_rates_at_date(ts, date)`: Point-in-time rate query (in 11_daily_series.R) — preferred way to get rates at any date
+- `get_rates_at_date(ts, date)`: Point-in-time rate query (in 12_daily_series.R) — preferred way to get rates at any date
 
 ## Stacking Rules
 
@@ -137,13 +142,13 @@ Key: 232 takes precedence over IEEPA reciprocal. For base 232 products (metal_sh
 ~11,000+ HTS8 product codes covered by Section 301 tariffs on China (Lists 1-4B + Biden modifications).
 List in `resources/s301_product_lists.csv` (~12,200 entries including dual-list products). Two sources:
 1. USITC "China Tariffs" reference document (hts.usitc.gov, ~10,400 codes)
-2. US Notes 20/31 from Chapter 99 PDF (`12_scrape_us_notes.R`, Lists 1-4B + Biden headings)
+2. US Notes 20/31 from Chapter 99 PDF (`03_scrape_us_notes.R`, Lists 1-4B + Biden headings)
 
 Rate aggregation uses generation-based stacking: MAX within generation (original Trump 9903.88.xx /
 Biden 9903.91-92.xx), SUM across generations. Products on both Trump List 3 (25%) and Biden (25%)
 get 50% total. Products on only one generation get that generation's rate.
 
-Applied as blanket tariff for China (country 5700) in `06_calculate_rates.R` step 3b, mirroring the
+Applied as blanket tariff for China (country 5700) in `07_calculate_rates.R` step 3b, mirroring the
 Section 232 blanket pattern.
 
 Known limitation: Some 9903.89.xx exclusions reference US Note product lists (not footnotes) and are
@@ -157,7 +162,7 @@ Fentanyl rates (9903.01.01-24) have product-specific carve-outs with lower rates
 - 9903.01.05 (MX): Potash → +10% (vs general +25%)
 
 Product lists in `resources/fentanyl_carveout_products.csv` (308 HTS8 prefixes, sourced from Tariff-ETRs).
-Applied in `06_calculate_rates.R` step 3: products matching carve-out HTS8 get the carve-out rate;
+Applied in `07_calculate_rates.R` step 3: products matching carve-out HTS8 get the carve-out rate;
 all others get the general blanket rate. `extract_ieepa_fentanyl_rates()` returns all entries with
 `entry_type` column ('general' vs 'carveout').
 
@@ -166,13 +171,23 @@ all others get the general blanket rate. `extract_ieepa_fentanyl_rates()` return
 ~1,087 products exempt from IEEPA reciprocal (Annex A / US Note 2 subdivision (v)(iii)).
 List in `resources/ieepa_exempt_products.csv`. Not parseable from HTS JSON (US Notes text unavailable via API).
 
+## IEEPA Duty-Free Treatment
+
+Configurable via `ieepa_duty_free_treatment` in `config/policy_params.yaml`:
+- `'all'` (default): Apply IEEPA reciprocal to all products regardless of MFN base rate
+- `'nonzero_base_only'`: Skip products with 0% MFN base rate (matches TPC methodology)
+
+TPC does not apply IEEPA reciprocal to duty-free products (~26K product-country pairs at rev_32).
+The legal text supports either interpretation. Setting to `'nonzero_base_only'` improves TPC match
+rate by ~8.5pp. Applied in `07_calculate_rates.R` step 2 (existing products and new IEEPA-only pairs).
+
 ## Floor Country Product Exemptions
 
 Products exempt from the 15% tariff floor for EU, Japan, S. Korea, Switzerland/Liechtenstein.
 Categories: PTAAP (agricultural/natural resources), civil aircraft, non-patented pharmaceuticals,
 particular articles. Defined in US Note 2 subdivisions (v)(xx)-(xxiv) and Note 3.
 List in `resources/floor_exempt_products.csv`, parsed from Chapter 99 PDF by
-`12_scrape_us_notes.R --floor-exemptions`. Applied in `06_calculate_rates.R` step 2:
+`03_scrape_us_notes.R --floor-exemptions`. Applied in `07_calculate_rates.R` step 2:
 exempt products get `rate_ieepa_recip = 0` for their respective country groups.
 
 Country groups: `eu` (27 EU members), `japan`, `korea`, `swiss` (Switzerland + Liechtenstein).
@@ -181,7 +196,7 @@ Country groups: `eu` (27 EU members), `japan`, `korea`, `swiss` (Switzerland + L
 
 15% floor structure effective Nov 14, 2025 (retroactive). IEEPA extraction range extended to 9903.02.02-91
 to natively parse Swiss floor entries (9903.02.82-91) when present in HTS JSON. Surcharge-to-floor override
-in `06_calculate_rates.R` is date-bounded by `swiss_framework` config in `policy_params.yaml`:
+in `07_calculate_rates.R` is date-bounded by `swiss_framework` config in `policy_params.yaml`:
 - `effective_date`: Nov 14, 2025 (start of override window)
 - `expiry_date`: March 31, 2026 (framework must be finalized by this date)
 - `finalized`: set to `true` once deal confirmed (removes expiry constraint)

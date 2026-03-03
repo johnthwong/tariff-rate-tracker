@@ -59,7 +59,7 @@ See Done section.
 See Done section.
 
 ### 10. Counterfactual scenario validation
-`08_apply_scenarios.R` exists but hasn't been tested against the full timeseries. Verify:
+`09_apply_scenarios.R` exists but hasn't been tested against the full timeseries. Verify:
 
 - `apply_scenario(ts, 'baseline')` equals raw rates
 - `apply_scenario(ts, 'no_ieepa')` zeros IEEPA columns
@@ -77,6 +77,27 @@ Rev_4 (2026-02-25) added 11 new ch99 entries under 9903.03.xx with a 10% blanket
 
 ### 20. Swiss framework finalization deadline (March 31, 2026)
 The US-Switzerland-Liechtenstein framework (EO 14346) must be finalized by March 31, 2026. If confirmed, set `swiss_framework.finalized: true` in `policy_params.yaml`. If it lapses, rates revert to surcharges. Monitor Federal Register and USITC revisions around this date.
+
+### 21. EU/Floor duty-free product gap — largest remaining TPC discrepancy
+**47.6% of all mismatches.** 61,601 duty-free EU products (base_rate = 0%) where we apply 15% floor but TPC disagrees for ~63%. Three sub-patterns:
+
+- **~11,000 products (17.8%)**: TPC gives 0% — suggests additional IEEPA exemption lists beyond our Annex A (1,087) + floor-specific (1,681) exemptions
+- **~23,200 products (37.7%)**: TPC gives continuous 0.1-14.9% — suggests TPC uses trade-weighted or partial-credit floor methodology, not a simple `max(0, 15% - base_rate)` formula
+- **~4,500 products (7.3%)**: TPC gives >15% — may be 232 interaction or specific-rate products with different AVE conversion
+
+Investigation steps:
+1. Cross-reference the ~11,000 TPC-zero products against IEEPA Annex A and Annex II exemption lists from the Federal Register EOs
+2. Check whether TPC applies the floor at tariff-line level vs a trade-weighted sector-level approach
+3. Investigate ad-valorem equivalent (AVE) differences for specific-rate products
+4. Compare EU match rates pre- vs post-floor (rev_10: 92.1% → rev_18: 45.3%) to isolate floor-specific errors
+
+See `docs/NEXT_STEPS.md` #1 for full analysis.
+
+### 22. Verify Iraq IEEPA rate (35% vs TPC ~24%)
+137 Iraq products at 54.7% match with us 11.3pp higher than TPC. Our IEEPA reciprocal rate for Iraq is 35%; TPC implies ~24%. May be a country-specific EO rate that changed or a parsing error. Check HTS JSON entries for Iraq in the 9903.01.xx range.
+
+### 23. Gulf state systematic TPC excess (~2-3pp)
+Oman, Qatar, UAE, Suriname all show TPC 2-3pp higher than our rates across ~1,500 products. TPC may capture an additional authority or use different base rate parsing for ad-valorem equivalents in these countries. Low priority individually but follows a consistent pattern worth understanding.
 
 ## Done
 
@@ -103,13 +124,13 @@ Earlier failed approaches: (1) Tariff-ETRs sector-level shares applied blanket (
 ### ~~Switzerland IEEPA over-application (+24pp)~~ (Fixed)
 Per [90 FR 59281](https://www.federalregister.gov/documents/2025/12/18/2025-23316) (FR Doc. 2025-23316, Dec 18, 2025): EO 14346 implements the US-Switzerland-Liechtenstein trade framework, effective Nov 14, 2025 (retroactive). Terminates 9903.02.36 (Liechtenstein +15% surcharge) and 9903.02.58 (Switzerland +39% surcharge). New entries 9903.02.82-91 establish a 15% floor structure matching EU/Japan/S. Korea pattern: products with base rate >= 15% get no additional duty; products with base rate < 15% are raised to 15%. Also exempts PTAAP agricultural/natural resources, civil aircraft, and non-patented pharmaceuticals.
 
-Fix: Added Switzerland (4419) and Liechtenstein (4411) to `floor_countries` in `config/policy_params.yaml`. Added override logic in `06_calculate_rates.R` that converts surcharge → floor for countries listed in `floor_countries` when the HTS JSON hasn't yet been updated. Created `docs/active_hts_changes.md` to track Federal Register changes not yet reflected in HTS JSON. Conditional expiry: framework must be finalized by March 31, 2026.
+Fix: Added Switzerland (4419) and Liechtenstein (4411) to `floor_countries` in `config/policy_params.yaml`. Added override logic in `07_calculate_rates.R` that converts surcharge → floor for countries listed in `floor_countries` when the HTS JSON hasn't yet been updated. Created `docs/active_hts_changes.md` to track Federal Register changes not yet reflected in HTS JSON. Conditional expiry: framework must be finalized by March 31, 2026.
 
 ### ~~China IEEPA reciprocal rate: 34% vs ~20%~~ (Fixed)
 Post-Geneva (rev_17+), 9903.01.63 is marked `[Compiler's note: provision suspended.]` in HTS JSON. Suspension detection in `extract_ieepa_rates()` was not triggering due to encoding/format variation. Added robust secondary regex check (`\\[Compiler.*suspended`). China's Phase 1 rate now correctly caps to the 10% universal baseline. Expected impact: ~17K China products drop from 34% to 10% IEEPA reciprocal.
 
 ### ~~Phantom IEEPA countries (~95K false positive pairs)~~ (Fixed)
-Countries with legitimate IEEPA entries that TPC doesn't model — Syria (5020), Moldova (4641), Laos (5530), Falkland Islands (3720), DR Congo (7660) — were inflating validation discrepancies. Added `tpc_excluded_countries` list to `config/policy_params.yaml` and exclusion filters in `test_tpc_comparison.R` and `07_validate_tpc.R`. Actual calculated rates unchanged; only validation comparisons affected.
+Countries with legitimate IEEPA entries that TPC doesn't model — Syria (5020), Moldova (4641), Laos (5530), Falkland Islands (3720), DR Congo (7660) — were inflating validation discrepancies. Added `tpc_excluded_countries` list to `config/policy_params.yaml` and exclusion filters in `test_tpc_comparison.R` and `08_validate_tpc.R`. Actual calculated rates unchanged; only validation comparisons affected.
 
 ### ~~Section 232 derivative products~~ (Implemented)
 ~130 aluminum-containing articles outside chapter 76 now covered via blanket matching using `resources/s232_derivative_products.csv`. Metal content scaling configurable (flat 50% default, CBO product-level buckets). Stacking rules updated for non-metal portion.
@@ -151,10 +172,10 @@ Diagnostic on rev_32 for 27 EU floor countries + Japan + S. Korea. Floor formula
 
 **Net result**: Germany 41.5% exact match, mean diff +1.55pp. Floor countries range 32-44% exact match.
 
-**Update**: Pattern A (product exemptions) now addressed. Extended `12_scrape_us_notes.R` to parse floor country product exemptions from US Note 2 subdivisions (v)(xx)-(xxiv) and Note 3. Product lists for PTAAP (agricultural/natural resources), civil aircraft, non-patented pharmaceuticals, and particular articles extracted from Chapter 99 PDF for EU, S. Korea, Switzerland/Liechtenstein, and Japan. Output in `resources/floor_exempt_products.csv`. Applied in `06_calculate_rates.R` — exempt products get `rate_ieepa_recip = 0` instead of the 15% floor. Patterns B (continuous rates) and C (232 interaction) remain open.
+**Update**: Pattern A (product exemptions) now addressed. Extended `03_scrape_us_notes.R` to parse floor country product exemptions from US Note 2 subdivisions (v)(xx)-(xxiv) and Note 3. Product lists for PTAAP (agricultural/natural resources), civil aircraft, non-patented pharmaceuticals, and particular articles extracted from Chapter 99 PDF for EU, S. Korea, Switzerland/Liechtenstein, and Japan. Output in `resources/floor_exempt_products.csv`. Applied in `07_calculate_rates.R` — exempt products get `rate_ieepa_recip = 0` instead of the 15% floor. Patterns B (continuous rates) and C (232 interaction) remain open.
 
 ### ~~US Note 20/31 product lists~~ (Implemented)
-New script `src/12_scrape_us_notes.R` downloads Chapter 99 PDF from USITC, finds "Heading 9903.XX.XX applies to" anchors, extracts HTS subheading codes from each product list section. Covers Note 20 (Lists 1-3 + 4A: 9903.88.01/.02/.03/.15) and Note 31 (Biden acceleration: 9903.91.01-.11). Note 21 doesn't exist as a separate note — List 4A modifications are embedded in Note 20 subdivision (u). Parser found 10,587 codes with 10,132 matching existing CSV (strong validation), adding 296 new entries (mostly List 3). Run with `Rscript src/12_scrape_us_notes.R` (or `--dry-run` to preview). Requires `pdftools` package.
+New script `src/03_scrape_us_notes.R` downloads Chapter 99 PDF from USITC, finds "Heading 9903.XX.XX applies to" anchors, extracts HTS subheading codes from each product list section. Covers Note 20 (Lists 1-3 + 4A: 9903.88.01/.02/.03/.15) and Note 31 (Biden acceleration: 9903.91.01-.11). Note 21 doesn't exist as a separate note — List 4A modifications are embedded in Note 20 subdivision (u). Parser found 10,587 codes with 10,132 matching existing CSV (strong validation), adding 296 new entries (mostly List 3). Run with `Rscript src/03_scrape_us_notes.R` (or `--dry-run` to preview). Requires `pdftools` package.
 
 ### ~~S301 in all stacking branches~~ (Fixed — #12)
 Added `+ rate_301` to the Others+232 and Others-no-232 branches in `apply_stacking_rules()` (`src/helpers.R`). S301 is unconditionally cumulative — applies to full customs value regardless of 232 status, with no `nonmetal_share` scaling. China branches already included `rate_301` correctly. Currently zero impact for non-China countries (S301 only targets China), but correct for forward-compatibility. No TPC validation change expected.

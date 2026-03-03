@@ -28,11 +28,11 @@ library(here)
 source(here('src', 'helpers.R'))
 source(here('src', '01_scrape_revision_dates.R'))
 source(here('src', '02_download_hts.R'))
-source(here('src', '03_parse_chapter99.R'))
-source(here('src', '04_parse_products.R'))
-source(here('src', '05_parse_policy_params.R'))
-source(here('src', '06_calculate_rates.R'))
-source(here('src', '07_validate_tpc.R'))
+source(here('src', '04_parse_chapter99.R'))
+source(here('src', '05_parse_products.R'))
+source(here('src', '06_parse_policy_params.R'))
+source(here('src', '07_calculate_rates.R'))
+source(here('src', '08_validate_tpc.R'))
 
 # =============================================================================
 # Pipeline Configuration
@@ -59,7 +59,8 @@ CONFIG <- list(
 # Main Pipeline
 # =============================================================================
 
-run_full_pipeline <- function(revision = NULL, skip_parse = FALSE, skip_validate = FALSE) {
+run_full_pipeline <- function(revision = NULL, skip_parse = FALSE, skip_validate = FALSE,
+                              stacking_method = 'mutual_exclusion') {
   start_time <- Sys.time()
 
   config <- CONFIG
@@ -166,7 +167,8 @@ run_full_pipeline <- function(revision = NULL, skip_parse = FALSE, skip_validate
     products, ch99_data, ieepa_rates, usmca,
     countries, revision, eff_date,
     s232_rates = s232_rates,
-    fentanyl_rates = fentanyl_rates
+    fentanyl_rates = fentanyl_rates,
+    stacking_method = stacking_method
   )
 
   # Save
@@ -238,6 +240,7 @@ if (sys.nframe() == 0) {
   revision <- NULL
   skip_parse <- FALSE
   skip_validate <- FALSE
+  stacking_method <- 'mutual_exclusion'
 
   for (i in seq_along(args)) {
     if (args[i] == '--revision' && i < length(args)) {
@@ -246,6 +249,8 @@ if (sys.nframe() == 0) {
       skip_parse <- TRUE
     } else if (args[i] == '--skip-validate') {
       skip_validate <- TRUE
+    } else if (args[i] == '--tpc-stacking') {
+      stacking_method <- 'tpc_additive'
     }
   }
 
@@ -253,6 +258,7 @@ if (sys.nframe() == 0) {
   result <- run_full_pipeline(
     revision = revision,
     skip_parse = skip_parse,
-    skip_validate = skip_validate
+    skip_validate = skip_validate,
+    stacking_method = stacking_method
   )
 }

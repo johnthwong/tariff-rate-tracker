@@ -8,7 +8,7 @@ library(jsonlite)
 library(here)
 
 source(here('src', 'helpers.R'))
-source(here('src', '03_parse_chapter99.R'))
+source(here('src', '04_parse_chapter99.R'))
 
 # ---- Load revision dates ----
 rev_dates <- load_revision_dates(here('config', 'revision_dates.csv'))

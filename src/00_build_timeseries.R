@@ -32,11 +32,11 @@ source(here('src', 'logging.R'))
 source(here('src', 'helpers.R'))
 source(here('src', '01_scrape_revision_dates.R'))
 source(here('src', '02_download_hts.R'))
-source(here('src', '03_parse_chapter99.R'))
-source(here('src', '04_parse_products.R'))
-source(here('src', '05_parse_policy_params.R'))
-source(here('src', '06_calculate_rates.R'))
-source(here('src', '07_validate_tpc.R'))
+source(here('src', '04_parse_chapter99.R'))
+source(here('src', '05_parse_products.R'))
+source(here('src', '06_parse_policy_params.R'))
+source(here('src', '07_calculate_rates.R'))
+source(here('src', '08_validate_tpc.R'))
 
 
 # =============================================================================
@@ -63,7 +63,8 @@ build_full_timeseries <- function(
   census_codes_path = 'resources/census_codes.csv',
   tpc_path = 'data/tpc/tariff_by_flow_day.csv',
   scenario = 'baseline',
-  start_from = NULL
+  start_from = NULL,
+  stacking_method = 'mutual_exclusion'
 ) {
   start_time <- Sys.time()
 
@@ -211,7 +212,8 @@ build_full_timeseries <- function(
         products, ch99_data, ieepa_rates, usmca,
         countries, rev_id, eff_date,
         s232_rates = s232_rates,
-        fentanyl_rates = fentanyl_rates
+        fentanyl_rates = fentanyl_rates,
+        stacking_method = stacking_method
       )
 
       # h. Save snapshot

@@ -320,6 +320,46 @@ parse_revision_id <- function(revision) {
 }
 
 
+#' Build USITC release name from revision identifier
+#'
+#' Maps a revision ID to the USITC release name used in API URLs.
+#' Returns NA for pre-2025 revisions (no API access).
+#'
+#' @param revision Character revision identifier (e.g., 'rev_18', '2026_basic')
+#' @return Character release name (e.g., '2025HTSRev18') or NA
+build_release_name <- function(revision) {
+  parsed <- parse_revision_id(revision)
+  year <- parsed$year
+  rev <- parsed$rev
+
+  if (year < 2025) return(NA_character_)
+
+  if (rev == 'basic') {
+    return(paste0(year, 'HTSBasic'))
+  }
+
+  # Extract numeric part from rev_N
+  rev_num <- as.integer(sub('^rev_', '', rev))
+  if (is.na(rev_num)) return(NA_character_)
+
+  return(paste0(year, 'HTSRev', rev_num))
+}
+
+
+#' Build USITC Chapter 99 PDF download URL
+#'
+#' Uses the USITC reststop file endpoint to construct a URL for downloading
+#' the Chapter 99 PDF for a specific HTS release.
+#'
+#' @param release_name Character release name from build_release_name()
+#' @return Character URL string
+build_chapter99_url <- function(release_name) {
+  paste0('https://hts.usitc.gov/reststop/file?release=',
+         URLencode(release_name, reserved = TRUE),
+         '&filename=Chapter+99')
+}
+
+
 #' Load revision dates from config CSV
 #'
 #' @param csv_path Path to revision_dates.csv
@@ -471,8 +511,10 @@ enforce_rate_schema <- function(df) {
 #' @param df Data frame with rate_232, rate_301, rate_ieepa_recip,
 #'   rate_ieepa_fent, rate_s122, rate_other, metal_share, country columns
 #' @param cty_china Census code for China (default: '5700')
+#' @param stacking_method 'mutual_exclusion' (default, 232/IEEPA mutual exclusion)
+#'   or 'tpc_additive' (all authorities stack additively, matching TPC methodology)
 #' @return df with total_additional and total_rate recomputed
-apply_stacking_rules <- function(df, cty_china = '5700') {
+apply_stacking_rules <- function(df, cty_china = '5700', stacking_method = 'mutual_exclusion') {
   # Ensure rate_s122 exists and has no NAs
   # (bind_rows can introduce NAs when combining dataframes with/without this column)
   if (!'rate_s122' %in% names(df)) {
@@ -484,6 +526,18 @@ apply_stacking_rules <- function(df, cty_china = '5700') {
   # Ensure metal_share exists (default 1.0 = full metal, no nonmetal portion)
   if (!'metal_share' %in% names(df)) {
     df$metal_share <- 1.0
+  }
+
+  # TPC additive: all authorities stack with no mutual exclusion
+  if (stacking_method == 'tpc_additive') {
+    return(
+      df %>%
+        mutate(
+          total_additional = rate_232 + rate_ieepa_recip + rate_ieepa_fent +
+            rate_301 + rate_s122 + rate_other,
+          total_rate = base_rate + total_additional
+        )
+    )
   }
 
   df %>%
@@ -694,7 +748,7 @@ load_232_derivative_products <- function(path = here('resources', 's232_derivati
 #' Products exempt from the 15% tariff floor for EU, Japan, S. Korea,
 #' Switzerland/Liechtenstein. Categories: PTAAP (agricultural/natural
 #' resources), civil aircraft, non-patented pharmaceuticals. Parsed from
-#' US Notes to Chapter 99 by 12_scrape_us_notes.R --floor-exemptions.
+#' US Notes to Chapter 99 by 03_scrape_us_notes.R --floor-exemptions.
 #'
 #' @param path Path to floor_exempt_products.csv
 #' @return Tibble with hts8, category, country_group, ch99_code; or empty tibble if missing
@@ -709,6 +763,30 @@ load_floor_exempt_products <- function(path = here('resources', 'floor_exempt_pr
   message('  Loaded ', nrow(products), ' floor exempt products (',
           n_distinct(products$hts8), ' unique HTS8)')
   return(products)
+}
+
+
+#' Load revision-specific floor country product exemptions
+#'
+#' Tries per-revision file first (data/us_notes/floor_exempt_{revision}.csv),
+#' then falls back to the static resources/floor_exempt_products.csv.
+#'
+#' @param revision_id Character revision ID (e.g., 'rev_18', '2026_basic')
+#' @return Tibble with hts8, category, country_group, ch99_code; or empty tibble
+load_revision_floor_exemptions <- function(revision_id) {
+  # Try per-revision file first
+  revision_path <- here('data', 'us_notes', paste0('floor_exempt_', revision_id, '.csv'))
+  if (file.exists(revision_path)) {
+    products <- read_csv(revision_path, col_types = cols(.default = col_character()))
+    message('  Loaded ', nrow(products), ' floor exempt products for ', revision_id,
+            ' (', n_distinct(products$hts8), ' unique HTS8)')
+    return(products)
+  }
+
+  # Fall back to static file
+  message('  No per-revision floor exemptions for ', revision_id,
+          '; using static fallback')
+  return(load_floor_exempt_products())
 }
 
 

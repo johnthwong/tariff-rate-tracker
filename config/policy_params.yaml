@@ -107,11 +107,44 @@ section_232_headings:
 floor_rates:
   eu_floor: 0.15
   floor_rate: 0.15
-  floor_countries: ['5880', '5800', '4419', '4411']   # Japan, South Korea, Switzerland, Liechtenstein
+  floor_countries:
+    # Japan, South Korea, Switzerland, Liechtenstein
+    - '5880'   # Japan
+    - '5800'   # South Korea
+    - '4419'   # Switzerland
+    - '4411'   # Liechtenstein
+    # EU-27 (must match eu27_codes above)
+    - '4330'   # Austria
+    - '4231'   # Belgium
+    - '4870'   # Bulgaria
+    - '4791'   # Croatia
+    - '4910'   # Cyprus
+    - '4351'   # Czech Republic
+    - '4099'   # Denmark
+    - '4470'   # Estonia
+    - '4050'   # Finland
+    - '4279'   # France
+    - '4280'   # Germany
+    - '4840'   # Greece
+    - '4370'   # Hungary
+    - '4190'   # Ireland
+    - '4759'   # Italy
+    - '4490'   # Latvia
+    - '4510'   # Lithuania
+    - '4239'   # Luxembourg
+    - '4730'   # Malta
+    - '4210'   # Netherlands
+    - '4550'   # Poland
+    - '4710'   # Portugal
+    - '4850'   # Romania
+    - '4359'   # Slovakia
+    - '4792'   # Slovenia
+    - '4700'   # Spain
+    - '4010'   # Sweden
 
 # --- Swiss/Liechtenstein Framework (EO 14346) ---
 # 15% floor structure per FR 2025-23316 (90 FR 59281), effective Nov 14, 2025.
-# The surcharge -> floor override in 06_calculate_rates.R only applies within
+# The surcharge -> floor override in 07_calculate_rates.R only applies within
 # this date window. If finalized is true, the override has no expiry.
 # Set finalized to true once the agreement is confirmed (removes expiry constraint).
 swiss_framework:
@@ -130,7 +163,7 @@ authority_columns:
   other:            rate_other
 
 # --- Section 301 rates (Ch99 pattern -> rate) ---
-# Used by 10_weighted_etr.R for direct rate lookup
+# Used by 11_weighted_etr.R for direct rate lookup
 section_301_rates:
   - ch99_pattern: '9903.88.01'
     s301_rate: 0.25
@@ -218,6 +251,13 @@ tpc_excluded_countries:
   - '5530'   # Laos
   - '3720'   # Falkland Islands
   - '7660'   # DR Congo
+
+# --- IEEPA reciprocal: duty-free product treatment ---
+# Whether to apply IEEPA reciprocal tariffs to products with 0% MFN base rate.
+# TPC excludes these; legal text supports either interpretation.
+#   'all' = apply to all products (current default, legally strict)
+#   'nonzero_base_only' = skip duty-free products (matches TPC methodology)
+ieepa_duty_free_treatment: 'all'
 
 # --- Validation thresholds ---
 validation_thresholds:
