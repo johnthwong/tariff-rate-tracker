@@ -1,8 +1,8 @@
 # Tariff Rate Tracker
 
-Daily statutory U.S. tariff rates at the HTS-10 × country level, built from USITC Harmonized Tariff Schedule JSON archives. Produced by the [Yale Budget Lab](https://budgetlab.yale.edu/).
+Daily statutory U.S. tariff rates at the HTS-10 × country level, built from USITC Harmonized Tariff Schedule JSON archives. Produced by [The Budget Lab at Yale](https://budgetlab.yale.edu/).
 
-The tracker processes 39 HTS revisions (January 2025 through March 2026) to construct a panel of ~4.5 million product-country tariff rates per revision. All rates are derived from HTS source data — no external rate inputs. Outputs are designed for use with the Yale Budget Lab [Tariff-Model](https://github.com/Budget-Lab-Yale/Tariff-Model).
+The tracker processes 39 HTS revisions (January 2025 through March 2026) to construct a panel of ~4.5 million product-country tariff rates per revision. This process uses HTS data sources, combined with ancillary data and economic assumptions detailed below, to estimate tariff rates. Outputs are designed for use with The Budget Lab at Yale [Tariff-Model](https://github.com/Budget-Lab-Yale/Tariff-Model).
 
 ---
 
@@ -32,7 +32,6 @@ The tracker processes 39 HTS revisions (January 2025 through March 2026) to cons
 | **IEEPA Reciprocal** | International Emergency Economic Powers Act | ~60 countries (Phases 1 & 2) | 10–50% (surcharge or floor) |
 | **IEEPA Fentanyl** | International Emergency Economic Powers Act | Canada, Mexico | 25–35% |
 | **Section 122** | Trade Act §122 | All countries (150-day statutory limit) | 10–25% |
-| **Section 201** | Trade Act §201 (safeguards) | Washing machines, solar panels | Varies |
 
 ### Pre-2025 Baseline
 
@@ -41,39 +40,36 @@ The tariff regime inherited at the start of 2025 included:
 - **MFN base rates**: ~2% import-weighted average (after FTA/GSP preference adjustment; ~4% statutory)
 - **Section 232 steel/aluminum** (2018/2020): 25% on chapters 72–73 (steel) and 76 (aluminum)
 - **Section 301 China** (2018–2024): 7.5–25% across Lists 1–4A, plus Biden-era accelerations on minerals, semiconductors, solar, EVs, and batteries (25–100%)
-- **Section 201 safeguards**: Various rates on solar panels and washing machines
-
-Before Proclamation 10896 (March 12, 2025), many major trading partners — Canada, Mexico, the EU-27, UK, Japan, South Korea, Australia, Brazil, Argentina, and Ukraine — had TRQ/quota agreements effectively exempting them from Section 232 duties. Russia faced a permanent 200% override (Proclamation 10522).
 
 ### Timeline: 2025 Through Early 2026
 
-**January 2025.** Executive Order 14195 imposes IEEPA fentanyl surcharges on China and Hong Kong (+10%).
+**January 2025.** [Executive Order 14195](https://www.federalregister.gov/documents/2025/02/07/2025-02408/imposing-duties-to-address-the-synthetic-opioid-supply-chain-in-the-peoples-republic-of-china) imposes IEEPA fentanyl surcharges on China and Hong Kong (+10%).
 
-**February 2025.** EOs 14193/14194 extend fentanyl surcharges to Canada (+25%) and Mexico (+25%). China's fentanyl surcharge increases to +20% cumulative.
+**February 2025.** [EO 14193](https://www.federalregister.gov/documents/2025/02/07/2025-02406/imposing-duties-to-address-the-flow-of-illicit-drugs-across-our-northern-border)/[14194](https://www.federalregister.gov/documents/2025/02/07/2025-02407/imposing-duties-to-address-the-situation-at-our-southern-border) extend fentanyl surcharges to Canada (+25%) and Mexico (+25%). China's fentanyl surcharge increases to +20% cumulative.
 
-**March 2025.** Proclamation 10908 imposes Section 232 tariffs on automobiles (25%, effective April 3). Proclamation 10896 revokes all pre-2025 Section 232 country exemptions (TRQ agreements expire March 12). Section 232 derivative products (aluminum-containing articles outside chapter 76) are added at 25%.
+**March 2025.** [Proclamation 10908](https://www.federalregister.gov/documents/2025/04/03/2025-05930/adjusting-imports-of-automobiles-and-automobile-parts-into-the-united-states) imposes Section 232 tariffs on automobiles (25%, effective April 3). [Proclamation 10896](https://www.federalregister.gov/documents/2025/02/18/2025-02833/adjusting-imports-of-steel-into-the-united-states) revokes all pre-2025 Section 232 country exemptions (TRQ agreements expire March 12). Section 232 derivative products (aluminum-containing articles outside chapter 76) are added at 25%.
 
-**April 2, 2025 — "Liberation Day."** EO 14257 announces IEEPA Phase 1 reciprocal tariffs: a universal 10% baseline on all countries plus country-specific surcharges on ~60 countries (11–50%). China receives +34%.
+**April 2, 2025 — "Liberation Day."** [EO 14257](https://www.federalregister.gov/documents/2025/04/07/2025-06063/regulating-imports-with-a-reciprocal-tariff-to-rectify-trade-practices-that-contribute-to-large-and) announces IEEPA Phase 1 reciprocal tariffs: a universal 10% baseline on all countries plus country-specific surcharges on ~60 countries (11–50%). China receives +34%.
 
 **April 3–5, 2025 — China escalation.** China's reciprocal rate escalates rapidly: +34% → +84% → +125%. All non-China Phase 1 country-specific rates are suspended for a 90-day pause. The universal 10% baseline remains active.
 
-**April 14, 2025 — Geneva Agreement.** US-China bilateral agreement de-escalates: China's reciprocal rate returns to +34%, then is suspended. China falls back to the universal 10% baseline.
+**April 14, 2025 — [Geneva Agreement](https://www.whitehouse.gov/briefings-statements/2025/05/joint-statement-on-u-s-china-economic-and-trade-meeting-in-geneva/).** US-China bilateral agreement de-escalates: China's reciprocal rate returns to +34%, then is suspended. China falls back to the universal 10% baseline.
 
-**May 2025.** Section 232 rates on steel and aluminum derivatives doubled from 25% to 50% (Proclamation 10945). Auto parts added to 232 coverage.
+**May 2025.** Section 232 rates on steel and aluminum derivatives [doubled from 25% to 50%](https://www.federalregister.gov/documents/2025/06/09/2025-10524/adjusting-imports-of-aluminum-and-steel-into-the-united-states). Auto parts added to 232 coverage.
 
 **July 2025.** Canada fentanyl surcharge increased from 25% to 35%. Copper added to Section 232 coverage (headings 7406–7419).
 
-**August 7, 2025 — IEEPA Phase 2.** EO 14323 reinstates country-specific reciprocal tariffs with individually negotiated rates. Phase 1 entries are unsuspended; Phase 2 rates stack on top. Key rates: Brazil +10%, UK +10%, EU 15% floor, India +25%, Switzerland +39%. Brazil also receives a country-specific EO surcharge (+40%). India later receives its own EO (+25%, August 20), bringing its total to +50%.
+**August 7, 2025 — IEEPA Phase 2.** [EO 14323](https://www.federalregister.gov/documents/2025/08/06/2025-15010/further-modifying-the-reciprocal-tariff-rates) reinstates country-specific reciprocal tariffs with individually negotiated rates. Phase 1 entries are unsuspended; Phase 2 rates stack on top. Key rates: Brazil +10%, UK +10%, EU 15% floor, India +25%, Switzerland +39%. Brazil also receives a [country-specific EO surcharge](https://www.federalregister.gov/documents/2025/08/05/2025-14896/addressing-threats-to-the-united-states-by-the-government-of-brazil) (+40%). India later receives its own EO (+25%, August 20), bringing its total to +50%.
 
 **September–November 2025.** Floor rate structures negotiated with Japan (September 12), South Korea (November 15): 15% minimum rate, with passthrough for products whose base rate already exceeds 15%. Section 301 crane tariffs added (100%). China fentanyl rate reduced to +10% (post-Geneva). Semiconductor tariffs introduced (25%, January 2026).
 
-**January 1, 2026.** Swiss framework (EO 14346): Switzerland and Liechtenstein receive floor rate structure (15% minimum). Biden-era Section 301 acceleration: minerals, semiconductors, EVs, batteries.
+**January 1, 2026.** [Swiss framework](https://www.federalregister.gov/documents/2025/12/18/2025-23316/implementing-certain-tariff-related-elements-of-the-framework-for-a-united-states-switzerland-liechtenstein) (EO 14346): Switzerland and Liechtenstein receive floor rate structure (15% minimum). Biden-era Section 301 acceleration: minerals, semiconductors, EVs, batteries.
 
 ### SCOTUS and Section 122
 
-**February 20, 2026 — *Learning Resources, Inc. v. Trump*, 607 U.S. ___ (2026).** In a 6–3 decision, the Supreme Court rules that IEEPA does not authorize tariffs (Roberts, writing for the majority). All IEEPA reciprocal and fentanyl tariffs are vacated.
+**February 20, 2026 — [*Learning Resources, Inc. v. Trump*](https://www.supremecourt.gov/opinions/25pdf/24-1287_4gcj.pdf), 607 U.S. ___ (2026).** In a 6–3 decision, the Supreme Court rules that IEEPA does not authorize tariffs (Roberts, writing for the majority). All IEEPA reciprocal and fentanyl tariffs are vacated.
 
-The administration immediately reimplements tariffs under Section 122 of the Trade Act of 1974, which authorizes blanket surcharges for up to 150 days without Congressional approval. A 10% blanket tariff on all countries takes effect February 25, 2026 (HTS 9903.03.xx), with exemptions for products already subject to Section 232, IEEPA-exempt products, civil aircraft, CA/MX, CAFTA-DR, donations, and informational materials.
+The administration immediately [reimplements tariffs under Section 122](https://www.whitehouse.gov/presidential-actions/2026/02/imposing-a-temporary-import-surcharge-to-address-fundamental-international-payments-problems/) of the Trade Act of 1974, which authorizes blanket surcharges for up to 150 days without Congressional approval. A 10% blanket tariff on all countries takes effect February 25, 2026 (HTS 9903.03.xx), with exemptions for products already subject to Section 232, IEEPA-exempt products, civil aircraft, CA/MX, CAFTA-DR, donations, and informational materials.
 
 **The 150-day clock:** Section 122 authority expires approximately July 25, 2026. The tracker enforces this statutory limit at three levels: (1) revisions after the expiry date get `rate_s122 = 0`, (2) daily aggregates split at the expiry boundary, and (3) `get_rates_at_date()` zeroes Section 122 for post-expiry queries. A `finalized` flag in `config/policy_params.yaml` controls this behavior — set to `true` if Congress extends the authority.
 
@@ -85,20 +81,20 @@ Section 232 and Section 301 tariffs are unaffected by the SCOTUS ruling (separat
 
 ### Inputs
 
-| Source | Location | Description |
-|--------|----------|-------------|
-| HTS JSON archives | `data/hts_archives/` | 39 files (~13–14 MB each) from USITC. Not committed to git. |
-| TPC benchmark | `data/tpc/tariff_by_flow_day.csv` | ~250K rows across 42 countries and 5 dates. **Validation only.** |
-| Census country codes | `resources/census_codes.csv` | 240 country codes |
-| Import weights | `resources/hs10_gtap_crosswalk.csv` | 18,700-row HTS-10 to GTAP sector crosswalk |
-| Partner mapping | `resources/country_partner_mapping.csv` | 50-row Census-to-partner aggregation |
-| IEEPA exempt products | `resources/ieepa_exempt_products.csv` | 1,087 HTS-10 codes (Annex A / US Note 2) |
-| 301 product lists | `resources/s301_product_lists.csv` | ~12,200 entries (~11,000 unique HTS-8 codes) |
-| 232 derivative products | `resources/s232_derivative_products.csv` | ~129 aluminum-containing article prefixes |
-| MFN exemption shares | `resources/mfn_exemption_shares.csv` | 4,695 HS2 × country FTA/GSP preference shares |
-| Fentanyl carve-outs | `resources/fentanyl_carveout_products.csv` | 308 HTS-8 prefixes (energy/minerals/potash) |
-| Floor exemptions | `resources/floor_exemptions/` | Per-revision country-product floor exemptions |
-| CBO metal content | `resources/cbo/` | Product-level metal content buckets |
+| Data | Location | Description | Source |
+|------|----------|-------------|--------|
+| HTS JSON archives | `data/hts_archives/` | 39 files (~13–14 MB each). Not committed to git. | [USITC](https://hts.usitc.gov/) |
+| TPC benchmark | `data/tpc/tariff_by_flow_day.csv` | ~250K rows across 42 countries and 5 dates. **Validation only.** Not publicly available. | [Tax Policy Center](https://www.taxpolicycenter.org/) |
+| Census country codes | `resources/census_codes.csv` | 240 country codes | [Census Bureau](https://www.census.gov/foreign-trade/schedules/b/countrycodes.html) |
+| Import weights | `resources/hs10_gtap_crosswalk.csv` | 18,700-row HTS-10 to GTAP sector crosswalk | [GTAP](https://www.gtap.agecon.purdue.edu/) |
+| Partner mapping | `resources/country_partner_mapping.csv` | 50-row Census-to-partner aggregation | Authors |
+| IEEPA exempt products | `resources/ieepa_exempt_products.csv` | 1,087 HTS-10 codes (Annex A / US Note 2) | [Tariff-ETRs](https://github.com/Budget-Lab-Yale/Tariff-ETRs) |
+| 301 product lists | `resources/s301_product_lists.csv` | ~12,200 entries (~11,000 unique HTS-8 codes) | [USITC](https://hts.usitc.gov/) |
+| 232 derivative products | `resources/s232_derivative_products.csv` | ~129 aluminum-containing article prefixes | [Tariff-ETRs](https://github.com/Budget-Lab-Yale/Tariff-ETRs) |
+| MFN exemption shares | `resources/mfn_exemption_shares.csv` | 4,695 HS2 × country FTA/GSP preference shares | [Tariff-ETRs](https://github.com/Budget-Lab-Yale/Tariff-ETRs) |
+| Fentanyl carve-outs | `resources/fentanyl_carveout_products.csv` | 308 HTS-8 prefixes (energy/minerals/potash) | [Tariff-ETRs](https://github.com/Budget-Lab-Yale/Tariff-ETRs) |
+| Floor exemptions | `resources/floor_exemptions/` | Per-revision country-product floor exemptions | [USITC](https://hts.usitc.gov/) |
+| CBO metal content | `resources/cbo/` | Product-level metal content buckets | [CBO](https://www.cbo.gov/) |
 
 ### Configuration
 
