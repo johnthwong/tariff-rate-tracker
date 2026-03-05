@@ -101,6 +101,7 @@ rate_timeseries.rds -> import-weighted ETRs (11_weighted_etr.R via get_rates_at_
 - `load_232_derivative_products()`: Reads derivative product list from resources/
 - `load_floor_exempt_products()`: Reads floor country product exemptions from resources/ (static); `load_revision_floor_exemptions()` for per-revision
 - `load_usmca_product_shares()`: Reads per-HTS10 x country USMCA utilization shares from Census SPI data
+- `load_mfn_exemption_shares()`: Reads HS2 x country MFN exemption shares (FTA/GSP preference utilization)
 - `load_metal_content()`: Computes per-product metal shares (flat/CBO/BEA methods)
 - `parse_revision_id()`: Extracts year + revision type from any revision ID (e.g., '2026_rev_3' -> year=2026, rev='rev_3')
 - `get_rates_at_date(ts, date, policy_params)`: Point-in-time rate query (in helpers.R) — preferred way to get rates at any date; adjusts for s122 expiry when policy_params provided
@@ -122,6 +123,30 @@ Mutual exclusion between 232 and IEEPA reciprocal (aligned with Tariff-ETRs):
 ```
 
 Key: 232 takes precedence over IEEPA reciprocal. For base 232 products (metal_share = 1.0), nonmetal_share = 0, preserving full mutual exclusion. For derivative 232 products (metal_share < 1.0), non-232 authorities apply to the non-metal portion. China exception: fentanyl stacks at full value (separate IEEPA authority) regardless of 232 status.
+
+## MFN Exemption Shares
+
+Adjusts statutory MFN base_rate down using FTA/GSP preference utilization data at HS2 x country level.
+Sourced from Tariff-ETRs project (`resources/mfn_exemption_shares.csv`, 4,695 rows).
+
+- Formula: `effective_mfn = statutory_mfn * (1 - exemption_share)`
+- Applied in step 6c of `07_calculate_rates.R`, between Section 122 and USMCA
+- `statutory_base_rate` column preserves original rate in RATE_SCHEMA
+- CA/MX excluded by default (USMCA product shares handle them at HTS10 level)
+- Config: `mfn_exemption` block in `policy_params.yaml` (`method: 'hs2'` or `'none'`)
+- Floor rate interaction: lower effective base_rate → larger IEEPA surcharge to reach floor, but total still caps correctly
+
+## Section 232 Country Exemptions
+
+Pre-March 2025, many countries had TRQ/quota agreements exempting them from 232 duties.
+These are NOT encoded in the HTS JSON — configured in `section_232_country_exemptions` in `policy_params.yaml`.
+
+- Exempt countries (rate=0): CA, MX, EU-27, UK, Japan, S. Korea, Australia, Brazil, Argentina, Ukraine
+- Russia override: 200% (Proclamation 10522, permanent)
+- All exemptions revoked by Proclamation 10896, effective 2025-03-12 (rev_6)
+- Date-bounded: applied only when revision effective_date < expiry_date
+- Applied in step 4 of `07_calculate_rates.R` after Ch99-based exemption parsing
+- Matches Tariff-ETRs `config/baseline/s232.yaml` methodology (binary exempt/non-exempt)
 
 ## Section 232 Coverage
 

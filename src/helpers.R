@@ -299,6 +299,37 @@ load_policy_params <- function(yaml_path = here('config', 'policy_params.yaml'))
     )
   }
 
+  # MFN exemption shares (FTA/GSP preference utilization)
+  if (!is.null(params$mfn_exemption)) {
+    params$MFN_EXEMPTION <- list(
+      method = params$mfn_exemption$method %||% 'none',
+      exclude_usmca_countries = isTRUE(params$mfn_exemption$exclude_usmca_countries)
+    )
+  } else {
+    params$MFN_EXEMPTION <- list(method = 'none', exclude_usmca_countries = TRUE)
+  }
+
+  # Section 232 country exemptions (TRQ/quota agreements)
+  if (!is.null(params$section_232_country_exemptions)) {
+    params$S232_COUNTRY_EXEMPTIONS <- map(params$section_232_country_exemptions, function(entry) {
+      # Expand 'eu' mnemonic to EU27 codes
+      raw_countries <- unlist(entry$countries)
+      expanded <- if ('eu' %in% raw_countries) {
+        c(setdiff(raw_countries, 'eu'), params$EU27_CODES)
+      } else {
+        raw_countries
+      }
+      list(
+        countries = expanded,
+        rate = entry$rate,
+        applies_to = unlist(entry$applies_to),
+        expiry_date = if (!is.null(entry$expiry_date)) as.Date(entry$expiry_date) else NULL
+      )
+    })
+  } else {
+    params$S232_COUNTRY_EXEMPTIONS <- list()
+  }
+
   # Section 122 (Trade Act §122, 150-day statutory limit)
   if (!is.null(params$section_122)) {
     params$SECTION_122 <- list(
@@ -451,7 +482,7 @@ resolve_json_path <- function(revision, archive_dir = here('data', 'hts_archives
 
 #' Canonical column vector for rate output
 RATE_SCHEMA <- c(
-  'hts10', 'country', 'base_rate',
+  'hts10', 'country', 'base_rate', 'statutory_base_rate',
   'rate_232', 'rate_301', 'rate_ieepa_recip', 'rate_ieepa_fent', 'rate_s122', 'rate_other',
   'metal_share',
   'total_additional', 'total_rate',
@@ -470,7 +501,7 @@ enforce_rate_schema <- function(df) {
   # Defaults by column
   defaults <- list(
     hts10 = NA_character_, country = NA_character_,
-    base_rate = 0, rate_232 = 0, rate_301 = 0,
+    base_rate = 0, statutory_base_rate = 0, rate_232 = 0, rate_301 = 0,
     rate_ieepa_recip = 0, rate_ieepa_fent = 0, rate_s122 = 0, rate_other = 0,
     metal_share = 1.0,
     total_additional = 0, total_rate = 0,
@@ -486,7 +517,7 @@ enforce_rate_schema <- function(df) {
   }
 
   # Fill NAs in numeric rate columns (bind_rows can introduce NAs)
-  rate_cols <- c('base_rate', 'rate_232', 'rate_301', 'rate_ieepa_recip',
+  rate_cols <- c('base_rate', 'statutory_base_rate', 'rate_232', 'rate_301', 'rate_ieepa_recip',
                  'rate_ieepa_fent', 'rate_s122', 'rate_other',
                  'total_additional', 'total_rate')
   for (col in rate_cols) {
@@ -833,6 +864,32 @@ load_usmca_product_shares <- function(path = here('resources', 'usmca_product_sh
     usmca_share = col_double()
   ))
   message('  Loaded USMCA product shares: ', nrow(shares), ' product-country pairs')
+  return(shares)
+}
+
+
+#' Load MFN exemption shares (FTA/GSP preference utilization)
+#'
+#' HS2 x country exemption shares computed from Census calculated duty data.
+#' effective_mfn = mfn_rate * (1 - exemption_share).
+#' Sourced from Tariff-ETRs project. Returns NULL if file not found.
+#'
+#' @param path Path to mfn_exemption_shares.csv
+#' @return Tibble with hs2, cty_code, exemption_share; or NULL if missing
+load_mfn_exemption_shares <- function(path = here('resources', 'mfn_exemption_shares.csv')) {
+  if (!file.exists(path)) {
+    message('  MFN exemption shares file not found — using statutory base rates')
+    return(NULL)
+  }
+  shares <- read_csv(path, col_types = cols(
+    hs2 = col_character(),
+    cty_code = col_character(),
+    exemption_share = col_double()
+  ))
+  # Clamp exemption shares to [0, 1]
+  shares <- shares %>%
+    mutate(exemption_share = pmin(pmax(exemption_share, 0), 1))
+  message('  Loaded MFN exemption shares: ', nrow(shares), ' HS2-country pairs')
   return(shares)
 }
 

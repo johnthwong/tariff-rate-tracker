@@ -17,6 +17,16 @@ The tracker builds a panel of statutory tariff rates from HTS JSON archives. The
 
 A simple diff of base rates across HTS revisions would miss all four mechanisms.
 
+### MFN Exemption Shares
+
+Statutory MFN rates overstate actual base-rate collections because many imports enter under preferential trade agreements (FTAs) or programs like GSP. The tracker adjusts base rates using HS2 x country exemption shares derived from Census calculated duty data (sourced from the Tariff-ETRs project). For each product-country pair:
+
+```
+effective_base_rate = statutory_mfn_rate * (1 - exemption_share)
+```
+
+This reduces the import-weighted average base rate from ~4% (statutory) to ~2% (effective), aligning with observed customs revenue. Canada and Mexico are excluded from this adjustment because their preferences are handled at finer HTS-10 granularity via USMCA product-level utilization shares. Both the effective and statutory base rates are preserved in the output schema. Configurable via `mfn_exemption` in `config/policy_params.yaml`.
+
 ### Pipeline Steps (per revision)
 
 1. **Parse Chapter 99 entries** -- extracts additional duty rates, authority type, and country scope from each subheading
@@ -44,7 +54,7 @@ The orchestrator repeats these steps for each HTS revision, producing per-revisi
 | `04_parse_chapter99.R` | Parses all Chapter 99 entries from HTS JSON. Extracts rates from the `general` field, infers authority type from the subheading range, and parses country scope from the `description` field. |
 | `05_parse_products.R` | Parses HTS-10 product lines. Extracts base MFN rates and Chapter 99 footnote references. |
 | `06_parse_policy_params.R` | Extracts policy parameters directly from HTS JSON: IEEPA country-specific reciprocal rates (with rate_type classification and EU expansion), IEEPA fentanyl rates, Section 232 rates (including 9903.94 autos), and USMCA eligibility. |
-| `07_calculate_rates.R` | Joins products to Chapter 99 authorities via footnote refs. Applies IEEPA reciprocal/fentanyl as blanket country-level tariffs (with product exemptions). Identifies Section 232 products by chapter and heading prefix. Gates Section 122 on statutory expiry. Applies stacking rules. Expands to the country dimension. |
+| `07_calculate_rates.R` | Joins products to Chapter 99 authorities via footnote refs. Applies IEEPA reciprocal/fentanyl as blanket country-level tariffs (with product exemptions). Identifies Section 232 products by chapter and heading prefix. Gates Section 122 on statutory expiry. Adjusts base rates for FTA/GSP preference utilization (MFN exemption shares). Applies stacking rules. Expands to the country dimension. |
 | `08_validate_tpc.R` | Compares calculated rates against TPC benchmark data at the HTS-10 x country x date level. Reports match rates and identifies systematic discrepancies. |
 
 ### Downstream (run automatically by `00_build`, or standalone)
@@ -165,7 +175,8 @@ Each snapshot/timeseries row contains:
 |--------|------|-------------|
 | `hts10` | chr | 10-digit HTS code |
 | `country` | chr | Census country code |
-| `base_rate` | dbl | MFN base rate |
+| `base_rate` | dbl | Effective MFN base rate (after FTA/GSP exemption adjustment) |
+| `statutory_base_rate` | dbl | Original statutory MFN rate (before exemption adjustment) |
 | `rate_232` | dbl | Section 232 |
 | `rate_301` | dbl | Section 301 |
 | `rate_ieepa_recip` | dbl | IEEPA reciprocal |
@@ -279,6 +290,24 @@ Each authority has a different mechanism for linking Ch99 entries to products:
 | `EU27_CODES` | `config/policy_params.yaml` | 27 Census codes | Expanding "European Union" Ch99 entries to member states |
 | `ISO_TO_CENSUS` | `config/policy_params.yaml` | 12 mappings | Converting Ch99 country descriptions (ISO-style) to Census codes |
 
+#### Section 232 Country Exemptions (Pre-March 2025)
+
+Before Proclamation 10896 (effective March 12, 2025), many major trading partners had TRQ/quota agreements that effectively exempted them from Section 232 duties on steel and aluminum. These agreements are not encoded in the HTS JSON and are configured in `section_232_country_exemptions` in `policy_params.yaml`:
+
+| Countries | Exemption Type | Rate | Expiry |
+|-----------|---------------|------|--------|
+| Canada, Mexico | USMCA-related | 0% | 2025-03-12 |
+| EU-27 | TRQ agreement | 0% | 2025-03-12 |
+| UK | TRQ agreement | 0% | 2025-03-12 |
+| Japan | TRQ agreement | 0% | 2025-03-12 |
+| South Korea | Quota agreement | 0% | 2025-03-12 |
+| Australia | Full exemption | 0% | 2025-03-12 |
+| Brazil, Argentina | Quota agreements | 0% | 2025-03-12 |
+| Ukraine | Exemption | 0% | 2025-03-12 |
+| Russia | Proclamation 10522 | 200% | Permanent |
+
+These are modeled as binary (rate = 0 or override rate), matching the Tariff-ETRs methodology. In reality, TRQ countries paid the full rate on over-quota imports, but quota utilization data is not available at the product level.
+
 #### Product Coverage Rules
 
 | Rule | Location | Logic | Notes |
@@ -369,6 +398,7 @@ Where `nonmetal_share = 1 - metal_share` when `rate_232 > 0` and `metal_share < 
 - `resources/ieepa_exempt_products.csv`: 1,087 HTS-10 codes exempt from IEEPA reciprocal (Annex A / US Note 2 subdivision (v)(iii)). Derived from Tariff-ETRs config.
 - `resources/s301_product_lists.csv`: ~12,200 entries (~11,000 unique HTS-8 codes) covered by Section 301 tariffs on China (Lists 1-4B + Biden modifications). Sourced from USITC "China Tariffs" reference document and US Notes 20/31 PDF parsing via `03_scrape_us_notes.R`. Products on multiple lists have separate entries per ch99 code for generation-based rate stacking.
 - `resources/s232_derivative_products.csv`: ~129 aluminum-containing derivative product prefixes (from US Note 19 via Tariff-ETRs config).
+- `resources/mfn_exemption_shares.csv`: 4,695 HS2 x country exemption shares for FTA/GSP preference utilization. Sourced from Tariff-ETRs project (Census calculated duty data). Used to adjust statutory MFN base rates down to effective rates.
 - `resources/cbo/`: CBO metal content bucket files for derivative products (high/low aluminum, copper).
 
 ## Validation Status

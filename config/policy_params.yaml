@@ -103,6 +103,68 @@ section_232_headings:
     default_rate: 0.25
     usmca_exempt: false
 
+# --- Section 232 country exemptions (pre-March 2025) ---
+# TRQ/quota agreements and full exemptions from Proclamations 9705/9704.
+# These are NOT encoded in the HTS JSON — the tariff schedule shows "all countries"
+# for steel and "all except [6]" for aluminum, but trade agreements separately
+# exempted major partners. Revoked by Proclamation 10896, effective 2025-03-12.
+# Modeled as rate = 0 for these countries (binary, matching Tariff-ETRs approach).
+# Russia gets 200% per 2023 Proclamation 10522 (not date-bounded — still active).
+#
+# applies_to: which 232 programs this exemption covers
+# expiry_date: when the exemption was revoked (null = still active)
+section_232_country_exemptions:
+  # Canada and Mexico: USMCA-related exemption
+  - countries: ['1220', '2010']
+    rate: 0
+    applies_to: ['steel', 'aluminum']
+    expiry_date: '2025-03-12'
+  # EU-27: TRQ agreement
+  - countries: 'eu'
+    rate: 0
+    applies_to: ['steel', 'aluminum']
+    expiry_date: '2025-03-12'
+  # UK: TRQ agreement
+  - countries: ['4120']
+    rate: 0
+    applies_to: ['steel', 'aluminum']
+    expiry_date: '2025-03-12'
+  # Japan: TRQ agreement
+  - countries: ['5880']
+    rate: 0
+    applies_to: ['steel', 'aluminum']
+    expiry_date: '2025-03-12'
+  # South Korea: Quota agreement
+  - countries: ['5800']
+    rate: 0
+    applies_to: ['steel', 'aluminum']
+    expiry_date: '2025-03-12'
+  # Australia: Full exemption
+  - countries: ['6021']
+    rate: 0
+    applies_to: ['steel', 'aluminum']
+    expiry_date: '2025-03-12'
+  # Brazil: Quota agreement
+  - countries: ['3510']
+    rate: 0
+    applies_to: ['steel', 'aluminum']
+    expiry_date: '2025-03-12'
+  # Argentina: Quota agreement
+  - countries: ['3570']
+    rate: 0
+    applies_to: ['steel', 'aluminum']
+    expiry_date: '2025-03-12'
+  # Ukraine: Exemption
+  - countries: ['4623']
+    rate: 0
+    applies_to: ['steel', 'aluminum']
+    expiry_date: '2025-03-12'
+  # Russia: 200% per 2023 Proclamation 10522 (permanent override)
+  - countries: ['4621']
+    rate: 2.0
+    applies_to: ['steel', 'aluminum']
+    expiry_date: null
+
 # --- Floor rate structure (EU, Japan, S. Korea, Switzerland, Liechtenstein) ---
 floor_rates:
   eu_floor: 0.15
@@ -251,6 +313,15 @@ tpc_excluded_countries:
   - '5530'   # Laos
   - '3720'   # Falkland Islands
   - '7660'   # DR Congo
+
+# --- MFN exemption shares (FTA/GSP preference utilization) ---
+# Adjusts statutory MFN base_rate down using Census calculated duty data.
+# effective_mfn = mfn_rate * (1 - exemption_share) at HS2 x country level.
+# method: 'none' (statutory rates), 'hs2' (Tariff-ETRs shares)
+# exclude_usmca_countries: skip CA/MX (USMCA product shares handle them at HTS10 level)
+mfn_exemption:
+  method: 'hs2'
+  exclude_usmca_countries: true
 
 # --- IEEPA reciprocal: duty-free product treatment ---
 # Whether to apply IEEPA reciprocal tariffs to products with 0% MFN base rate.
