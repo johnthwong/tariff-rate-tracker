@@ -1058,7 +1058,7 @@ load_metal_content <- function(metal_cfg = NULL, hts10_codes = character(0),
       hs10 = col_character(),
       .default = col_double()
     )) %>%
-      select(hs10, metal_share)
+      select(hts10 = hs10, metal_share)
 
     # Only apply BEA shares to derivative products
     result <- result %>%
