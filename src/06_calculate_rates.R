@@ -815,6 +815,8 @@ calculate_rates_for_revision <- function(
     # Heading-level: autos, copper, etc.
     auto_products <- character(0)
     copper_products <- character(0)
+    wood_products <- character(0)
+    mhd_products <- character(0)
     heading_product_lists <- list()
 
     if (!is.null(s232_headings)) {
@@ -835,22 +837,31 @@ calculate_rates_for_revision <- function(
           usmca_exempt = cfg$usmca_exempt %||% FALSE
         )
 
-        if (grepl('auto|vehicle', tariff_name, ignore.case = TRUE)) {
+        if (grepl('auto|passenger|light_truck', tariff_name, ignore.case = TRUE)) {
           auto_products <- c(auto_products, matched)
         } else if (grepl('copper', tariff_name, ignore.case = TRUE)) {
           copper_products <- c(copper_products, matched)
+        } else if (grepl('softwood|furniture|cabinet', tariff_name, ignore.case = TRUE)) {
+          wood_products <- c(wood_products, matched)
+        } else if (grepl('mhd|bus', tariff_name, ignore.case = TRUE)) {
+          mhd_products <- c(mhd_products, matched)
         }
       }
     }
     auto_products <- unique(auto_products)
     copper_products <- unique(copper_products)
+    wood_products <- unique(wood_products)
+    mhd_products <- unique(mhd_products)
 
     n_steel <- length(steel_products)
     n_alum <- length(aluminum_products)
     n_auto <- length(auto_products)
     n_copper <- length(copper_products)
+    n_wood <- length(wood_products)
+    n_mhd <- length(mhd_products)
     message('  Section 232 coverage: ', n_steel, ' steel + ', n_alum,
-            ' aluminum + ', n_auto, ' auto + ', n_copper, ' copper products')
+            ' aluminum + ', n_auto, ' auto + ', n_copper, ' copper + ',
+            n_wood, ' wood + ', n_mhd, ' MHD products')
 
     # --- Build product-level 232 rate lookup from heading configs ---
     # Each heading config specifies its own rate. Build an hts10 -> rate mapping.
@@ -1007,6 +1018,151 @@ calculate_rates_for_revision <- function(
       message('  Adding ', nrow(new_232_pairs), ' product-country pairs for 232-only duties')
       rates <- bind_rows(rates, new_232_pairs)
     }
+  }
+
+  # 4b. Apply Section 232 auto rebate
+  #     Reduces effective 232 rate on auto/vehicle products by a credit reflecting
+  #     US assembly content: effective_rate -= rebate_rate * us_assembly_share.
+  #     Applied before metal content scaling (step 5) and before USMCA (step 7).
+  auto_rebate_cfg <- if (!is.null(.pp)) .pp$auto_rebate else NULL
+  rebate_rate <- if (!is.null(auto_rebate_cfg)) auto_rebate_cfg$rebate_rate %||% 0 else 0
+  assembly_share <- if (!is.null(auto_rebate_cfg)) auto_rebate_cfg$us_assembly_share %||% 0 else 0
+  rebate_deduction <- rebate_rate * assembly_share
+
+  if (rebate_deduction > 0 && length(auto_products) > 0) {
+    rates <- rates %>%
+      mutate(
+        rate_232 = if_else(
+          hts10 %in% auto_products & rate_232 > 0,
+          pmax(rate_232 - rebate_deduction, 0),
+          rate_232
+        )
+      )
+    n_rebated <- sum(rates$hts10 %in% auto_products & rates$rate_232 > 0)
+    message('  Auto rebate: -', round(rebate_deduction * 100, 2),
+            'pp on ', n_rebated, ' auto product-country pairs')
+  }
+
+  # 4c. Apply country-specific 232 deal rates (floor/surcharge)
+  #     Auto deals: EU/Japan/Korea get 15% floor on vehicles; UK gets +7.5% surcharge.
+  #     Wood deals: UK 10% floor on softwood, EU/Japan/Korea 15% floor on furniture/cabinets.
+  #     Floor mechanism: effective_232 = max(floor_rate - base_rate, 0)
+  #     Surcharge mechanism: effective_232 = surcharge_rate (flat)
+  #     These override the blanket 232 rate set in step 4 for deal countries.
+  n_deal_overrides <- 0L
+
+  # Helper: convert ISO country code to Census code(s), expanding EU to 27 members
+  iso_to_census_vec <- function(iso_code) {
+    if (iso_code == 'EU') {
+      return(if (!is.null(.pp)) names(.pp$eu27_codes) else EU27_CODES)
+    }
+    census <- ISO_TO_CENSUS[iso_code]
+    if (is.na(census)) return(character(0))
+    as.character(census)
+  }
+
+  # Apply auto deal rates
+  if (nrow(s232_rates$auto_deal_rates) > 0 && length(auto_products) > 0) {
+    for (i in seq_len(nrow(s232_rates$auto_deal_rates))) {
+      deal <- s232_rates$auto_deal_rates[i, ]
+      census_codes <- iso_to_census_vec(deal$country)
+      if (length(census_codes) == 0) next
+
+      # Determine which products this deal covers (vehicles vs parts)
+      deal_products <- if (deal$program == 'auto_parts') {
+        # Parts: products NOT in passenger vehicle/light truck prefixes
+        # For now, use all auto_products minus vehicle prefixes
+        auto_vehicles_cfg <- s232_headings[grepl('passenger|light_truck', names(s232_headings), ignore.case = TRUE)]
+        vehicle_prefixes <- unlist(lapply(auto_vehicles_cfg, function(x) x$prefixes))
+        if (length(vehicle_prefixes) > 0) {
+          veh_pattern <- paste0('^(', paste(vehicle_prefixes, collapse = '|'), ')')
+          auto_products[!grepl(veh_pattern, auto_products)]
+        } else {
+          auto_products
+        }
+      } else {
+        auto_products
+      }
+
+      if (deal$rate_type == 'floor') {
+        rates <- rates %>%
+          mutate(
+            rate_232 = if_else(
+              hts10 %in% deal_products & country %in% census_codes,
+              pmax(deal$rate - base_rate, 0),
+              rate_232
+            )
+          )
+      } else {
+        # surcharge: flat additional rate
+        rates <- rates %>%
+          mutate(
+            rate_232 = if_else(
+              hts10 %in% deal_products & country %in% census_codes,
+              deal$rate,
+              rate_232
+            )
+          )
+      }
+      n_affected <- sum(rates$hts10 %in% deal_products & rates$country %in% census_codes)
+      n_deal_overrides <- n_deal_overrides + n_affected
+    }
+  }
+
+  # Apply wood deal rates
+  # Identify wood product sets by heading config
+  wood_softwood_products <- character(0)
+  wood_furn_products <- character(0)
+  if (!is.null(s232_headings)) {
+    for (nm in names(s232_headings)) {
+      cfg <- s232_headings[[nm]]
+      prefixes <- unlist(cfg$prefixes)
+      if (length(prefixes) == 0) next
+      pattern <- paste0('^(', paste(prefixes, collapse = '|'), ')')
+      matched <- products %>% filter(grepl(pattern, hts10)) %>% pull(hts10)
+      if (grepl('softwood', nm, ignore.case = TRUE)) {
+        wood_softwood_products <- c(wood_softwood_products, matched)
+      } else if (grepl('furniture|cabinet', nm, ignore.case = TRUE)) {
+        wood_furn_products <- c(wood_furn_products, matched)
+      }
+    }
+  }
+  all_wood_products <- unique(c(wood_softwood_products, wood_furn_products))
+
+  if (nrow(s232_rates$wood_deal_rates) > 0 && length(all_wood_products) > 0) {
+    for (i in seq_len(nrow(s232_rates$wood_deal_rates))) {
+      deal <- s232_rates$wood_deal_rates[i, ]
+      census_codes <- iso_to_census_vec(deal$country)
+      if (length(census_codes) == 0) next
+
+      # Wood deals apply to all wood products (softwood + furniture/cabinets)
+      if (deal$rate_type == 'floor') {
+        rates <- rates %>%
+          mutate(
+            rate_232 = if_else(
+              hts10 %in% all_wood_products & country %in% census_codes,
+              pmax(deal$rate - base_rate, 0),
+              rate_232
+            )
+          )
+      } else {
+        rates <- rates %>%
+          mutate(
+            rate_232 = if_else(
+              hts10 %in% all_wood_products & country %in% census_codes,
+              deal$rate,
+              rate_232
+            )
+          )
+      }
+      n_affected <- sum(rates$hts10 %in% all_wood_products & rates$country %in% census_codes)
+      n_deal_overrides <- n_deal_overrides + n_affected
+    }
+  }
+
+  if (n_deal_overrides > 0) {
+    message('  232 deal rates (floor/surcharge): ', n_deal_overrides,
+            ' product-country pairs overridden')
   }
 
   # 5. Apply Section 232 derivative tariff + metal content scaling

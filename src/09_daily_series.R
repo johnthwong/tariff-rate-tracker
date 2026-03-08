@@ -88,6 +88,9 @@ build_daily_aggregates <- function(ts, date_range = NULL, imports = NULL,
       )
   }
 
+  # China code for net authority decomposition
+  CTY_CHINA <- if (!is.null(policy_params)) policy_params$CTY_CHINA %||% '5700' else '5700'
+
   # --- Section 122 expiry: split intervals if needed ---
   s122_expiry <- NULL
   if (!is.null(policy_params$SECTION_122) &&
@@ -196,16 +199,38 @@ build_daily_aggregates <- function(ts, date_range = NULL, imports = NULL,
     if (zero_s122 && 'rate_s122' %in% names(rev_data)) {
       rev_data <- rev_data %>% mutate(rate_s122 = 0)
     }
+
+    # Compute net authority contributions (matching apply_stacking_rules logic):
+    # - 232 vs IEEPA: mutually exclusive, except on nonmetal portion of derivatives
+    # - Fentanyl: China always stacks; others only nonmetal when 232 present
+    # - s122: scales by nonmetal on 232 products (excluded to extent 232 applies)
+    # - 301: full customs value always
+    net_data <- rev_data %>%
+      mutate(
+        metal_share = if ('metal_share' %in% names(rev_data)) metal_share else 1.0,
+        nonmetal_share = if_else(rate_232 > 0 & metal_share < 1.0, 1 - metal_share, 0),
+        net_232 = if_else(rate_232 > 0, rate_232, 0),
+        net_ieepa = if_else(rate_232 > 0, rate_ieepa_recip * nonmetal_share, rate_ieepa_recip),
+        net_fentanyl = case_when(
+          country == CTY_CHINA ~ rate_ieepa_fent,
+          rate_232 > 0 ~ rate_ieepa_fent * nonmetal_share,
+          TRUE ~ rate_ieepa_fent
+        ),
+        net_301 = if_else(country == CTY_CHINA, rate_301, 0),
+        net_s122 = if_else(rate_232 > 0, rate_s122 * nonmetal_share, rate_s122),
+        net_other = if ('rate_other' %in% names(rev_data)) rate_other else 0
+      )
+
     row <- tibble(
       revision = revision,
       valid_from = valid_from,
       valid_until = valid_until,
-      mean_232 = mean(rev_data$rate_232),
-      mean_301 = mean(rev_data$rate_301),
-      mean_ieepa = mean(rev_data$rate_ieepa_recip),
-      mean_fentanyl = mean(rev_data$rate_ieepa_fent),
-      mean_s122 = if ('rate_s122' %in% names(rev_data)) mean(rev_data$rate_s122) else 0,
-      mean_other = if ('rate_other' %in% names(rev_data)) mean(rev_data$rate_other) else 0
+      mean_232 = mean(net_data$net_232),
+      mean_301 = mean(net_data$net_301),
+      mean_ieepa = mean(net_data$net_ieepa),
+      mean_fentanyl = mean(net_data$net_fentanyl),
+      mean_s122 = mean(net_data$net_s122),
+      mean_other = mean(net_data$net_other)
     )
     if (has_weights) {
       wt_data <- ts_weighted %>% filter(revision == !!revision)
@@ -213,16 +238,28 @@ build_daily_aggregates <- function(ts, date_range = NULL, imports = NULL,
         wt_data <- wt_data %>% mutate(rate_s122 = 0)
       }
       if (nrow(wt_data) > 0) {
-        row$etr_232 <- sum(wt_data$rate_232 * wt_data$imports) / total_imports
-        row$etr_301 <- sum(wt_data$rate_301 * wt_data$imports) / total_imports
-        row$etr_ieepa <- sum(wt_data$rate_ieepa_recip * wt_data$imports) / total_imports
-        row$etr_fentanyl <- sum(wt_data$rate_ieepa_fent * wt_data$imports) / total_imports
-        row$etr_s122 <- if ('rate_s122' %in% names(wt_data)) {
-          sum(wt_data$rate_s122 * wt_data$imports) / total_imports
-        } else 0
-        row$etr_other <- if ('rate_other' %in% names(wt_data)) {
-          sum(wt_data$rate_other * wt_data$imports) / total_imports
-        } else 0
+        # Apply same net decomposition to weighted data
+        wt_net <- wt_data %>%
+          mutate(
+            metal_share = if ('metal_share' %in% names(wt_data)) metal_share else 1.0,
+            nonmetal_share = if_else(rate_232 > 0 & metal_share < 1.0, 1 - metal_share, 0),
+            net_232 = if_else(rate_232 > 0, rate_232, 0),
+            net_ieepa = if_else(rate_232 > 0, rate_ieepa_recip * nonmetal_share, rate_ieepa_recip),
+            net_fentanyl = case_when(
+              country == CTY_CHINA ~ rate_ieepa_fent,
+              rate_232 > 0 ~ rate_ieepa_fent * nonmetal_share,
+              TRUE ~ rate_ieepa_fent
+            ),
+            net_301 = if_else(country == CTY_CHINA, rate_301, 0),
+            net_s122 = if_else(rate_232 > 0, rate_s122 * nonmetal_share, rate_s122),
+            net_other = if ('rate_other' %in% names(wt_data)) rate_other else 0
+          )
+        row$etr_232 <- sum(wt_net$net_232 * wt_net$imports) / total_imports
+        row$etr_301 <- sum(wt_net$net_301 * wt_net$imports) / total_imports
+        row$etr_ieepa <- sum(wt_net$net_ieepa * wt_net$imports) / total_imports
+        row$etr_fentanyl <- sum(wt_net$net_fentanyl * wt_net$imports) / total_imports
+        row$etr_s122 <- sum(wt_net$net_s122 * wt_net$imports) / total_imports
+        row$etr_other <- sum(wt_net$net_other * wt_net$imports) / total_imports
       } else {
         row$etr_232 <- row$etr_301 <- row$etr_ieepa <- row$etr_fentanyl <- row$etr_s122 <- row$etr_other <- 0
       }

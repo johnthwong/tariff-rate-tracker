@@ -64,7 +64,7 @@ eu27_codes:
 
 # --- Authority classification ranges (9903.xx) ---
 authority_ranges:
-  section_232:      [80, 81, 82, 83, 84, 85, 94, 74, 78]
+  section_232:      [80, 81, 82, 83, 84, 85, 94, 74, 76, 78]
   section_301:      [86, 87, 88, 89, 91, 92]
   ieepa_reciprocal: [90, 93, 95, 96]  # Legacy ranges only; Phase 1/2 use ieepa_phase1_range/ieepa_phase2_range
   section_201:      [40, 41, 42, 43, 44, 45]
@@ -101,6 +101,32 @@ section_232_headings:
     prefixes: ['7406', '7407', '7408', '7409', '7410', '7411', '7412', '7413',
                '7415', '7418', '7419']
     default_rate: 0.25
+    usmca_exempt: false
+  softwood:
+    prefixes: ['44031100', '44032101', '44032201', '44032301', '44032401',
+               '44032501', '44032601', '44039901', '44061100', '44069100',
+               '44071100', '44071200', '44071300', '44071400', '44071900']
+    default_rate: 0.10
+    usmca_exempt: false
+  wood_furniture:
+    prefixes: ['9401614011', '9401614031', '9401616011', '9401616031']
+    default_rate: 0.25
+    usmca_exempt: false
+  kitchen_cabinets:
+    prefixes: ['9403409060', '9403608093', '9403910080']
+    default_rate: 0.25
+    usmca_exempt: false
+  mhd_vehicles:
+    prefixes: ['87012100', '87012200', '87012300', '87012400', '87012900',
+               '87041010', '87041050', '87042211', '87042251', '87042301',
+               '87043201', '87044200', '87044300', '87045200', '87046000',
+               '87049001', '87054000', '8705900080', '87060003', '8706000520',
+               '8706000575', '87060025', '87060050', '87091100', '87091900']
+    default_rate: 0.25
+    usmca_exempt: true
+  buses:
+    prefixes: ['8702']
+    default_rate: 0.10
     usmca_exempt: false
 
 # --- Section 232 country exemptions (pre-March 2025) ---
@@ -284,13 +310,25 @@ section_232_derivatives:
 #   cbo:  product-level buckets from CBO files (high=0.75, low=0.25, copper=0.90)
 #   bea:  sector-level shares from BEA I-O tables (future)
 metal_content:
-  method: 'flat'         # 'flat', 'cbo', or 'bea'
-  flat_share: 0.50       # default 50% to match TPC
-  primary_chapters: ['72', '73', '76']  # products in these chapters = 100% metal
+  method: 'bea'          # 'flat', 'cbo', or 'bea'
+  flat_share: 0.50       # fallback for unmatched derivatives (all methods)
+  primary_chapters: ['72', '73', '76', '74']  # products in these chapters = 100% metal
   # CBO method params (used when method = 'cbo'):
   # cbo_high_share: 0.75
   # cbo_low_share: 0.25
   # cbo_copper_share: 0.90
+  # BEA method params (used when method = 'bea'):
+  # Reads resources/metal_content_shares_bea_hs10.csv (HS10-level shares
+  # from 2017 BEA Detail I-O table via HS10->NAICS->BEA crosswalk chain).
+  # Matches Tariff-ETRs 'bea' detail method.
+
+# --- Section 232 auto rebate ---
+# Reduces effective 232 rate on auto products by (rebate_rate * assembly_share).
+# Reflects US assembly credit: domestic content offsets a fraction of the tariff.
+# Set rebate_rate to 0 to disable.
+auto_rebate:
+  rebate_rate: 0.0375          # 3.75% rebate per Proclamation
+  us_assembly_share: 0.33      # fraction of vehicle assembled in US
 
 # --- Fentanyl product carve-outs ---
 # Product-specific fentanyl rate carve-outs for CA/MX.

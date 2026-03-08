@@ -665,23 +665,145 @@ extract_section232_rates <- function(ch99_data) {
     auto_exempt <- character(0)
   }
 
-  has_232 <- (steel_rate > 0 || aluminum_rate > 0 || auto_rate > 0)
+  # --- Auto deal rates: country-specific floor/additive rates from 9903.94 ---
+  # Country entries have country_type = 'specific' (parsed by parse_countries).
+  # Two patterns:
+  #   Floor: general = "15%" (no "+" prefix) → effective rate = max(floor - base, 0)
+  #   Additive: general = "+7.5%" → flat surcharge
+  #   Passthrough: general = "The duty provided..." (rate = NA) → no additional duty
+  auto_deal_rates <- tibble(
+    country = character(), rate = numeric(), rate_type = character(),
+    ch99_code = character(), program = character()
+  )
 
-  if (auto_rate > 0) {
-    message('  232 coverage: steel + aluminum + autos')
-  } else if (has_232) {
-    message('  232 coverage: steel + aluminum only (no auto entries found)')
+  if (nrow(s232_auto) > 0) {
+    auto_country <- s232_auto %>%
+      filter(country_type == 'specific') %>%
+      mutate(
+        iso_country = map_chr(countries, ~.x[1]),
+        # Distinguish floor vs surcharge from the general_raw field
+        rate_type = case_when(
+          is.na(rate) ~ 'passthrough',
+          !grepl('\\+', general_raw) & grepl('^[0-9]+\\.?[0-9]*%$', trimws(general_raw)) ~ 'floor',
+          TRUE ~ 'surcharge'
+        ),
+        # Classify program: vehicles vs parts based on description
+        program = case_when(
+          grepl('(?:part|parts)\\b', description, ignore.case = TRUE) &
+            !grepl('passenger vehicles and light trucks', description, ignore.case = TRUE) ~ 'auto_parts',
+          TRUE ~ 'auto_vehicles'
+        )
+      ) %>%
+      filter(!is.na(rate), rate_type != 'passthrough')
+
+    if (nrow(auto_country) > 0) {
+      auto_deal_rates <- auto_country %>%
+        select(iso_country, rate, rate_type, ch99_code, program) %>%
+        rename(country = iso_country)
+      message('  Auto deal rates: ', nrow(auto_deal_rates), ' country-specific entries (',
+              paste(unique(auto_deal_rates$country), collapse = ', '), ')')
+    }
   }
+
+  # --- Wood products (9903.76) ---
+  s232_wood <- ch99_data %>%
+    filter(grepl('^9903\\.76', ch99_code))
+
+  wood_rate <- 0
+  wood_furniture_rate <- 0
+  wood_deal_rates <- tibble(
+    country = character(), rate = numeric(), rate_type = character(),
+    ch99_code = character()
+  )
+
+  if (nrow(s232_wood) > 0) {
+    # Universal entries: 9903.76.01 (softwood 10%), 9903.76.02 (furniture 25%), 9903.76.03 (cabinets 25%)
+    wood_softwood <- s232_wood %>%
+      filter(ch99_code == '9903.76.01', !is.na(rate))
+    wood_furn <- s232_wood %>%
+      filter(ch99_code %in% c('9903.76.02', '9903.76.03'), !is.na(rate))
+
+    if (nrow(wood_softwood) > 0) {
+      wood_rate <- max(wood_softwood$rate)
+      message('  Softwood 232: ', round(wood_rate * 100), '%')
+    }
+    if (nrow(wood_furn) > 0) {
+      wood_furniture_rate <- max(wood_furn$rate)
+      message('  Wood furniture/cabinets 232: ', round(wood_furniture_rate * 100), '%')
+    }
+
+    # Country-specific deal entries: 9903.76.20-23
+    wood_country <- s232_wood %>%
+      filter(country_type == 'specific', !is.na(rate)) %>%
+      mutate(
+        iso_country = map_chr(countries, ~.x[1]),
+        rate_type = case_when(
+          !grepl('\\+', general_raw) & grepl('^[0-9]+\\.?[0-9]*%$', trimws(general_raw)) ~ 'floor',
+          TRUE ~ 'surcharge'
+        )
+      )
+
+    if (nrow(wood_country) > 0) {
+      wood_deal_rates <- wood_country %>%
+        select(iso_country, rate, rate_type, ch99_code) %>%
+        rename(country = iso_country)
+      message('  Wood deal rates: ', nrow(wood_deal_rates), ' country-specific entries (',
+              paste(unique(wood_deal_rates$country), collapse = ', '), ')')
+    }
+  }
+
+  # --- MHD vehicles (9903.74) ---
+  s232_mhd <- ch99_data %>%
+    filter(grepl('^9903\\.74', ch99_code), !is.na(rate))
+
+  mhd_rate <- 0
+  if (nrow(s232_mhd) > 0) {
+    mhd_all <- s232_mhd %>% filter(country_type == 'all')
+    if (nrow(mhd_all) > 0) {
+      mhd_rate <- max(mhd_all$rate)
+      message('  MHD vehicles 232: ', round(mhd_rate * 100), '%')
+    }
+  }
+
+  # --- Copper (9903.78) ---
+  s232_copper <- ch99_data %>%
+    filter(grepl('^9903\\.78', ch99_code), !is.na(rate))
+
+  copper_rate <- 0
+  if (nrow(s232_copper) > 0) {
+    copper_all <- s232_copper %>% filter(country_type == 'all')
+    if (nrow(copper_all) > 0) {
+      copper_rate <- max(copper_all$rate)
+      message('  Copper 232: ', round(copper_rate * 100), '%')
+    }
+  }
+
+  has_232 <- (steel_rate > 0 || aluminum_rate > 0 || auto_rate > 0 ||
+              wood_rate > 0 || wood_furniture_rate > 0 || mhd_rate > 0 || copper_rate > 0)
+
+  coverage_parts <- c()
+  if (steel_rate > 0 || aluminum_rate > 0) coverage_parts <- c(coverage_parts, 'steel/aluminum')
+  if (auto_rate > 0) coverage_parts <- c(coverage_parts, 'autos')
+  if (wood_rate > 0 || wood_furniture_rate > 0) coverage_parts <- c(coverage_parts, 'wood')
+  if (mhd_rate > 0) coverage_parts <- c(coverage_parts, 'MHD')
+  if (copper_rate > 0) coverage_parts <- c(coverage_parts, 'copper')
+  if (has_232) message('  232 coverage: ', paste(coverage_parts, collapse = ' + '))
 
   return(list(
     steel_rate = steel_rate,
     aluminum_rate = aluminum_rate,
     auto_rate = auto_rate,
     derivative_rate = derivative_rate,
+    wood_rate = wood_rate,
+    wood_furniture_rate = wood_furniture_rate,
+    mhd_rate = mhd_rate,
+    copper_rate = copper_rate,
     steel_exempt = steel_exempt,
     aluminum_exempt = aluminum_exempt,
     auto_exempt = auto_exempt,
     derivative_exempt = derivative_exempt,
+    auto_deal_rates = auto_deal_rates,
+    wood_deal_rates = wood_deal_rates,
     has_232 = has_232
   ))
 }

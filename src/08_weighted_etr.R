@@ -305,31 +305,45 @@ compute_net_authority_contributions <- function(df, stacking_method = 'mutual_ex
     )
   }
 
+  # Ensure metal_share exists for derivative scaling
+  if (!'metal_share' %in% names(df)) {
+    df$metal_share <- 1.0
+  }
+
   df %>%
     mutate(
-      # 232 vs IEEPA: mutually exclusive (232 takes precedence)
+      # For derivative 232 products (metal_share < 1.0), IEEPA/s122 apply
+      # to the non-metal portion. For primary 232 (metal_share = 1.0),
+      # nonmetal_share = 0 → full mutual exclusion.
+      nonmetal_share = if_else(rate_232 > 0 & metal_share < 1.0, 1 - metal_share, 0),
+      # 232: already scaled by metal_share in step 5
       net_232 = case_when(
         rate_232 > 0 ~ rate_232,
         TRUE ~ 0
       ),
+      # IEEPA reciprocal: excluded by 232, except on nonmetal portion of derivatives
       net_ieepa = case_when(
-        rate_232 > 0 ~ 0,        # 232 takes precedence
+        rate_232 > 0 ~ rate_ieepa_recip * nonmetal_share,
         TRUE ~ rate_ieepa_recip
       ),
-      # Fentanyl: stacks for China always; for others only when no 232
+      # Fentanyl: China always stacks; others only on nonmetal when 232 present
       net_fentanyl = case_when(
         country == CTY_CHINA ~ rate_ieepa_fent,
-        rate_232 > 0 ~ 0,        # fentanyl does NOT stack on 232 for non-China
+        rate_232 > 0 ~ rate_ieepa_fent * nonmetal_share,
         TRUE ~ rate_ieepa_fent
       ),
-      # 301: China only
+      # 301: China only, full customs value (no metal scaling)
       net_301 = case_when(
         country == CTY_CHINA ~ rate_301,
         TRUE ~ 0
       ),
-      # s122: stacks on everything
-      net_s122 = rate_s122
-    )
+      # s122: scales by nonmetal_share on 232 products (excluded to extent 232 applies)
+      net_s122 = case_when(
+        rate_232 > 0 ~ rate_s122 * nonmetal_share,
+        TRUE ~ rate_s122
+      )
+    ) %>%
+    select(-nonmetal_share)
 }
 
 

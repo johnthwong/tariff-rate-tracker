@@ -82,6 +82,23 @@ parse_countries <- function(description) {
     return(list(type = 'specific', countries = c('RU'), exempt = character(0)))
   }
 
+  # Country-specific "products of [country]" pattern (Section 232 deals, wood tariffs)
+  # e.g., "Passenger vehicles that are products of the United Kingdom"
+  #        "Wood products of Japan as provided for..."
+  #        "...products of the European Union..."
+  #        "...products of South Korea..."
+  country_specific_map <- c(
+    'united kingdom' = 'UK', 'japan' = 'JP',
+    'european union' = 'EU', 'south korea' = 'KR', 'korea' = 'KR'
+  )
+  for (name in names(country_specific_map)) {
+    if (str_detect(desc_lower, paste0('products?\\s+of\\s+(the\\s+)?', name))) {
+      return(list(type = 'specific',
+                  countries = country_specific_map[name],
+                  exempt = character(0)))
+    }
+  }
+
   # Default: applies to all countries
   return(list(type = 'all', countries = character(0), exempt = character(0)))
 }
