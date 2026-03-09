@@ -15,7 +15,7 @@
 | T1 | **Apply product-level USMCA shares to 232 auto/MHD** — replace binary exemption (`heading_usmca_exempt → rate=0` for CA/MX) with `rate_232 * (1 - usmca_share)` using Census SPI shares from `usmca_product_shares.csv` | `06_calculate_rates.R` step 4 | **+3-4pp Mexico**, resolves largest single discrepancy | [#7](#issue-7-232-usmca-automhd-exemption--binary-vs-share-based-mexico--3-to--4pp) |
 | T2 | **Implement 232 auto deal rates** (Notes 33(h)-(k)) — Japan/Korea/EU autos at 15% floor, UK autos at 7.5% surcharge, UK auto parts at 10% floor, Japan/Korea/EU auto parts at 15% floor | `06_calculate_rates.R` step 4c, `policy_params.yaml` | **-1-2pp Japan/EU/UK** | [#5](#issue-5-232-auto-deal-rates-japan--05pp-eu--05pp-uk--1pp), [#11](#issue-11-japaneu-auto-deal-rates-under-232-japan--11pp-eu-implicit) |
 | T3 | **Expand IEEPA product exemptions** — add Brazil EO-specific agricultural/energy exemptions and other country-specific carve-outs to `ieepa_exempt_products.csv` | `resources/ieepa_exempt_products.csv` | **-0.5-1pp overall** | [#3](#issue-3-ieepa-product-exemptions-overall--05-to--1pp-for-etrs) |
-| T4 | **Fix Brazil/India country EO stacking** — ensure country-specific EO rates (e.g., Brazil +40% from 9903.01.77, India +25% from 9903.01.84) stack with the universal 10% baseline (9903.01.25) rather than replacing it. **TPC validates**: Brazil TPC mean=43.1% vs tracker 10.0% (-33pp); India TPC mean=44.2% vs tracker 25.0% (-19pp) | `05_parse_policy_params.R`, `06_calculate_rates.R` step 2 | **+30pp Brazil, +19pp India** (country-specific) | [#6](#issue-6-brazilindia-country-eo-classification-minimal-net-impact), [TPC validation](#country-level-tpc-mean-rates-vs-tracker-vs-etrs-nov-2025-unweighted-product-mean) |
+| ~~T4~~ | ~~**Fix Brazil/India country EO stacking**~~ — **RESOLVED**: investigation confirmed the tracker already correctly stacks country_eo + Phase 2 rates (Brazil: 40%+10%=50%, India: 25%+25%=50%). Original comparison used stale data. Tracker mean at rev_32: Brazil=48.0%, India=48.0% (vs TPC 43.1%/44.2% — tracker slightly higher due to fewer product exemptions). | N/A | **No change needed** | [#6](#issue-6-brazilindia-country-eo-classification-minimal-net-impact) |
 | T5 | **Expand IEEPA product exemptions** — add Brazil EO-specific agricultural/energy exemptions and other country-specific carve-outs to `ieepa_exempt_products.csv`. TPC exempts 22% of Japan products vs tracker ~1%; EU similar gap. | `resources/ieepa_exempt_products.csv` | **-0.5-1pp overall** | [#3](#issue-3-ieepa-product-exemptions-overall--05-to--1pp-for-etrs), [TPC validation](#floor-rates-tpc-confirms-floor--product-exemptions) |
 | T6 | **Narrow 232 auto/MHD parts prefix matching** — audit `s232_auto_parts.txt` (136 prefixes) and `s232_mhd_parts.txt` (182 prefixes) against proclamation HTS10 lists; remove overly broad prefixes like '8471' | `resources/s232_auto_parts.txt`, `resources/s232_mhd_parts.txt` | **-0.5-1pp scattered** | [#4](#issue-4-section-232-automhd-parts-coverage-japan-05-1pp-others-smaller) |
 | T7 | **Add 15 missing S122 exempt products** — reconcile `s122_exempt_products.csv` (1,656) against ETRs list (1,671) | `resources/s122_exempt_products.csv` | **~0.1pp** | [#10](#issue-10-s122-product-exemptions-minimal--01pp) |
@@ -117,12 +117,12 @@ Note: TPC rates of 95% also confirm TPC stacks IEEPA reciprocal on 232 (no mutua
 |---------|----------|-------------|-------------|-------------------|-------|
 | China | 41.5% | 42.0% | **+0.5pp** | 32.8% | Tracker ≈ TPC; ETRs too low (301 stacking) |
 | Canada | 22.6% | 25.0% | +2.4pp | 7.2% | Tracker close; ETRs way too low (USMCA) |
-| Mexico | 16.8% | 25.0% | +8.2pp | 11.4% | Tracker too high (stale comparison?); ETRs closer |
+| Mexico | 16.8% | 25.0% | +8.2pp | 11.4% | Tracker too high (product exemptions); ETRs closer |
 | Japan | 12.4% | 25.0% | +12.6pp | 13.6% | ETRs ≈ TPC; Tracker too high (product exemptions) |
-| Brazil | 43.1% | 10.0% | -33.1pp | N/A | Tracker missing Brazil +40% EO rate |
-| India | 44.2% | 25.0% | -19.2pp | N/A | Tracker missing India +25% EO stacking |
+| Brazil | 43.1% | 48.0% | **+4.9pp** | N/A | Tracker correctly stacks country_eo + Phase 2; higher than TPC (product exemptions) |
+| India | 44.2% | 48.0% | **+3.8pp** | N/A | Tracker correctly stacks country_eo + Phase 2; higher than TPC (product exemptions) |
 
-*Note: Unweighted product means differ from import-weighted ETRs. The Mexico/Japan tracker means may reflect stale comparison data (pre-fix code).*
+*Note: Unweighted product means differ from import-weighted ETRs. Tracker means for Brazil/India corrected — original values (10.0%/25.0%) were from stale pre-fix comparison data. Tracker is ~5pp above TPC for Brazil/India, likely due to TPC applying more product exemptions.*
 
 ---
 
@@ -224,29 +224,27 @@ Note: TPC rates of 95% also confirm TPC stacks IEEPA reciprocal on 232 (no mutua
 
 ---
 
-### Issue 6: Brazil/India Country EO Stacking (MAJOR — validated by TPC)
+### Issue 6: Brazil/India Country EO Classification (RESOLVED — not a bug)
 
 **Tariff-Rate-Tracker:**
-- Brazil +40% (9903.01.77) classified as **reciprocal** (country_eo range 9903.01.76-89)
-- India +25% (9903.01.84) classified as **reciprocal**
-- Universal 10% baseline (9903.01.25) classified as **reciprocal**
-- Within Phase 1 reciprocal, the tracker picks the MAX entry — so Brazil gets 40% (not 40% + 10% = 50%)
+- Brazil +40% (9903.01.77) classified as **reciprocal** (country_eo phase, range 9903.01.76-89)
+- India +25% (9903.01.84) classified as **reciprocal** (country_eo phase)
+- Phase 2: Brazil +10% (9903.02.09), India +25% (9903.02.26)
+- Stacking: country_eo + phase2_aug7 summed across phases → Brazil 50%, India 50%
 
 **Tariff-ETRs:**
 - Brazil +40% classified as **fentanyl** + reciprocal default 10%
 - India +25% in reciprocal with headline 15%
 - Both stack because they're in separate IEEPA yaml files (reciprocal + fentanyl)
 
-**TPC validation (Nov 2025):**
-- **Brazil**: TPC mean = **43.1%**, Tracker mean = **10.0%** (-33pp gap!)
-- **India**: TPC mean = **44.2%**, Tracker mean = **25.0%** (-19pp gap!)
-- These are the largest country-level gaps in the entire comparison
+**TPC validation (Nov 2025, corrected):**
+- **Brazil**: TPC mean = **43.1%**, Tracker mean = **48.0%** (+4.9pp)
+- **India**: TPC mean = **44.2%**, Tracker mean = **48.0%** (+3.8pp)
+- Original tracker means (10.0%/25.0%) were from stale pre-fix comparison data
 
-**Root cause:** The tracker treats Brazil's +40% as replacing the universal 10% baseline (MAX within Phase 1), giving Brazil only 40%. TPC gives Brazil ~43% (40% country EO + ~3% from other authorities). The tracker also appears to be computing Brazil's rate far below even 40% — the 10% mean suggests the Brazil EO rate isn't being extracted at all, or is being misclassified.
+**Status:** **RESOLVED.** Investigation confirmed the tracker correctly extracts and stacks country_eo rates with Phase 2 rates. The original comparison table used stale data from before the country_eo extraction was fully operational. The tracker is now ~5pp *above* TPC for both countries, likely because TPC applies more product-specific exemptions (Brazil agricultural/energy carve-outs in 9903.01.78-83).
 
-**Impact:** For Brazil with 232: ETRs computes `(10% recip + 40% fent) x nonmetal` while tracker computes `(40% recip + 0% fent) x nonmetal` — i.e. 50% vs 40% on nonmetal. But the TPC data suggests the overall gap is much larger than this classification difference alone.
-
-**Which is more right:** **ETRs is more right, and the tracker has a likely bug.** Brazil's TPC mean of 43.1% vs tracker's 10.0% indicates the tracker is NOT applying the Brazil +40% EO rate at all for most products. This needs urgent investigation — the Brazil EO extraction or application may be broken.
+**Classification difference remains:** The tracker classifies Brazil +40% as reciprocal (country_eo), while ETRs classifies it as fentanyl. Both produce the same total rate (50%) through different decomposition. This is a classification choice, not a computational error.
 
 ---
 
@@ -259,9 +257,9 @@ Note: TPC rates of 95% also confirm TPC stacks IEEPA reciprocal on 232 (no mutua
 | 3. IEEPA product exemptions | **-0.5 to -1pp** (overall) | **ETRs** (more complete) |
 | 4. 232 auto/MHD parts scope | **+0.5-1pp** (scattered) | **ETRs** (explicit HTS10 lists) |
 | 5. Auto deal rates | **+1-2pp** (Japan/EU/UK) | **ETRs** (negotiated deals) |
-| 6. Brazil/India EO stacking | **-30pp Brazil, -19pp India** (country-specific); ~0.5pp overall | **ETRs** (likely tracker bug) |
+| 6. Brazil/India EO classification | **RESOLVED** — tracker correctly stacks at 50%; ~5pp above TPC (product exemptions) | **Both correct** (classification differs) |
 
-The overall +4.1pp gap is primarily driven by Issues 1 (USMCA) and 2 (301 stacking) pushing the tracker higher, partially offset by Issues 3-5 where ETRs has more complete implementation. Issue 6 (Brazil/India) is the largest country-specific gap but has small overall impact due to low import shares. TPC product-level data strongly validates the tracker on USMCA (Issue 1) and 301 stacking (Issue 2), while flagging Brazil/India as a likely tracker bug.
+The overall +4.1pp gap is primarily driven by Issues 1 (USMCA) and 2 (301 stacking) pushing the tracker higher, partially offset by Issues 3-5 where ETRs has more complete implementation. TPC product-level data strongly validates the tracker on USMCA (Issue 1) and 301 stacking (Issue 2). Issue 6 (Brazil/India) was initially flagged as a bug but is now confirmed resolved — the tracker correctly stacks country_eo + Phase 2 rates.
 
 ---
 
@@ -368,4 +366,4 @@ The overall -0.96pp gap is the net result of: China's persistent +3.2pp (301 sta
 
 5. **S122 exempt products**: The tracker should add the 15 missing exempt products to align with ETRs.
 
-6. **Brazil/country EO stacking**: The tracker should ensure country-specific EO rates (e.g., Brazil +40%) stack with the universal 10% baseline rather than replacing it.
+6. ~~**Brazil/country EO stacking**~~: **RESOLVED** — tracker correctly stacks country_eo (40%/25%) + Phase 2 (10%/25%) = 50% for both Brazil and India. Original comparison used stale data.
