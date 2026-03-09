@@ -579,12 +579,30 @@ extract_section232_rates <- function(ch99_data) {
   steel_entries <- s232_sa %>% filter(s232_type == 'steel')
   aluminum_entries <- s232_sa %>% filter(s232_type == 'aluminum')
 
-  # Steel: use PARENT entries only (9903.80.xx)
+  # Steel: check for June 2025 increase entries (9903.81.87+) first, then
+  # fall back to original entries (9903.80.xx). The June 2025 proclamation
+  # doubled steel from 25% to 50% via new 9903.81.87-93 entries.
+  # UK gets 25% via 9903.81.94-99.
+  steel_increase <- steel_entries %>%
+    filter(ch99_code == '9903.81.87', country_type %in% c('all', 'all_except'))
   steel_parent <- steel_entries %>% filter(grepl('^9903\\.80\\.', ch99_code))
   steel_all <- steel_parent %>% filter(country_type == 'all')
   steel_except <- steel_parent %>% filter(country_type == 'all_except')
 
-  if (nrow(steel_all) > 0) {
+  # UK-specific steel entries (9903.81.94-99)
+  steel_uk <- steel_entries %>%
+    filter(grepl('^9903\\.81\\.9[4-9]', ch99_code), !is.na(rate))
+  steel_country_overrides <- list()
+  if (nrow(steel_uk) > 0) {
+    uk_rate <- max(steel_uk$rate)
+    steel_country_overrides[['4120']] <- uk_rate
+  }
+
+  if (nrow(steel_increase) > 0) {
+    steel_rate <- steel_increase$rate[1]
+    steel_exempt <- character(0)
+    message('  Steel 232: ', round(steel_rate * 100), '% (all countries, June 2025 increase)')
+  } else if (nrow(steel_all) > 0) {
     steel_rate <- max(steel_all$rate)
     steel_exempt <- character(0)
     message('  Steel 232: ', round(steel_rate * 100), '% (all countries)')
@@ -597,17 +615,40 @@ extract_section232_rates <- function(ch99_data) {
     steel_rate <- 0
     steel_exempt <- character(0)
   }
+  if (length(steel_country_overrides) > 0) {
+    message('  Steel 232 country overrides: ',
+            paste(names(steel_country_overrides), '=',
+                  round(unlist(steel_country_overrides) * 100), '%', collapse = ', '))
+  }
 
-  # Aluminum: use PARENT entries only (9903.85.01, 9903.85.03)
+  # Aluminum: check for June 2025 increase entry (9903.85.02) first, then
+  # fall back to original entries (9903.85.01/.03). UK gets 25% via 9903.85.12-15.
+  alum_increase <- aluminum_entries %>%
+    filter(ch99_code == '9903.85.02', country_type %in% c('all', 'all_except'))
   alum_parent <- aluminum_entries %>%
     filter(ch99_code %in% c('9903.85.01', '9903.85.03'))
-  alum_increase <- aluminum_entries %>%
-    filter(ch99_code == '9903.85.12')
+  # Original "increase to 25%" entry (pre-June 2025, Proclamation 10896)
+  alum_25_increase <- aluminum_entries %>%
+    filter(ch99_code == '9903.85.12', country_type == 'all')
 
   alum_except <- alum_parent %>% filter(country_type == 'all_except')
 
-  if (nrow(alum_increase) > 0 && alum_increase$country_type[1] == 'all') {
+  # UK-specific aluminum entries (9903.85.12-15)
+  alum_uk <- aluminum_entries %>%
+    filter(grepl('^9903\\.85\\.1[2-5]', ch99_code),
+           grepl('United Kingdom', description, ignore.case = TRUE))
+  aluminum_country_overrides <- list()
+  if (nrow(alum_uk) > 0) {
+    uk_alum_rate <- max(alum_uk$rate)
+    aluminum_country_overrides[['4120']] <- uk_alum_rate
+  }
+
+  if (nrow(alum_increase) > 0) {
     aluminum_rate <- alum_increase$rate[1]
+    aluminum_exempt <- character(0)
+    message('  Aluminum 232: ', round(aluminum_rate * 100), '% (all countries, June 2025 increase)')
+  } else if (nrow(alum_25_increase) > 0) {
+    aluminum_rate <- alum_25_increase$rate[1]
     aluminum_exempt <- character(0)
     message('  Aluminum 232: ', round(aluminum_rate * 100), '% (all countries, increased)')
   } else if (nrow(alum_except) > 0) {
@@ -618,6 +659,11 @@ extract_section232_rates <- function(ch99_data) {
   } else {
     aluminum_rate <- 0
     aluminum_exempt <- character(0)
+  }
+  if (length(aluminum_country_overrides) > 0) {
+    message('  Aluminum 232 country overrides: ',
+            paste(names(aluminum_country_overrides), '=',
+                  round(unlist(aluminum_country_overrides) * 100), '%', collapse = ', '))
   }
 
   # --- Aluminum derivatives (9903.85.04/.07/.08) ---
@@ -804,6 +850,8 @@ extract_section232_rates <- function(ch99_data) {
     derivative_exempt = derivative_exempt,
     auto_deal_rates = auto_deal_rates,
     wood_deal_rates = wood_deal_rates,
+    steel_country_overrides = steel_country_overrides,
+    aluminum_country_overrides = aluminum_country_overrides,
     has_232 = has_232
   ))
 }

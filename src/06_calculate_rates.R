@@ -822,7 +822,17 @@ calculate_rates_for_revision <- function(
     if (!is.null(s232_headings)) {
       for (tariff_name in names(s232_headings)) {
         cfg <- s232_headings[[tariff_name]]
+        # Support both inline prefixes and external file
         prefixes <- unlist(cfg$prefixes)
+        if (!is.null(cfg$prefixes_file)) {
+          pf_path <- here(cfg$prefixes_file)
+          if (file.exists(pf_path)) {
+            prefixes <- c(prefixes, trimws(readLines(pf_path)))
+            prefixes <- prefixes[nchar(prefixes) > 0]
+          } else {
+            message('  WARNING: prefixes_file not found: ', pf_path)
+          }
+        }
         if (length(prefixes) == 0) next
 
         # Match products by prefix
@@ -837,13 +847,13 @@ calculate_rates_for_revision <- function(
           usmca_exempt = cfg$usmca_exempt %||% FALSE
         )
 
-        if (grepl('auto|passenger|light_truck', tariff_name, ignore.case = TRUE)) {
+        if (grepl('auto|passenger|light_truck|auto_parts', tariff_name, ignore.case = TRUE)) {
           auto_products <- c(auto_products, matched)
         } else if (grepl('copper', tariff_name, ignore.case = TRUE)) {
           copper_products <- c(copper_products, matched)
         } else if (grepl('softwood|furniture|cabinet', tariff_name, ignore.case = TRUE)) {
           wood_products <- c(wood_products, matched)
-        } else if (grepl('mhd|bus', tariff_name, ignore.case = TRUE)) {
+        } else if (grepl('mhd|bus|mhd_parts', tariff_name, ignore.case = TRUE)) {
           mhd_products <- c(mhd_products, matched)
         }
       }
@@ -895,6 +905,21 @@ calculate_rates_for_revision <- function(
         aluminum_rate = if_else(alum_exempt, 0, s232_rates$aluminum_rate),
         auto_rate = if_else(auto_exempt, 0, s232_rates$auto_rate)
       )
+
+    # --- Apply HTS-extracted 232 country overrides (e.g., UK deal rates) ---
+    # These come from country-specific ch99 entries (e.g., 9903.81.94 UK steel 25%)
+    for (cty in names(s232_rates$steel_country_overrides)) {
+      idx <- country_232$country == cty
+      if (any(idx)) {
+        country_232$steel_rate[idx] <- s232_rates$steel_country_overrides[[cty]]
+      }
+    }
+    for (cty in names(s232_rates$aluminum_country_overrides)) {
+      idx <- country_232$country == cty
+      if (any(idx)) {
+        country_232$aluminum_rate[idx] <- s232_rates$aluminum_country_overrides[[cty]]
+      }
+    }
 
     # --- Apply config-level 232 country exemptions (TRQ/quota agreements) ---
     # These override rates for countries with trade agreements not encoded in HTS JSON.

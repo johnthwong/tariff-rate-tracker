@@ -124,6 +124,14 @@ section_232_headings:
                '8706000575', '87060025', '87060050', '87091100', '87091900']
     default_rate: 0.25
     usmca_exempt: true
+  auto_parts:
+    prefixes_file: 'resources/s232_auto_parts.txt'
+    default_rate: 0.25
+    usmca_exempt: true
+  mhd_parts:
+    prefixes_file: 'resources/s232_mhd_parts.txt'
+    default_rate: 0.25
+    usmca_exempt: true
   buses:
     prefixes: ['8702']
     default_rate: 0.10
@@ -301,7 +309,7 @@ section_301_products:
 # covered by 9903.85.04/.07/.08. Product list not extractable from HTS JSON.
 section_232_derivatives:
   resource_file: 'resources/s232_derivative_products.csv'
-  default_rate: 0.25    # same as base aluminum rate
+  default_rate: 0.50    # fallback; actual rate extracted from ch99 (9903.85.04/.07/.08)
 
 # --- Metal content shares for 232 derivatives ---
 # The tariff on derivative products applies only to the metal content portion
