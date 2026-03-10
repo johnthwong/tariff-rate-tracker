@@ -46,10 +46,65 @@ When USITC publishes an HTS revision incorporating a change listed here, the ove
 
 **HTS status (March 2026)**: Native floor entries (9903.02.82-91) are present in HTS JSON starting from `2026_basic` (Jan 1, 2026) and persist through `2026_rev_4` (Feb 25, 2026). The surcharge-to-floor override in `06_calculate_rates.R` is now a no-op for these revisions since the native entries win rate selection. The override remains necessary for `rev_32` (Nov 15, 2025) and earlier revisions within the framework window.
 
-**Conditional expiry**: The Framework agreement must be finalized by March 31, 2026. If not, rates revert to +39% (Switzerland) / +15% (Liechtenstein) surcharges. When confirmed, set `swiss_framework.finalized: true` in `config/policy_params.yaml` to make the floor treatment permanent.
+**Conditional expiry**: The Framework agreement must be finalized by **March 31, 2026** (22 days from today). If not, rates revert to +39% (Switzerland) / +15% (Liechtenstein) surcharges. When confirmed, set `swiss_framework.finalized: true` in `config/policy_params.yaml` to make the floor treatment permanent. **Action required by late March.**
+
+---
+
+## 2. Section 122 Phase 3 (10% blanket)
+
+**Source**: Trade Act of 1974 §122; Executive Order (Phase 3)
+
+**Authority**: Section 122 of the Trade Act of 1974
+
+**Effective**: February 25, 2026
+
+**Statutory limit**: 150 days from initial effective date → expires July 25, 2026
+
+**Summary**: 10% blanket tariff on all imports from all countries. Exempt products listed in Annex II (1,656 HTS8 codes in `resources/s122_exempt_products.csv`). USMCA-eligible products reduced by `(1 - usmca_share)`. Mutually exclusive with Section 232 (232 takes precedence).
+
+**HTS modifications** (2026_rev_4):
+
+| Action | Code | Description |
+|--------|------|-------------|
+| New | 9903.03.01 | 10% blanket on all countries |
+| New | 9903.03.02-11 | Exemptions: transit, IEEPA exempt, civil aircraft, 232, CA/MX, CAFTA-DR, donations, informational materials |
+
+**Pipeline handling**: Implemented in `06_calculate_rates.R` (rate calculation), `09_daily_series.R` (interval splitting at S122 effective/expiry dates), and `helpers.R:get_rates_at_date()` (expiry enforcement). Config: `section_122` block in `policy_params.yaml`.
+
+---
+
+## 3. Semiconductor Tariffs (25%)
+
+**Source**: US Note 39 to Chapter 99
+
+**Authority**: Section 232 / IEEPA (semiconductor-specific)
+
+**Effective**: January 16, 2026
+
+**Summary**: 25% tariff on semiconductor articles. New subchapter 9903.79 with country-specific exemptions.
+
+**HTS modifications** (2026_rev_1):
+
+| Action | Code | Description |
+|--------|------|-------------|
+| New | 9903.79.01 | Semiconductor articles 25% |
+| New | 9903.79.02-09 | Exemptions: transit, USMCA, country-specific |
+
+**Pipeline handling**: Parsed automatically via standard Chapter 99 extraction. No special handling required.
 
 ---
 
 ## Resolved
 
-_(None yet)_
+### R1. 232 Auto Parts Product List (official CBP source)
+
+**Source**: CBP "Automobile Parts HTS List" (Attachment 2), published May 1, 2025 via GovDelivery.
+Direct PDF: https://content.govdelivery.com/attachments/USDHSCBP/2025/05/01/file_attachments/3248126/Attachment%202_Auto%20Parts%20HTS%20List.pdf
+
+**Authority**: U.S. Note 33 to subchapter III of Chapter 99, subdivisions (g) and (h), heading 9903.94.05 (dutiable parts) and 9903.94.06 (USMCA-content exempt parts).
+
+**Summary**: 130 HTS codes defining automobile parts subject to Section 232. Replaces the previous reverse-engineered list (136 prefixes from Tariff-ETRs). Changes: removed 7 codes that belong to MHD parts only (8708.99.03/.06/.23/.27/.31/.41, 8708.99.4850), added 1 missing prefix (8483.10.30). Note: the CBP list confirms '8471' as an official auto parts prefix (previously flagged as overly broad).
+
+**Resolution**: Updated `resources/s232_auto_parts.txt` (March 2026). No code changes required — the file is loaded dynamically via `prefixes_file` in `policy_params.yaml`.
+
+**MHD parts verified**: `s232_mhd_parts.txt` (182 codes) confirmed to match live HTSUS US Note 34, subdivision (i), heading 9903.74.08 exactly (verified against `chapter99_2026_rev_4.pdf`, page 541). No changes needed.

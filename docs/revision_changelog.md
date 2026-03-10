@@ -127,9 +127,11 @@ No Chapter 99 changes.
 ### `rev_15` — 2025-05-14
 Phase 1 suspension continues. No new entries.
 
-### `rev_16` — 2025-06-06: 232 Auto Parts Rates, IEEPA Entry
-- Added: 9903.94.31 (auto parts 7.5%), 9903.94.32 (auto parts 10%)
+### `rev_16` — 2025-06-06: 232 Auto Parts Rates + UK Deal
+- Added: 9903.94.31 (auto parts 7.5% — UK parts floor)
+- Added: 9903.94.32 (auto parts 10% — UK vehicles surcharge)
 - Added: 9903.96.01 (IEEPA reciprocal entry)
+- UK auto deal: vehicles +7.5% surcharge, parts 10% floor (per US-UK trade framework)
 
 ### `rev_17` — 2025-07-01: CA Fentanyl Increase + Copper 232
 - Rate change: 9903.01.10 (CA fentanyl): 25% → **35%**
@@ -159,16 +161,16 @@ No Chapter 99 changes.
 ### `rev_21-22` — 2025-08-28 to 2025-09-03
 No Chapter 99 changes.
 
-### `rev_23` — 2025-09-12: Japan Floor
+### `rev_23` — 2025-09-12: Japan Floor + 232 Auto Deal
 **Japan trade framework**: Floor structure replaces surcharge.
 - Added: 9903.02.72 (Japan passthrough, base >= 15%)
 - Added: 9903.02.73 (Japan 15% floor, base < 15%)
-- Added: 9903.94.40-43 (232 auto Japan entries with floor)
+- Added: 9903.94.40-43 (232 auto Japan entries: vehicles 15% floor, parts 15% floor)
 - Added: 9903.96.02 (IEEPA reciprocal entry)
 
-### `rev_24` — 2025-09-19: EU Exemption Entries
+### `rev_24` — 2025-09-19: EU Floor Entries + 232 Auto Deal
 - Added: 9903.02.74-77 (EU exemption/passthrough entries)
-- Added: 9903.94.50-53 (232 auto EU entries with floor)
+- Added: 9903.94.50-53 (232 auto EU entries: vehicles 15% floor, parts 15% floor)
 
 ### `rev_25` — 2025-09-26: Section 122 Entries
 - Added: 9903.76.01-04 (Section 122 entries, 10%-25%)
@@ -196,13 +198,13 @@ No Chapter 99 changes.
 ### `rev_31` — 2025-11-12
 No Chapter 99 changes.
 
-### `rev_32` — 2025-11-15: S. Korea Floor
+### `rev_32` — 2025-11-15: S. Korea Floor + 232 Auto Deal
 **S. Korea trade framework**: Floor structure.
 - Added: 9903.02.79 (S. Korea passthrough, base >= 15%)
 - Added: 9903.02.80 (S. Korea 15% floor, base < 15%)
 - Added: 9903.02.81 (general exemption entry)
 - Added: 9903.76.23 (Section 122 entry)
-- Added: 9903.94.60-65 (232 auto S. Korea entries with floor)
+- Added: 9903.94.60-65 (232 auto S. Korea entries: vehicles 15% floor, parts 15% floor)
 - *TPC validation date: 2025-11-17*
 
 ### `2026_basic` — 2026-01-01: Switzerland/Liechtenstein Floor
@@ -251,7 +253,8 @@ No Chapter 99 changes. +153 product line additions.
 | 2025-07-01 | CA fentanyl increased to 35% | rev_17 |
 | 2025-08-07 | **Phase 2 reciprocal** (country-specific, 71 entries) | rev_18 |
 | 2025-08-20 | India EO (+25%) | rev_20 |
-| 2025-09-12 | Japan floor (15%) | rev_23 |
+| 2025-09-12 | Japan floor (15%) + 232 auto deal | rev_23 |
+| 2025-09-19 | EU floor entries + 232 auto deal | rev_24 |
 | 2025-10-06 | Copper 232 | rev_26 |
 | 2025-10-15 | 301 cranes (100%); China fentanyl reduced to 10% | rev_27 |
 | 2025-11-15 | S. Korea floor (15%) | rev_32 |

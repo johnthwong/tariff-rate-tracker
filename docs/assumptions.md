@@ -22,25 +22,25 @@ This document catalogs methodological assumptions derived from non-official sour
 
 | Method | Share | Source |
 |--------|-------|--------|
-| Flat (default) | 50% for all derivatives | Matches TPC methodology |
+| Flat | 50% for all derivatives | Matches TPC methodology |
 | CBO | 75% (high aluminum), 25% (low aluminum), 90% (copper) | CBO budget analysis files |
-| BEA | Product-level (future) | Not yet implemented |
+| BEA (default) | HS10-level shares from BEA Detail I-O table | `resources/metal_content_shares_bea_hs10.csv` |
 
-**Source:** Flat 50% reverse-engineered from TPC. CBO buckets from Congressional Budget Office tariff analysis (`resources/cbo/`). No official HTS or Federal Register guidance specifies metal content calculation methodology.
+**Source:** Flat 50% reverse-engineered from TPC. CBO buckets from Congressional Budget Office tariff analysis (`resources/cbo/`). BEA shares computed from BEA Detail I-O table, matching Tariff-ETRs `bea_granularity: 'detail'`. No official HTS or Federal Register guidance specifies metal content calculation methodology.
 
-**Implementation:** `config/policy_params.yaml` (`metal_content` block), `src/helpers.R:load_metal_content()`.
+**Implementation:** `config/policy_params.yaml` (`metal_content` block, `method: 'bea'`), `resources/metal_content_shares_bea_hs10.csv`, `src/helpers.R:load_metal_content()`.
 
 ---
 
 ## 3. USMCA Utilization Shares
 
-**Assumption:** USMCA preference utilization is measured at the product-country level using Census Bureau RATE_PROV field code 18, computed from calendar year 2024 monthly import data. Tariff rates are scaled by `(1 - usmca_share)` for Canadian and Mexican products.
+**Assumption:** USMCA preference utilization is measured at the product-country level using Census Bureau RATE_PROV field code 18, computed from calendar year 2024 monthly import data. Tariff rates are scaled by `(1 - usmca_share)` for Canadian and Mexican products. Applied to IEEPA reciprocal, IEEPA fentanyl, Section 122, and Section 232 auto/MHD programs.
 
 **Source:** Census Bureau Import Detail (IMP_DETL.TXT) files. Methodology replicates TPC's approach ("multiplied by the complement of the USMCA share for each product").
 
 **Why non-official:** Census RATE_PROV coding is administrative, not statutory. Product-level utilization is an empirical estimate, not a legal determination. Falls back to binary HTS `special` field eligibility (S/S+) when shares are unavailable.
 
-**Implementation:** `src/compute_usmca_shares.R`, `resources/usmca_product_shares.csv`, applied in `src/06_calculate_rates.R`.
+**Implementation:** `src/compute_usmca_shares.R`, `resources/usmca_product_shares.csv` (22,449 product-country pairs), applied in `src/06_calculate_rates.R` steps 2 (fentanyl), 4 (232 auto/MHD), and 7 (IEEPA/S122).
 
 ---
 
@@ -51,6 +51,18 @@ This document catalogs methodological assumptions derived from non-official sour
 **Source:** Tariff-ETRs project, reverse-engineered from US Note 19 to Chapter 99 PDF. Should be re-derived directly when USITC API provides US Notes data.
 
 **Implementation:** `resources/s232_derivative_products.csv`, loaded by `src/helpers.R:load_232_derivative_products()`.
+
+---
+
+## 4a. Section 232 Auto Parts Product List *(now official)*
+
+**Assumption:** 130 HTS codes define automobile parts subject to Section 232 tariffs under headings 9903.94.05 (dutiable) and 9903.94.06 (USMCA-content exempt).
+
+**Source:** CBP "Automobile Parts HTS List" (Attachment 2), published May 1, 2025 via GovDelivery. References U.S. Note 33 to subchapter III of Chapter 99, subdivisions (g) and (h). PDF: `data/cbp/Attachment 2_Auto Parts HTS List.pdf`.
+
+**Why this section remains:** While both product lists are now verified against official sources, the files are still maintained externally because the HTS JSON API does not provide US Notes text (zero product-level footnotes reference 9903.94.05). The MHD parts list (`s232_mhd_parts.txt`, 182 codes) was verified against live HTSUS US Note 34, subdivision (i), heading 9903.74.08 — exact match confirmed.
+
+**Implementation:** `resources/s232_auto_parts.txt`, loaded via `prefixes_file` in `config/policy_params.yaml` (`section_232_headings.auto_parts`).
 
 ---
 
@@ -70,11 +82,17 @@ This document catalogs methodological assumptions derived from non-official sour
 
 ## 6. IEEPA Product Exemptions (Annex A)
 
-**Assumption:** ~1,087 HTS10 products are exempt from IEEPA reciprocal tariffs, as defined by executive order Annex A / US Note 2 subdivision (v)(iii).
+**Assumption:** ~4,325 HTS10 products are exempt from IEEPA reciprocal tariffs. Three sources:
 
-**Source:** Executive orders (official policy), but the product list is maintained as an external resource file because the HTS JSON API does not provide US Notes text.
+1. **Annex A / US Note 2 subdivision (v)(iii)**: ~2,172 HTS8 codes expanded to ~4,106 HTS10 (including ITA prefix entries for headings 8471, 8473.30, 8486, 8523, 8524, 8541, 8542)
+2. **Chapter 98 statutory exemption**: US Note 2 subdivision (v)(i) explicitly exempts Chapter 98 articles from IEEPA reciprocal, except 9802.00.40/.50/.60/.80. Adds ~101 HTS10 codes.
+3. **Country-specific carve-outs**: Merged from Tariff-ETRs `ieepa_reciprocal.yaml` product_rates (rate=0).
 
-**Implementation:** `resources/ieepa_exempt_products.csv`, applied in `src/06_calculate_rates.R`.
+**Source:** Executive orders (official policy), but the product list is maintained as an external resource file because the HTS JSON API does not provide US Notes text. List history: initial 1,087 codes → +1,085 from ETRs merge (March 2026) → +1,993 from HTS8→HTS10 expansion + 101 Ch98 + 59 ITA prefix expansion (March 9, 2026).
+
+**Why non-official:** While the exemptions themselves are statutory (defined in US Notes), the compiled product list requires manual extraction from Chapter 99 PDF text since the HTS JSON API does not provide US Notes subdivisions. The HTS8→HTS10 expansion uses the HTS JSON product hierarchy to enumerate all statistical suffixes.
+
+**Implementation:** `resources/ieepa_exempt_products.csv`, applied in `src/06_calculate_rates.R`. Expansion script: `src/expand_ieepa_exempt.R`.
 
 ---
 

@@ -679,13 +679,13 @@ calculate_rates_for_revision <- function(
 
   if (has_fentanyl) {
     # Separate general (blanket) and carve-out entries.
-    # Some countries have multiple general entries (e.g., China 9903.01.20 and
-    # 9903.01.24) — take first per country to avoid row multiplication in joins.
+    # Some countries have multiple general entries (e.g., China 9903.01.20 +10%
+    # and 9903.01.24 +20%) — the later entry supersedes. Take max rate per
+    # country to get the effective rate (avoids row multiplication in joins).
     general_fent <- fentanyl_rates %>%
       filter(entry_type == 'general') %>%
-      arrange(ch99_code) %>%
-      distinct(census_code, .keep_all = TRUE) %>%
-      select(census_code, fent_rate = rate)
+      group_by(census_code) %>%
+      summarise(fent_rate = max(rate), .groups = 'drop')
 
     carveout_fent <- fentanyl_rates %>%
       filter(entry_type == 'carveout') %>%
@@ -820,7 +820,31 @@ calculate_rates_for_revision <- function(
     heading_product_lists <- list()
 
     if (!is.null(s232_headings)) {
+      # Gate each heading config on whether its Ch99 program exists in this revision.
+      # Programs added progressively: assembled autos at rev_6, parts at rev_11,
+      # copper at rev_17, MHD/wood later. Check extracted rates + specific Ch99 codes.
+      has_auto_parts_ch99 <- any(grepl('^9903\\.94\\.0[5-9]', ch99_data$ch99_code))
+      heading_gates <- list(
+        autos_passenger  = s232_rates$auto_rate > 0,
+        autos_light      = s232_rates$auto_rate > 0,
+        auto_parts       = has_auto_parts_ch99,
+        copper           = s232_rates$copper_rate > 0,
+        softwood         = s232_rates$wood_rate > 0 || s232_rates$wood_furniture_rate > 0,
+        wood_furniture   = s232_rates$wood_rate > 0 || s232_rates$wood_furniture_rate > 0,
+        kitchen_cabinets = s232_rates$wood_rate > 0 || s232_rates$wood_furniture_rate > 0,
+        mhd_vehicles     = s232_rates$mhd_rate > 0,
+        mhd_parts        = s232_rates$mhd_rate > 0,
+        buses            = s232_rates$mhd_rate > 0
+      )
+
       for (tariff_name in names(s232_headings)) {
+        # Check if this heading's Ch99 program is active in this revision
+        gate_val <- heading_gates[[tariff_name]]
+        if (!is.null(gate_val) && !gate_val) {
+          message('  Skipping 232 heading "', tariff_name, '" — Ch99 entries not in this revision')
+          next
+        }
+
         cfg <- s232_headings[[tariff_name]]
         # Support both inline prefixes and external file
         prefixes <- unlist(cfg$prefixes)

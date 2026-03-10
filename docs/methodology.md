@@ -49,7 +49,7 @@ Several categories of products are exempt from otherwise-blanket tariffs. These 
 
 | Exemption | File | Count | Effect |
 |-----------|------|-------|--------|
-| General IEEPA exempt (Annex A) | `ieepa_exempt_products.csv` | ~1,087 HTS-10 | Zero IEEPA reciprocal for all countries |
+| General IEEPA exempt (Annex A + carve-outs + Ch98 + ITA prefixes) | `ieepa_exempt_products.csv` | ~4,325 HTS-10 | Zero IEEPA reciprocal for all countries |
 | Floor country product exemptions | `floor_exempt_products.csv` | ~1,697 HTS-8 across 4 country groups | Zero IEEPA reciprocal for EU/Japan/Korea/Swiss |
 | Section 301 product lists | `s301_product_lists.csv` | ~12,200 entries (~11,000 HTS-8) | Defines which products receive 301 duty; generation-based stacking |
 | Section 232 derivatives | `s232_derivative_products.csv` | ~130 HTS prefixes | Defines aluminum articles outside ch76 |
@@ -82,7 +82,7 @@ For base Section 232 products (steel, aluminum, autos, copper), `metal_share = 1
 
 Note: `rate_301` uses generation-based stacking — MAX within each generation (original Trump 9903.88.xx / Biden 9903.91-92.xx), SUM across generations. Products on both Trump and Biden lists receive both duties (e.g., 25% + 25% = 50%).
 
-USMCA exemption: For Canadian and Mexican products, IEEPA reciprocal and fentanyl rates are multiplied by `(1 - usmca_share)`, where `usmca_share` is the fraction of 2024 import value that entered under USMCA preference (Census RATE_PROV = 18). Shares are computed per-HTS10 x country from Census IMP_DETL.TXT fixed-width files by `src/compute_usmca_shares.R` and stored in `resources/usmca_product_shares.csv` (22,449 product-country pairs). Products not imported from CA/MX in 2024 retain full tariff (share = 0). Falls back to binary eligibility (S/S+ in HTS `special` field → zero rate) if Census SPI shares are unavailable. Section 232 is not affected by USMCA.
+USMCA exemption: For Canadian and Mexican products, tariff rates are multiplied by `(1 - usmca_share)`, where `usmca_share` is the fraction of 2024 import value that entered under USMCA preference (Census RATE_PROV = 18). Shares are computed per-HTS10 x country from Census IMP_DETL.TXT fixed-width files by `src/compute_usmca_shares.R` and stored in `resources/usmca_product_shares.csv` (22,449 product-country pairs). Products not imported from CA/MX in 2024 retain full tariff (share = 0). Falls back to binary eligibility (S/S+ in HTS `special` field → zero rate) if Census SPI shares are unavailable. Applied to IEEPA reciprocal, IEEPA fentanyl, Section 122, and Section 232 auto/MHD programs.
 
 ### Calculation Pipeline
 
@@ -127,15 +127,15 @@ Point-in-time rate queries use interval encoding: each rate observation has `val
 
 Rates are compared at the HTS-10 x country level against TPC benchmark data at 5 snapshot dates corresponding to major policy events:
 
-| Revision | Policy Event | TPC Date | Exact Match | Within 2pp | Mean Abs Diff |
-|----------|-------------|----------|-------------|------------|---------------|
-| rev_6 | 232 Autos | 2025-03-17 | 61.4% | 61.6% | 5.0pp |
-| rev_10 | Liberation Day | 2025-04-17 | 86.4% | 86.4% | 2.0pp |
-| rev_17 | 232 Increase | 2025-07-17 | 77.1% | 77.5% | 3.4pp |
-| rev_18 | Phase 2 | 2025-10-17 | 61.0% | 61.8% | 5.8pp |
-| rev_32 | Floor Countries | 2025-11-17 | 66.1% | 67.0% | 4.9pp |
+| Revision | Policy Event | TPC Date | Exact (<0.5pp) | Within 2pp | Mean Abs Diff |
+|----------|-------------|----------|----------------|------------|---------------|
+| rev_6 | 232 Autos | 2025-03-17 | 47.4% | 48.2% | 7.97pp |
+| rev_10 | Liberation Day | 2025-04-17 | 84.4% | 84.8% | 2.94pp |
+| rev_17 | 232 Increase | 2025-07-17 | 81.8% | 85.4% | 2.11pp |
+| rev_18 | Phase 2 | 2025-10-17 | 65.1% | 67.8% | 4.59pp |
+| rev_32 | Floor Countries | 2025-11-17 | 72.8% | 75.7% | 3.22pp |
 
-Best-matching countries (rev_32): Madagascar 94%, Bangladesh 94%, Tunisia 92%, Nepal 91%, Pakistan 89%.
+The rev_6 (pre-IEEPA) rate is lower because differences at that date are dominated by 232 auto/USMCA treatment where methodological choices diverge from TPC. The post-IEEPA rates (rev_10 onwards) show strong agreement, peaking at 85.4% within-2pp for rev_17. The largest remaining actionable lever is IEEPA duty-free treatment: switching to `nonzero_base_only` would boost rev_32 exact match from 72.8% to 87.9% (+15.1pp).
 
 ---
 
