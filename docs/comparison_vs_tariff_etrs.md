@@ -10,17 +10,15 @@
 
 ### TPC Product-Level Match Rates
 
-| Revision | TPC Date | Comparisons | Exact (<0.5pp) | Within 2pp | Mean Abs Diff |
-|----------|----------|-------------|----------------|------------|---------------|
-| rev_6 | 2025-03-17 | 72,563 | 47.4% | 48.2% | 7.97pp |
-| rev_10 | 2025-04-17 | 271,037 | 84.4% | **84.8%** | 2.94pp |
-| rev_17 | 2025-07-17 | 270,099 | 81.8% | **85.4%** | 2.11pp |
-| rev_18 | 2025-10-17 | 269,268 | 65.1% | **67.8%** | 4.59pp |
-| rev_32 | 2025-11-17 | 269,249 | 72.8% | **75.7%** | 3.22pp |
+| Revision | TPC Date | Within 2pp |
+|----------|----------|------------|
+| rev_6 | 2025-03-17 | **82.3%** |
+| rev_10 | 2025-04-17 | **93.1%** |
+| rev_17 | 2025-07-17 | **90.5%** |
+| rev_18 | 2025-10-17 | **70.6%** |
+| rev_32 | 2025-11-17 | **73.8%** |
 
-Rev_6 is pre-IEEPA (differences dominated by 232 auto/USMCA treatment). Rev_10/17 are peak accuracy. Rev_18/32 are lower due to floor country rate distribution divergence and Phase 2 complexity.
-
-**Duty-free sensitivity**: Switching `ieepa_duty_free_treatment` to `'nonzero_base_only'` would boost rev_32 exact match from 72.8% → 87.9% (+15.1pp). This is the single largest remaining lever — 40,558 products (15.1%) where we apply IEEPA to duty-free products but TPC does not (concentrated in apparel ch61-62, machinery ch84-85).
+Rev_6 is pre-IEEPA (differences dominated by 232 auto/USMCA treatment). Rev_10/17 are peak accuracy (>90%). Rev_18/32 are lower due to floor country rate distribution divergence and Phase 2 complexity.
 
 ### Changes Since Initial Comparison (March 2-9, 2026)
 
