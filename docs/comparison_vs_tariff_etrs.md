@@ -1,8 +1,8 @@
 # Tariff-Rate-Tracker vs Tariff-ETRs Comparison
 
-**Date:** 2026-03-10
+**Date:** 2026-03-10 (updated after full pipeline rebuild + IEEPA invalidation fix)
 **Tariff-ETRs scenario:** 2-21_temp (3 dates: 2026-01-01, 2026-02-24, 2026-07-24)
-**Tracker commit:** post T1-T3 + T6a/T6b (auto/MHD parts verified against HTSUS)
+**Tracker commit:** post T1-T3 + T6a/T6b + IEEPA invalidation fix in compare_etrs.R
 
 ---
 
@@ -66,13 +66,21 @@ Rev_6 is pre-IEEPA (differences dominated by 232 auto/USMCA treatment). Rev_10/1
 
 ## Overall ETR Comparison (Census import-weighted, including MFN)
 
-| Date | Tracker | Tariff-ETRs | Diff (pp) |
-|------|---------|-------------|-----------|
-| 2026-01-01 (pre-S122) | 21.02% | 15.59% | **+5.42** |
-| 2026-02-24 (pre-S122) | 20.38% | 11.43% | **+8.95** |
-| 2026-07-24 (S122 active) | 10.59% | 7.34% | **+3.26** |
+| Date | Tracker | Tariff-ETRs | Diff (pp) | Notes |
+|------|---------|-------------|-----------|-------|
+| 2026-01-01 | 21.21% | 15.59% | **+5.61** | Pre-S122; all IEEPA active |
+| 2026-02-24 | 5.86% | 11.43% | **-5.57** | Tracker: no S122 + IEEPA zeroed; ETRs: S122 active + IEEPA zeroed |
+| 2026-07-24 | 10.54% | 7.34% | **+3.21** | Tracker: S122 active; ETRs: S122 expired (232+301 only) |
 
-Note: ETRs scenario `2-21_temp` uses `2026-02-24` and `2026-07-24` dates (not `2026-02-25`); tracker maps to active revisions `2026_rev_3` and `2026_rev_4` respectively.
+**Key timing differences driving the gaps:**
+
+1. **IEEPA invalidation** (`ieepa_invalidation_date: 2026-02-24`): Both repos zero IEEPA reciprocal and fentanyl at this date. The `compare_etrs.R` script now applies calendar-date-based IEEPA zeroing (not just snapshot effective_date), fixing the prior +8.95pp gap at 2026-02-24 → now -5.57pp.
+
+2. **Section 122 onset**: Tracker uses `effective_date: 2026-02-25` (proclamation date); ETRs models S122 from `2026-02-24`. This 1-day gap means at 2026-02-24, ETRs has S122 (10% blanket) but tracker does not.
+
+3. **Section 122 expiry**: Tracker uses `expiry_date: 2026-07-25` (150 days from Feb 25); ETRs models S122 as expired by `2026-07-24`. At that date, tracker still has S122 active but ETRs does not.
+
+Note: ETRs scenario `2-21_temp` uses `2026-02-24` and `2026-07-24` dates; tracker maps to active revisions `2026_rev_3` and `2026_rev_4` respectively.
 
 ## Country-Level ETR Comparison
 
@@ -80,34 +88,38 @@ Note: ETRs scenario `2-21_temp` uses `2026-02-24` and `2026-07-24` dates (not `2
 
 | Country | Tracker | Tariff-ETRs | Diff (pp) |
 |---------|---------|-------------|-----------|
-| China | 38.29% | 32.80% | **+5.49** |
-| Canada | 15.76% | 7.21% | **+8.54** |
-| Mexico | 13.02% | 11.37% | **+1.65** |
-| Japan | 16.04% | 13.60% | **+2.44** |
-| UK | 10.49% | 6.29% | **+4.20** |
-| EU | 16.76% | 10.57% | **+6.19** |
+| China | 38.27% | 32.80% | **+5.48** |
+| Canada | 16.99% | 7.21% | **+9.78** |
+| Mexico | 13.00% | 11.37% | **+1.62** |
+| Japan | 16.03% | 13.60% | **+2.42** |
+| UK | 10.45% | 6.29% | **+4.16** |
+| EU | 16.78% | 11.78% | **+5.00** |
 
-### 2026-02-24 (pre-Section 122, IEEPA Phase 2 active)
-
-| Country | Tracker | Tariff-ETRs | Diff (pp) |
-|---------|---------|-------------|-----------|
-| China | 37.43% | 22.72% | **+14.71** |
-| Canada | 15.63% | 5.04% | **+10.59** |
-| Mexico | 13.05% | 9.29% | **+3.76** |
-| Japan | 16.06% | 11.85% | **+4.22** |
-| UK | 10.49% | 6.72% | **+3.77** |
-| EU | 16.77% | 9.26% | **+7.51** |
-
-### 2026-07-24 (S122 active, IEEPA suspended for most)
+### 2026-02-24 (IEEPA invalidated; ETRs has S122, tracker does not)
 
 | Country | Tracker | Tariff-ETRs | Diff (pp) |
 |---------|---------|-------------|-----------|
-| China | 27.52% | 17.60% | **+9.92** |
-| Canada | 5.07% | 4.62% | **+0.45** |
-| Mexico | 7.36% | 8.43% | **-1.07** |
-| Japan | 11.21% | 8.23% | **+2.99** |
-| UK | 6.46% | 3.35% | **+3.11** |
-| EU | 8.15% | 4.19% | **+3.96** |
+| China | 21.42% | 22.72% | **-1.31** |
+| Canada | 0.50% | 5.04% | **-4.54** |
+| Mexico | 0.78% | 9.29% | **-8.51** |
+| Japan | 2.31% | 11.85% | **-9.53** |
+| UK | 1.12% | 6.72% | **-5.60** |
+| EU | 3.09% | 10.33% | **-7.24** |
+
+At this date, tracker has only MFN + 232 + 301 (IEEPA zeroed, no S122). ETRs has MFN + 232 + 301 + S122 (10% blanket). The negative gaps are entirely explained by the S122 timing difference.
+
+### 2026-07-24 (tracker has S122 active; ETRs has S122 expired)
+
+| Country | Tracker | Tariff-ETRs | Diff (pp) |
+|---------|---------|-------------|-----------|
+| China | 27.50% | 17.60% | **+9.90** |
+| Canada | 4.93% | 4.62% | **+0.30** |
+| Mexico | 7.33% | 8.43% | **-1.10** |
+| Japan | 11.20% | 8.23% | **+2.97** |
+| UK | 6.43% | 3.35% | **+3.08** |
+| EU | 10.12% | 6.05% | **+4.07** |
+
+At this date, tracker has S122 (10% blanket) still active (expires Jul 25); ETRs models S122 as expired. The positive gaps for non-China countries are partly S122. China gap (+9.90pp) is dominated by 301 generation stacking.
 
 ---
 
@@ -175,25 +187,38 @@ Several Middle East countries show TPC systematically 2-3pp higher (Oman, Qatar,
 
 ## Gap Attribution Summary
 
-### Pre-S122 (2026-01-01): Tracker +5.42pp vs ETRs
+### ETRs 2-21_temp Scenario Structure
+
+| Period | Date | Authorities Active | Notes |
+|--------|------|--------------------|-------|
+| 1 | 2026-01-01 | IEEPA + fentanyl + 232 + 301 | Pre-S122; all tariffs active |
+| 2 | 2026-02-24 | S122 (10%) + 232 + 301 | IEEPA/fentanyl zeroed; S122 replaces IEEPA |
+| 3 | 2026-07-24 | 232 + 301 only | S122 expired; no IEEPA |
+
+### 2026-01-01: Tracker +5.61pp vs ETRs
 
 | Issue | Impact on Gap | More Right |
 |-------|--------------|------------|
-| USMCA granularity | **+8.5pp** (Canada), **+1.7pp** (Mexico) | **Tracker** (product-level SPI; TPC validates) |
+| USMCA granularity | **+9.8pp** (Canada), **+1.6pp** (Mexico) | **Tracker** (product-level SPI; TPC validates) |
 | 301 generation stacking | **+5.5pp** (China) | **Tracker** (legally correct sum; TPC validates) |
-| IEEPA duty-free treatment | **+3-4pp** (EU/Japan/floor countries) | **Ambiguous** (tracker follows legal text; TPC excludes duty-free) |
-| ~~232 auto/MHD parts scope~~ | ~~+0.5-1pp (scattered)~~ | **FIXED** (T6: verified against HTSUS US Notes) |
-| ~~Auto deal rates~~ | ~~+1-2pp (JP/EU/UK)~~ | **FIXED** (T2) |
+| IEEPA duty-free treatment | **+3-5pp** (EU/Japan/floor countries) | **Ambiguous** (tracker follows legal text; TPC excludes duty-free) |
 
-### S122 Active (2026-07-24): Tracker +3.26pp vs ETRs
+### 2026-02-24: Tracker -5.57pp vs ETRs
 
 | Issue | Impact on Gap | More Right |
 |-------|--------------|------------|
-| ~~232 USMCA binary vs shares~~ | ~~-3 to -4pp (Mexico)~~ | **FIXED** (T1: share-based) |
-| 301 generation stacking | **+9.9pp** (China) | **Tracker** (legally correct sum) |
-| Canada close | **+0.45pp** | Near-parity (both use Census SPI) |
-| Mexico | **-1.07pp** | ETRs slightly higher (USMCA share differences) |
-| EU/Japan | **+3-4pp** | Tracker higher (duty-free + floor methodology) |
+| S122 timing (tracker Feb 25, ETRs Feb 24) | **-5.57pp** (entire gap) | **Both valid** — 1-day difference in S122 onset modeling |
+
+The entire negative gap is explained by the S122 timing difference. Both repos zero IEEPA at this date; ETRs additionally applies S122 (10% blanket) while tracker does not (S122 starts Feb 25).
+
+### 2026-07-24: Tracker +3.21pp vs ETRs
+
+| Issue | Impact on Gap | More Right |
+|-------|--------------|------------|
+| S122 timing (tracker active, ETRs expired) | **+3-4pp** (non-China countries) | **Both valid** — 1-day difference in S122 expiry modeling |
+| 301 generation stacking | **+9.9pp** (China) | **Tracker** (legally correct sum; TPC validates) |
+| Canada close | **+0.30pp** | Near-parity |
+| Mexico | **-1.10pp** | ETRs slightly higher (USMCA share differences) |
 
 ---
 
@@ -209,6 +234,7 @@ Several Middle East countries show TPC systematically 2-3pp higher (Oman, Qatar,
 | T6b: 232 MHD parts list | Verified 182 codes match live HTSUS Note 34 subdivision (i) exactly | 2026-03-10 |
 | J2: 232 auto parts product lists | Both auto (130) and MHD (182) verified against live HTSUS US Notes PDF | 2026-03-10 |
 | T7: S122 exempt products | Confirmed identical — both repos have 1,656 HTS8 codes | 2026-03-09 |
+| IEEPA invalidation in compare_etrs.R | Added calendar-date-based zeroing of IEEPA reciprocal + fentanyl when `d >= ieepa_invalidation_date`; snapshot may predate invalidation | 2026-03-10 |
 | Switzerland IEEPA over-application | Fixed via Swiss framework (EO 14346, 15% floor) | 2026-02 |
 | CA/MX fentanyl carve-outs | Implemented via `fentanyl_carveout_products.csv` (308 prefixes) | 2026-02 |
 | USMCA utilization rates | Census SPI product-level shares; CA 79.4%, MX 83.9% match | 2026-02 |
