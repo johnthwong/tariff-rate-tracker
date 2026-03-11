@@ -2,7 +2,7 @@
 
 **Last updated:** 2026-03-11
 **Tariff-ETRs scenario:** 2-21_temp (3 dates: 2026-01-01, 2026-02-24, 2026-07-24)
-**Tracker build:** Mar 11, 2026 (base rate inheritance + 301 supersession + total-imports denominator)
+**Tracker build:** Mar 11, 2026 (base rate inheritance + 301 supersession + total-imports denominator + S122 zeroing fix + copper 50% rate)
 
 ---
 
@@ -10,11 +10,13 @@
 
 | Date | Tracker | Tariff-ETRs | Diff (pp) | Regime |
 |------|---------|-------------|-----------|--------|
-| 2026-01-01 | 15.93% | 14.25% | **+1.68** | IEEPA + fentanyl + 232 + 301 |
-| 2026-02-24 | 10.79% | 10.49% | **+0.30** | S122 + 232 + 301 (IEEPA zeroed) |
-| 2026-07-24 | 6.40% | 7.29% | **-0.90** | 232 + 301 + MFN only |
+| 2026-01-01 | 16.05% | 14.25% | **+1.80** | IEEPA + fentanyl + 232 + 301 |
+| 2026-02-24 | 10.91% | 10.49% | **+0.42** | S122 + 232 + 301 (IEEPA zeroed) |
+| 2026-07-24 | 7.62% | 7.29% | **+0.33** | 232 + 301 + MFN only |
 
-Both use total imports ($3,124B) as denominator, treating unmatched products as 0% tariff. The two repos are within 2pp at every date, and within 0.3pp at the S122 date.
+Both use total imports ($3,124B) as denominator, treating unmatched products as 0% tariff. The two repos are within 2pp at every date. All three dates show the tracker above ETRs, consistent with the tracker's higher 301 rates for China and copper 232 coverage.
+
+Note: Jan 1/Feb 24 tracker numbers are approximate — the copper patch doesn't fully account for IEEPA/S122 stacking interactions on newly-232 copper products (metal_share=1.0 → IEEPA/S122 should reduce to 0). The Jul 24 numbers are exact (only 232/301/MFN remain).
 
 ### Denominator note
 
@@ -30,14 +32,14 @@ The matched share rises from 72.5% to 94.8% between Jan 1 and Feb 24 because `20
 
 | Country | Tracker | ETRs | Diff (pp) | Primary driver |
 |---------|---------|------|-----------|----------------|
-| China | 38.81% | 32.80% | +6.01 | 301 rate treatment |
-| Canada | 16.89% | 7.21% | +9.68 | USMCA share granularity |
-| Mexico | 13.01% | 11.37% | +1.63 | USMCA share granularity |
-| Japan | 12.15% | 13.60% | -1.45 | MFN preference shares |
-| UK | 6.56% | 6.29% | +0.27 | Near-match |
-| EU | 8.81% | 9.30% | -0.49 | Near-match |
+| China | 38.86% | 32.80% | +6.07 | 301 rate treatment |
+| Canada | 17.17% | 7.21% | +9.95 | USMCA share granularity |
+| Mexico | 13.06% | 11.37% | +1.68 | USMCA share granularity |
+| Japan | 12.21% | 13.60% | -1.39 | 232 product coverage |
+| UK | 6.64% | 6.29% | +0.35 | Near-match |
+| EU | 8.95% | 9.30% | -0.34 | Near-match |
 
-The +1.68pp overall gap reflects large offsetting country-level differences: China and Canada push the tracker up; Japan, EU, and others pull it down.
+The +1.80pp overall gap reflects large offsetting country-level differences: China and Canada push the tracker up; Japan, EU, and others pull it down.
 
 ### Divergence source 1: USMCA share granularity (+9.7pp Canada, +1.6pp Mexico)
 
@@ -51,7 +53,7 @@ ETRs applies USMCA exemption rates from a 47-row GTAP sector file (~85-90% share
 
 **Assessment:** Tracker is correct. ETRs over-exempts CA/MX by ~2x. Proposed ETRs fix: E1.
 
-### Divergence source 2: Section 301 rate treatment (+6.0pp China)
+### Divergence source 2: Section 301 rate treatment (+4-6pp China)
 
 ETRs applies a flat 301 rate per product. The tracker applies per-list rates (MAX across ch99 codes; Biden supersedes Trump on 8 overlapping products). TPC confirms multi-list rates — 85%+ rates require it:
 
@@ -64,45 +66,56 @@ ETRs applies a flat 301 rate per product. The tracker applies per-list rates (MA
 
 **Assessment:** Tracker is correct. Proposed ETRs fix: E2.
 
-### Divergence source 3: MFN preference methodology (-1 to -4pp Japan and others)
+### Divergence source 3: 232 product coverage (offsetting, ±1-4pp per country)
 
-The tracker applies Census-based MFN exemption shares that reduce applied MFN rates for FTA/GSP-eligible trade. ETRs uses GTAP-level trade preferences. At this date (with IEEPA active), MFN base rates are a smaller share of total rates, so the impact is modest. Japan -1.45pp and EU -0.49pp are partially driven by this.
+HTS2 chapter-level comparison reveals 232 product coverage differences between the two repos. These produce large offsetting gaps at the chapter level:
 
-**Assessment:** Unclear which is more accurate. Not yet validated against a third source.
+| Chapter | Tracker | ETRs | Diff | Revenue gap | Issue |
+|---------|---------|------|------|-------------|-------|
+| Ch87 (autos) | 4.51% | 16.41% | -11.9pp | -$46B | ETRs higher: broader parts coverage or USMCA differences |
+| Ch72 (base steel) | 40.75% | 0.39% | +40.4pp | +$13B | **ETRs missing ch72** — lists only ch73 steel articles |
+| Ch76 (aluminum) | 32.71% | 47.99% | -15.3pp | -$4B | ETRs higher: copper-related derivatives? |
+| Ch74 (copper) | 1.05% | 23.45% | -22.4pp | -$4B | Tracker was at 25%, should be 50% (now fixed) |
+
+The ch72 gap is a confirmed ETRs bug: the `s232.yaml` steel product list starts at `73012010`, missing all chapter 72 base steel products (flat-rolled, bars, wire). The ch74 gap was a tracker bug: copper rate should be 50% (matching June 2025 proclamation, 9903.78.01), not 25%.
+
+**Assessment:** Both repos have coverage gaps. Ch72 is ETRs-side; ch74 was tracker-side (now fixed). Ch87 (autos) needs further investigation — likely USMCA share differences for CA/MX auto products.
 
 ### Why the gap is small overall (+1.68pp)
 
-The USMCA and 301 divergences (tracker high) are offset by MFN preference shares and other country-level differences (tracker low). The IEEPA duty-free treatment question — previously identified as a major gap — is not visible at the overall level because products with 0% base rate are a small share of total imports when using the correct denominator.
+The USMCA and 301 divergences (tracker high) are offset by 232 product coverage differences (tracker low on autos/copper, ETRs low on base steel). The net effect is a modest +1.68pp.
 
 ---
 
 ## Non-IEEPA Period
 
-### 2026-02-24: S122 + 232 + 301 (tracker +0.30pp)
+### 2026-02-24: S122 + 232 + 301 (tracker +0.42pp)
 
 | Country | Tracker | ETRs | Diff (pp) |
 |---------|---------|------|-----------|
-| China | 27.27% | 22.72% | +4.55 |
-| Canada | 4.88% | 5.04% | -0.17 |
-| Mexico | 7.35% | 9.29% | -1.94 |
-| Japan | 11.12% | 11.85% | -0.72 |
-| UK | 6.89% | 6.72% | +0.17 |
-| EU | 8.15% | 8.05% | +0.09 |
+| China | 27.33% | 22.72% | +4.61 |
+| Canada | 5.15% | 5.04% | +0.11 |
+| Mexico | 7.40% | 9.29% | -1.90 |
+| Japan | 11.18% | 11.85% | -0.67 |
+| UK | 6.96% | 6.72% | +0.25 |
+| EU | 8.29% | 8.05% | +0.24 |
 
-Near-perfect alignment. The +0.30pp overall gap is essentially zero. Non-China countries are all within 2pp. China's +4.55pp is 301 rate treatment. S122 coverage is high (94.8% of imports matched), so the denominator issue is minimal.
+Near-perfect alignment. Non-China countries are all within 2pp. China's +4.61pp is 301 rate treatment. S122 coverage is high (94.8% of imports matched), so the denominator issue is minimal.
 
-### 2026-07-24: 232 + 301 + MFN only (tracker -0.90pp)
+### 2026-07-24: 232 + 301 + MFN only (tracker +0.33pp)
 
 | Country | Tracker | ETRs | Diff (pp) |
 |---------|---------|------|-----------|
-| China | 21.55% | 17.60% | +3.94 |
-| Canada | 2.81% | 4.62% | -1.82 |
-| Mexico | 4.88% | 8.43% | -3.55 |
-| Japan | 4.03% | 8.23% | -4.20 |
-| UK | 1.45% | 3.35% | -1.90 |
-| EU | 2.99% | 4.12% | -1.13 |
+| China | 22.29% | 17.60% | +4.68 |
+| Canada | 3.77% | 4.62% | -0.85 |
+| Mexico | 5.62% | 8.43% | -2.81 |
+| Japan | 7.87% | 8.23% | -0.35 |
+| UK | 3.72% | 3.35% | +0.37 |
+| EU | 4.56% | 4.12% | +0.44 |
 
-With S122 expired and IEEPA zeroed, only 232, 301, and MFN remain. The tracker is lower for most countries. China's +3.94pp (301) is offset by Japan -4.20pp, Mexico -3.55pp, and broad MFN preference divergence. This is where the MFN preference methodology difference is most visible — it's the dominant rate component for non-232/non-301 products.
+With S122 expired and IEEPA zeroed, only 232, 301, and MFN remain. The overall gap is +0.33pp. China's +4.68pp (301 rates) is partially offset by Mexico -2.81pp and Canada -0.85pp (USMCA differences). Japan is -0.35pp (near-match), UK and EU are within 0.5pp.
+
+Previous versions of this comparison showed a -0.90pp gap at Jul 24 with Japan at -4.20pp. This was caused by a bug in the S122 expiry logic: subtracting the nominal `rate_s122` from `total_additional` over-subtracted for 232 products where metal_share stacking reduced the effective S122 contribution to zero. The fix: reconstruct `total_additional` from remaining component rates after zeroing, rather than subtracting nominal rates.
 
 ---
 
@@ -138,9 +151,9 @@ The tracker is within ~1pp of TPC at the latest two dates. The rev_10 outlier (-
 |---|--------|-----------|-----------|-------------|-----|
 | 1 | USMCA share granularity | Tracker high (CA/MX) | +9.7pp CA, +1.6pp MX | **Tracker** (TPC validates) | ETRs E1 |
 | 2 | 301 rate treatment | Tracker high (China) | +4-6pp China | **Tracker** (TPC validates) | ETRs E2 |
-| 3 | MFN preference methodology | Tracker low (broad) | -1 to -4pp per country | Unclear | Joint investigation |
+| 3 | 232 product coverage | Offsetting | Ch72 ±40pp, Ch87 ±12pp, Ch74 ±22pp | Both have gaps | E3 + T1 |
 
-Divergences #1 and #2 are ETRs-side issues confirmed by TPC. Divergence #3 is unresolved and most visible when MFN is the dominant rate (post-IEEPA/S122 expiry).
+Divergences #1 and #2 are ETRs-side issues confirmed by TPC. Divergence #3 is bilateral: ETRs is missing ch72 base steel from its 232 product list; the tracker had copper at 25% instead of 50% (now fixed). The ch87 (autos) gap needs further investigation.
 
 ---
 
@@ -152,10 +165,17 @@ Divergences #1 and #2 are ETRs-side issues confirmed by TPC. Divergence #3 is un
 |---|--------|--------|-------------|
 | E1 | Replace GTAP-level USMCA shares with product-level Census SPI data | Open | +4-8pp Canada, +2-3pp Mexico |
 | E2 | Implement per-list 301 rates (Biden supersedes Trump on overlap) | Open | +4-6pp China |
+| E3 | Add chapter 72 base steel products to s232.yaml | Open | +40pp ch72 (partially offsets E1/E2) |
 
 ### Tracker
 
-All identified tracker-side issues have been resolved. Remaining gaps are ETRs-side (E1, E2) or joint investigation (MFN preferences).
+| # | Change | Status | Est. impact |
+|---|--------|--------|-------------|
+| T1 | Copper rate 25% → 50% (9903.78.01, June 2025 proclamation) | **Done** | +22pp ch74 |
+| T2 | Fix S122 expiry zeroing (reconstruct from components, not subtract) | **Done** | +1.1pp overall at Jul 24 |
+| T3 | Fix `parse_ch99_rate()` regex for "a duty of X%" pattern | **Done** | Enables automatic copper rate extraction |
+
+Remaining tracker gap vs ETRs at ch87 (autos) needs investigation — likely USMCA share differences for CA/MX auto products, not a product coverage issue.
 
 ---
 
@@ -163,6 +183,8 @@ All identified tracker-side issues have been resolved. Remaining gaps are ETRs-s
 
 | Issue | Resolution | Date |
 |-------|-----------|------|
+| S122 expiry zeroing | Reconstruct total_additional from remaining components instead of subtracting nominal rate_s122. The nominal rate differs from the effective contribution due to metal_share stacking (232 products). Bug inflated Jul 24 gap from +0.20pp to -0.90pp | 2026-03-11 |
+| Copper 232 rate | Config default_rate updated from 0.25 to 0.50 per 9903.78.01 (June 2025 proclamation). Also fixed parse_ch99_rate() regex to handle "a duty of X%" text format | 2026-03-11 |
 | ETR denominator | Use total imports ($3,124B), not matched-only. Matched-only inflated tracker ETR from 15.93% to 21.96% at 2026-01-01 | 2026-03-11 |
 | Base rate inheritance | Statistical suffixes (~59% of HTS10) inherit MFN from parent indent. 11,558 products fixed | 2026-03-11 |
 | 301 Biden supersession | Biden supersedes Trump on 8 overlapping products (MAX, not SUM) | 2026-03-11 |

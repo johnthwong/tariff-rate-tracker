@@ -77,7 +77,13 @@ for (d in comparison_dates) {
   rates <- readRDS(snap_path)
   cat('  Snapshot rows:', nrow(rates), '\n')
 
-  # Apply S122 expiry if date is past expiry
+  # Apply S122 expiry and IEEPA invalidation.
+  # After zeroing, reconstruct total_additional from non-stacking components
+  # (rate_232, rate_301, rate_section_201 are already effective/scaled in the snapshot).
+  # Cannot subtract raw rate_s122/rate_ieepa from total_additional because stacking
+  # rules (metal_share) mean effective contribution differs from raw rate.
+  needs_reconstruct <- FALSE
+
   s122_cfg <- pp$section_122
   if (!is.null(s122_cfg)) {
     s122_expiry <- as.Date(s122_cfg$expiry_date)
@@ -88,38 +94,42 @@ for (d in comparison_dates) {
     } else if (d > s122_expiry) {
       cat('  S122 expired — zeroing rate_s122\n')
       if ('rate_s122' %in% names(rates)) {
-        # Recalculate total_additional and total_rate without s122
-        rates <- rates %>%
-          mutate(
-            total_additional = total_additional - rate_s122,
-            total_rate = base_rate + total_additional,
-            rate_s122 = 0
-          )
+        rates$rate_s122 <- 0
+        needs_reconstruct <- TRUE
       }
     } else {
       cat('  S122 not yet active\n')
     }
   }
 
-  # Apply IEEPA invalidation if calendar date >= invalidation date
-  # (snapshot may be from an earlier revision whose effective_date < invalidation)
   ieepa_inv <- pp$ieepa_invalidation_date
   if (!is.null(ieepa_inv)) {
     ieepa_inv <- as.Date(ieepa_inv)
     if (d >= ieepa_inv) {
       cat('  IEEPA invalidated as of', as.character(ieepa_inv), '— zeroing reciprocal + fentanyl\n')
       if ('rate_ieepa_recip' %in% names(rates)) {
-        rates <- rates %>%
-          mutate(
-            total_additional = total_additional - rate_ieepa_recip - rate_ieepa_fent,
-            total_rate = base_rate + total_additional,
-            rate_ieepa_recip = 0,
-            rate_ieepa_fent = 0
-          )
+        rates$rate_ieepa_recip <- 0
+        rates$rate_ieepa_fent <- 0
+        needs_reconstruct <- TRUE
       }
     } else {
       cat('  IEEPA active (invalidation:', as.character(ieepa_inv), ')\n')
     }
+  }
+
+  if (needs_reconstruct) {
+    # After zeroing stacking-sensitive components, reconstruct total_additional.
+    # rate_232 is already metal_share-scaled; rate_301/rate_section_201 are full value.
+    # Zeroed components (s122, ieepa) contribute 0. This is correct because the
+    # remaining components (232, 301, 201) don't interact through stacking rules.
+    rate_cols <- intersect(
+      c('rate_232', 'rate_301', 'rate_ieepa_recip', 'rate_ieepa_fent',
+        'rate_s122', 'rate_other', 'rate_section_201'),
+      names(rates)
+    )
+    rates$total_additional <- rowSums(rates[, rate_cols, drop = FALSE], na.rm = TRUE)
+    rates$total_rate <- rates$base_rate + rates$total_additional
+    cat('  Reconstructed total_rate from remaining components\n')
   }
 
   # Join with imports

@@ -100,7 +100,7 @@ section_232_headings:
   copper:
     prefixes: ['7406', '7407', '7408', '7409', '7410', '7411', '7412', '7413',
                '7415', '7418', '7419']
-    default_rate: 0.25
+    default_rate: 0.50    # 9903.78.01: 50% upon value of copper content (June 2025 proclamation)
     usmca_exempt: false
   softwood:
     prefixes: ['44031100', '44032101', '44032201', '44032301', '44032401',
