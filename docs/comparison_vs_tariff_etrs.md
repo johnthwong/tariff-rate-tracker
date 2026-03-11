@@ -2,7 +2,7 @@
 
 **Last updated:** 2026-03-11
 **Tariff-ETRs scenario:** 2-21_temp (3 dates: 2026-01-01, 2026-02-24, 2026-07-24)
-**Tracker build:** Mar 11, 2026 (base rate inheritance + 301 supersession + S122 alignment)
+**Tracker build:** Mar 11, 2026 (base rate inheritance + 301 supersession + total-imports denominator)
 
 ---
 
@@ -10,32 +10,38 @@
 
 | Date | Tracker | Tariff-ETRs | Diff (pp) | Regime |
 |------|---------|-------------|-----------|--------|
-| 2026-01-01 | 21.96% | 15.60% | **+6.36** | IEEPA + fentanyl + 232 + 301 |
-| 2026-02-24 | 11.39% | 10.50% | **+0.88** | S122 + 232 + 301 (IEEPA zeroed) |
-| 2026-07-24 | 6.75% | 7.34% | **-0.58** | 232 + 301 + MFN only |
+| 2026-01-01 | 15.93% | 14.25% | **+1.68** | IEEPA + fentanyl + 232 + 301 |
+| 2026-02-24 | 10.79% | 10.49% | **+0.30** | S122 + 232 + 301 (IEEPA zeroed) |
+| 2026-07-24 | 6.40% | 7.29% | **-0.90** | 232 + 301 + MFN only |
 
-The two repos diverge for different reasons depending on whether IEEPA authorities are active. Stripping IEEPA away (Feb 24 and Jul 24) brings the overall gap to under 1pp, isolating the IEEPA-period divergence as the primary challenge.
+Both use total imports ($3,124B) as denominator, treating unmatched products as 0% tariff. The two repos are within 2pp at every date, and within 0.3pp at the S122 date.
+
+### Denominator note
+
+The tracker snapshot only contains products with Ch99 tariff exposure. Unmatched products (27.5% of imports at 2026-01-01, 5.2% at 2026-02-24) have zero additional tariff. The correct ETR denominator is total imports across all products, not just the matched subset. Prior versions of this comparison used matched-only imports, which inflated the tracker ETR to 21.96% at 2026-01-01 — an artifact, not a real divergence.
+
+The matched share rises from 72.5% to 94.8% between Jan 1 and Feb 24 because `2026_rev_4` adds S122 entries that cover nearly all products.
 
 ---
 
-## IEEPA Period (2026-01-01): Tracker +6.36pp
-
-When all IEEPA authorities are active, the tracker is systematically higher than ETRs for every major partner.
+## IEEPA Period (2026-01-01): Tracker +1.68pp
 
 ### Country-level detail
 
 | Country | Tracker | ETRs | Diff (pp) | Primary driver |
 |---------|---------|------|-----------|----------------|
-| China | 39.27% | 32.80% | +6.47 | 301 rate treatment |
-| Canada | 17.06% | 7.21% | +9.85 | USMCA share granularity |
-| Mexico | 13.19% | 11.37% | +1.82 | USMCA share granularity |
-| Japan | 16.02% | 13.60% | +2.42 | IEEPA duty-free treatment |
-| UK | 11.52% | 6.29% | +5.23 | IEEPA duty-free treatment |
-| EU | 16.78% | 10.55% | +6.22 | IEEPA duty-free treatment |
+| China | 38.81% | 32.80% | +6.01 | 301 rate treatment |
+| Canada | 16.89% | 7.21% | +9.68 | USMCA share granularity |
+| Mexico | 13.01% | 11.37% | +1.63 | USMCA share granularity |
+| Japan | 12.15% | 13.60% | -1.45 | MFN preference shares |
+| UK | 6.56% | 6.29% | +0.27 | Near-match |
+| EU | 8.81% | 9.30% | -0.49 | Near-match |
 
-### Divergence source 1: USMCA share granularity (+9.9pp Canada, +1.8pp Mexico)
+The +1.68pp overall gap reflects large offsetting country-level differences: China and Canada push the tracker up; Japan, EU, and others pull it down.
 
-ETRs applies USMCA exemption rates from a 47-row GTAP sector file, producing shares of ~85-90% for Canada and ~75-85% for Mexico. The tracker uses product-level Census SPI data, producing shares of ~41% (Canada) and ~47% (Mexico). TPC's independent product-level data shows 45.5% (Canada) and 50.7% (Mexico), validating the tracker.
+### Divergence source 1: USMCA share granularity (+9.7pp Canada, +1.6pp Mexico)
+
+ETRs applies USMCA exemption rates from a 47-row GTAP sector file (~85-90% shares). The tracker uses product-level Census SPI data (~41% Canada, ~47% Mexico). TPC independently validates the tracker's approach:
 
 | Source | Canada share | Mexico share |
 |--------|-------------|-------------|
@@ -43,11 +49,11 @@ ETRs applies USMCA exemption rates from a 47-row GTAP sector file, producing sha
 | Tracker (Census SPI) | 41.2% | 47.3% |
 | ETRs (GTAP sectors) | ~85-90% | ~75-85% |
 
-**Assessment:** Tracker is correct. ETRs systematically over-exempts CA/MX by roughly 2x. This is the single largest driver of the IEEPA-period gap. Proposed ETRs fix: E1.
+**Assessment:** Tracker is correct. ETRs over-exempts CA/MX by ~2x. Proposed ETRs fix: E1.
 
-### Divergence source 2: Section 301 rate treatment (+6.5pp China)
+### Divergence source 2: Section 301 rate treatment (+6.0pp China)
 
-ETRs applies a flat 301 rate per product. The tracker applies per-list rates — each product's 301 rate is the maximum rate across all ch99 codes it appears on. Products on both a Trump list (e.g., 9903.88.03 at 25%) and a Biden list (e.g., 9903.91.05 at 50%) receive the Biden rate (supersession, not stacking). Products on Trump lists only receive the Trump rate; products on Biden lists only receive the Biden rate. TPC's rate distribution confirms this approach — rates of 85%+ are only possible with multi-list 301 application:
+ETRs applies a flat 301 rate per product. The tracker applies per-list rates (MAX across ch99 codes; Biden supersedes Trump on 8 overlapping products). TPC confirms multi-list rates — 85%+ rates require it:
 
 | TPC rate cluster | Count | Decomposition |
 |-----------------|-------|---------------|
@@ -56,67 +62,65 @@ ETRs applies a flat 301 rate per product. The tracker applies per-list rates —
 | ~85% | 421 (3%) | fentanyl(10%) + 301_Trump(25%) + 301_Biden(50%) |
 | ~95% | 528 (4%) | recip(10%) + fentanyl(10%) + 301_Trump(25%) + 301_Biden(50%) |
 
-**Assessment:** Tracker is correct. ETRs understates China 301 by ~6pp. Proposed ETRs fix: E2.
+**Assessment:** Tracker is correct. Proposed ETRs fix: E2.
 
-### Divergence source 3: IEEPA duty-free treatment (+2-6pp EU/UK/Japan)
+### Divergence source 3: MFN preference methodology (-1 to -4pp Japan and others)
 
-The tracker applies IEEPA surcharges to all products including those with 0% MFN base rates (following the legal text of the IEEPA orders, which do not exempt duty-free products). TPC shows a continuous distribution of rates 0-14.9% for duty-free products in floor countries, suggesting either (a) a larger exempt product list, or (b) a trade-weighted partial-credit methodology.
+The tracker applies Census-based MFN exemption shares that reduce applied MFN rates for FTA/GSP-eligible trade. ETRs uses GTAP-level trade preferences. At this date (with IEEPA active), MFN base rates are a smaller share of total rates, so the impact is modest. Japan -1.45pp and EU -0.49pp are partially driven by this.
 
-The tracker exempts 4,325 HTS10 products from IEEPA (sourced from HTS footnotes, Ch98 statutory exemptions, and ITA zero-binding prefixes). TPC appears to exempt ~22% of Japan products vs the tracker's ~1-2%.
+**Assessment:** Unclear which is more accurate. Not yet validated against a third source.
 
-**Assessment:** Ambiguous. The tracker follows the legal text; TPC may reflect administrative practice or analytical convention. This gap disappears entirely when IEEPA is zeroed (Feb 24 and Jul 24 dates).
+### Why the gap is small overall (+1.68pp)
+
+The USMCA and 301 divergences (tracker high) are offset by MFN preference shares and other country-level differences (tracker low). The IEEPA duty-free treatment question — previously identified as a major gap — is not visible at the overall level because products with 0% base rate are a small share of total imports when using the correct denominator.
 
 ---
 
-## Non-IEEPA Period: S122 (2026-02-24, +0.88pp) and Post-S122 (2026-07-24, -0.58pp)
+## Non-IEEPA Period
 
-With IEEPA zeroed, the three IEEPA-period divergences drop out and different dynamics emerge.
-
-### 2026-02-24: S122 + 232 + 301 (tracker +0.88pp)
+### 2026-02-24: S122 + 232 + 301 (tracker +0.30pp)
 
 | Country | Tracker | ETRs | Diff (pp) |
 |---------|---------|------|-----------|
-| China | 28.99% | 22.72% | +6.27 |
-| Canada | 5.00% | 5.04% | -0.05 |
-| Mexico | 7.53% | 9.29% | -1.76 |
-| Japan | 11.59% | 11.85% | -0.25 |
-| UK | 7.22% | 6.72% | +0.50 |
-| EU | 8.76% | 8.15% | +0.62 |
+| China | 27.27% | 22.72% | +4.55 |
+| Canada | 4.88% | 5.04% | -0.17 |
+| Mexico | 7.35% | 9.29% | -1.94 |
+| Japan | 11.12% | 11.85% | -0.72 |
+| UK | 6.89% | 6.72% | +0.17 |
+| EU | 8.15% | 8.05% | +0.09 |
 
-Non-China countries align well (within 2pp). The +0.88pp overall gap is almost entirely China's 301 treatment (+6.27pp), partially offset by Mexico (-1.76pp, USMCA shares dampening the S122 effect). Canada is essentially exact (-0.05pp).
+Near-perfect alignment. The +0.30pp overall gap is essentially zero. Non-China countries are all within 2pp. China's +4.55pp is 301 rate treatment. S122 coverage is high (94.8% of imports matched), so the denominator issue is minimal.
 
-### 2026-07-24: 232 + 301 + MFN only (tracker -0.58pp)
+### 2026-07-24: 232 + 301 + MFN only (tracker -0.90pp)
 
 | Country | Tracker | ETRs | Diff (pp) |
 |---------|---------|------|-----------|
-| China | 22.90% | 17.60% | +5.30 |
-| Canada | 2.88% | 4.62% | -1.75 |
-| Mexico | 5.00% | 8.43% | -3.43 |
-| Japan | 4.20% | 8.23% | -4.02 |
-| UK | 1.52% | 3.35% | -1.83 |
-| EU | 3.22% | 4.19% | -0.97 |
+| China | 21.55% | 17.60% | +3.94 |
+| Canada | 2.81% | 4.62% | -1.82 |
+| Mexico | 4.88% | 8.43% | -3.55 |
+| Japan | 4.03% | 8.23% | -4.20 |
+| UK | 1.45% | 3.35% | -1.90 |
+| EU | 2.99% | 4.12% | -1.13 |
 
-With S122 expired, only 232, 301, and MFN base rates remain. China is still higher (+5.30pp, 301 treatment). Every other major partner is lower, exposing two non-IEEPA divergences:
-
-### Divergence source 4: MFN preference methodology (-2 to -4pp broad)
-
-The tracker applies Census-based MFN exemption shares (`mfn_exemption_shares.csv`, 4,695 HS2 x country pairs from Tariff-ETRs) that reduce applied MFN rates for FTA/GSP-eligible trade. ETRs uses GTAP-level trade preferences, which appear to produce higher effective MFN rates.
-
-This gap is most visible at Jul 24 when MFN is the dominant rate component. It affects the majority of countries — the tracker is lower for most non-China partners.
-
-**Assessment:** Needs investigation. The tracker's Census-based shares may be more aggressive than warranted; ETRs' GTAP shares may be insufficiently granular. Neither has been validated against a third source for MFN preferences specifically.
-
-### Divergence source 5: USMCA effect on non-IEEPA authorities (-1.8pp CA, -3.4pp MX)
-
-The same USMCA share divergence from the IEEPA period persists here, but now works in the opposite direction relative to ETRs. With IEEPA gone, USMCA primarily reduces 232 auto exposure and S122/MFN rates. The tracker's lower USMCA shares mean less exemption from 232 and MFN, yet ETRs' higher GTAP shares show higher rates at this date — suggesting the USMCA effect is interacting with the MFN preference divergence.
-
-Japan's -4.02pp gap is notable: with no IEEPA, no fentanyl, and no 301 exposure, Japan's rate is nearly pure 232 + MFN. The tracker's lower rate suggests the MFN exemption shares or 232 auto deal treatment differs meaningfully for Japan.
+With S122 expired and IEEPA zeroed, only 232, 301, and MFN remain. The tracker is lower for most countries. China's +3.94pp (301) is offset by Japan -4.20pp, Mexico -3.55pp, and broad MFN preference divergence. This is where the MFN preference methodology difference is most visible — it's the dominant rate component for non-232/non-301 products.
 
 ---
 
 ## TPC Product-Level Validation
 
-TPC benchmark data (`data/tpc/tariff_by_flow_day.csv`) provides product-level rates at 5 pre-S122 dates during the IEEPA period.
+TPC benchmark provides product-level rates at 5 dates during the IEEPA period. Import-weighted comparison using total imports denominator:
+
+| Date | Tracker | TPC | Diff (pp) | Rev |
+|------|---------|-----|-----------|-----|
+| 2025-03-17 | 10.42% | 7.99% | +2.44 | rev_6 |
+| 2025-04-17 | 15.20% | 23.48% | -8.28 | rev_10 |
+| 2025-07-17 | 16.43% | 15.35% | +1.08 | rev_17 |
+| 2025-10-17 | 16.19% | 18.20% | -2.01 | rev_18 |
+| 2025-11-17 | 15.93% | 16.14% | -0.21 | rev_32 |
+
+The tracker is within ~1pp of TPC at the latest two dates. The rev_10 outlier (-8.28pp) reflects the April 9 reciprocal suspension period — the tracker may understate the brief window when high Liberation Day rates were active.
+
+### Within-2pp product-level match rates
 
 | Revision | TPC Date | Within 2pp |
 |----------|----------|------------|
@@ -126,26 +130,17 @@ TPC benchmark data (`data/tpc/tariff_by_flow_day.csv`) provides product-level ra
 | rev_18 | 2025-10-17 | **79.9%** |
 | rev_32 | 2025-11-17 | **84.9%** |
 
-Rev_10/17 are peak accuracy (>90%). Rev_18/32 improved substantially (+9.3pp, +11.1pp respectively) with the base rate inheritance fix. Rev_6 is pre-IEEPA reciprocal (differences dominated by 232 auto/USMCA treatment).
-
-### TPC remaining discrepancy patterns
-
-1. **Floor country product exemptions** (~48,000 EU mismatches): TPC shows a continuous 0-14.9% distribution for duty-free products in floor countries vs the tracker's binary 0% or 15%. Likely reflects TPC's larger exempt product list or partial-credit methodology.
-
-2. **232 + IEEPA stacking** (~25,800 products): TPC stacks IEEPA reciprocal on top of 232 (no mutual exclusion). The tracker follows ETRs' legal authority structure with mutual exclusion. Documented analytical choice, not a bug.
-
 ---
 
 ## Summary of Divergences
 
-| # | Source | IEEPA period | Non-IEEPA period | Who's right | Fix |
-|---|--------|-------------|-------------------|-------------|-----|
-| 1 | USMCA share granularity | +9.9pp CA, +1.8pp MX | -1.8pp CA, -3.4pp MX | **Tracker** (TPC validates) | ETRs E1 |
-| 2 | 301 rate treatment | +6.5pp China | +5.3pp China | **Tracker** (TPC validates) | ETRs E2 |
-| 3 | IEEPA duty-free treatment | +2-6pp EU/UK/JP | N/A | Ambiguous | — |
-| 4 | MFN preference methodology | masked by IEEPA | -2 to -4pp broad | Unclear | Investigation needed |
+| # | Source | Direction | Magnitude | Who's right | Fix |
+|---|--------|-----------|-----------|-------------|-----|
+| 1 | USMCA share granularity | Tracker high (CA/MX) | +9.7pp CA, +1.6pp MX | **Tracker** (TPC validates) | ETRs E1 |
+| 2 | 301 rate treatment | Tracker high (China) | +4-6pp China | **Tracker** (TPC validates) | ETRs E2 |
+| 3 | MFN preference methodology | Tracker low (broad) | -1 to -4pp per country | Unclear | Joint investigation |
 
-The IEEPA-period gap (+6.36pp) is dominated by known, tracker-correct divergences (#1, #2) plus an ambiguous IEEPA duty-free question (#3). The non-IEEPA gap (-0.58pp) is small overall but masks offsetting errors: China 301 (+5.3pp) vs MFN preferences and USMCA effects pulling the other direction.
+Divergences #1 and #2 are ETRs-side issues confirmed by TPC. Divergence #3 is unresolved and most visible when MFN is the dominant rate (post-IEEPA/S122 expiry).
 
 ---
 
@@ -156,11 +151,11 @@ The IEEPA-period gap (+6.36pp) is dominated by known, tracker-correct divergence
 | # | Change | Status | Est. impact |
 |---|--------|--------|-------------|
 | E1 | Replace GTAP-level USMCA shares with product-level Census SPI data | Open | +4-8pp Canada, +2-3pp Mexico |
-| E2 | Implement per-list 301 rates (Biden supersedes Trump on overlap) | Open | +5-6pp China |
+| E2 | Implement per-list 301 rates (Biden supersedes Trump on overlap) | Open | +4-6pp China |
 
 ### Tracker
 
-All identified tracker issues have been resolved. Remaining gaps are either ETRs-side (E1, E2) or require joint investigation (MFN preferences, IEEPA duty-free treatment).
+All identified tracker-side issues have been resolved. Remaining gaps are ETRs-side (E1, E2) or joint investigation (MFN preferences).
 
 ---
 
@@ -168,18 +163,18 @@ All identified tracker issues have been resolved. Remaining gaps are either ETRs
 
 | Issue | Resolution | Date |
 |-------|-----------|------|
-| Base rate inheritance | Statistical suffixes (~59% of HTS10) inherit MFN from parent indent. 11,558 products fixed. TPC match: rev_18 +9.3pp, rev_32 +11.1pp | 2026-03-11 |
-| 301 Biden supersession | Biden supersedes Trump on 8 overlapping products (MAX, not SUM). Semiconductors: 75% → 50% | 2026-03-11 |
+| ETR denominator | Use total imports ($3,124B), not matched-only. Matched-only inflated tracker ETR from 15.93% to 21.96% at 2026-01-01 | 2026-03-11 |
+| Base rate inheritance | Statistical suffixes (~59% of HTS10) inherit MFN from parent indent. 11,558 products fixed | 2026-03-11 |
+| 301 Biden supersession | Biden supersedes Trump on 8 overlapping products (MAX, not SUM) | 2026-03-11 |
 | S122 timing alignment | Effective 2026-02-24, expiry 2026-07-23 (matching ETRs) | 2026-03-10 |
-| IEEPA invalidation | Calendar-date zeroing of IEEPA reciprocal + fentanyl in compare_etrs.R | 2026-03-10 |
-| IEEPA exempt products | Expanded 1,087 → 4,325 HTS10 (HTS8→10, Ch98, ITA prefixes) | 2026-03-09 |
+| IEEPA invalidation | Calendar-date zeroing in compare_etrs.R | 2026-03-10 |
+| IEEPA exempt products | Expanded 1,087 to 4,325 HTS10 | 2026-03-09 |
 | 232 USMCA shares | Product-level Census SPI replaces binary exemption | 2026-03-09 |
 | 232 auto deal rates | 12 entries: UK surcharge/floor, JP/EU/KR 15% floor | 2026-03-09 |
-| 232 auto/MHD parts lists | Auto: 130 codes (CBP source, Note 33(g)). MHD: 182 codes (Note 34(i)) | 2026-03-10 |
+| 232 auto/MHD parts lists | Auto: 130 codes (CBP, Note 33(g)). MHD: 182 codes (Note 34(i)) | 2026-03-10 |
 | S122 exempt products | Confirmed identical (1,656 HTS8 codes) | 2026-03-09 |
-| Brazil/India EO stacking | Confirmed correct (country_eo + Phase 2) | 2026-03-09 |
 | Swiss framework | EO 14346, 15% floor, date-bounded | 2026-02 |
-| CA/MX fentanyl carve-outs | 308 prefixes from fentanyl_carveout_products.csv | 2026-02 |
-| China IEEPA (34% → 10%) | Post-Geneva suspension detection | 2026-02 |
+| CA/MX fentanyl carve-outs | 308 prefixes | 2026-02 |
+| China IEEPA (34% to 10%) | Post-Geneva suspension detection | 2026-02 |
 | Universal IEEPA baseline | ~143 unlisted countries get 10% default | 2026-02 |
 | 232 derivatives | ~130 aluminum articles with BEA metal content scaling | 2026-02 |

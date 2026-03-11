@@ -27,6 +27,16 @@ imports <- imports_raw %>%
   filter(value > 0) %>%
   rename(hts10 = hs10, country_code = cty_code)
 
+# Total imports across all products (denominator for ETR)
+# Snapshot only has products with Ch99 exposure; unmatched products have 0% additional tariff
+total_imports_all <- sum(imports$value)
+cat('Total imports (all products):', round(total_imports_all / 1e9, 1), 'B\n')
+
+# Country-level total imports (for country ETR denominator)
+country_total_imports <- imports %>%
+  group_by(country_code) %>%
+  summarise(total_value = sum(value), .groups = 'drop')
+
 # ---- Policy params for partner groupings ----
 pp <- load_policy_params()
 
@@ -117,20 +127,31 @@ for (d in comparison_dates) {
     inner_join(imports %>% select(hts10, country = country_code, value),
                by = c('hts10', 'country'))
 
-  total_imports <- sum(merged$value)
+  matched_imports <- sum(merged$value)
+  cat('  Matched imports:', round(matched_imports / 1e9, 1), 'B of',
+      round(total_imports_all / 1e9, 1), 'B (',
+      round(matched_imports / total_imports_all * 100, 1), '%)\n')
 
-  # Overall weighted ETR
-  overall_etr <- sum(merged$total_rate * merged$value) / total_imports
+  # Overall weighted ETR — use total imports as denominator
+  # Unmatched products have 0% additional tariff (no Ch99 exposure)
+  tariff_revenue <- sum(merged$total_rate * merged$value)
+  overall_etr <- tariff_revenue / total_imports_all
   cat('  Overall ETR:', round(overall_etr * 100, 2), '%\n')
 
-  # By country (census-weighted) — match ETRs format
+  # By country — use total country imports as denominator
   country_etrs <- merged %>%
     group_by(country) %>%
     summarise(
-      imports = sum(value),
-      etr = sum(total_rate * value) / sum(value),
+      matched_imports = sum(value),
+      tariff_rev = sum(total_rate * value),
       .groups = 'drop'
     ) %>%
+    left_join(country_total_imports, by = c('country' = 'country_code')) %>%
+    mutate(
+      imports = total_value,
+      etr = tariff_rev / total_value
+    ) %>%
+    select(country, imports, etr) %>%
     arrange(desc(etr))
 
   # Compare with Tariff-ETRs
@@ -143,7 +164,7 @@ for (d in comparison_dates) {
     inner_join(etrs_at_date, by = 'country') %>%
     mutate(
       diff_pp = (etr - etrs_level) * 100,
-      import_share = imports / total_imports
+      import_share = imports / total_imports_all
     )
 
   # Print key partners
@@ -160,10 +181,11 @@ for (d in comparison_dates) {
     }
   }
 
-  # EU aggregate
+  # EU aggregate — use total EU imports as denominator
   eu_data <- merged %>% filter(country %in% eu27)
-  if (nrow(eu_data) > 0) {
-    eu_etr <- sum(eu_data$total_rate * eu_data$value) / sum(eu_data$value)
+  eu_total_imp <- country_total_imports %>% filter(country_code %in% eu27) %>% pull(total_value) %>% sum()
+  if (nrow(eu_data) > 0 && eu_total_imp > 0) {
+    eu_etr <- sum(eu_data$total_rate * eu_data$value) / eu_total_imp
     # ETRs EU aggregate
     eu_etrs <- etrs_at_date %>%
       filter(country %in% eu27) %>%
@@ -175,7 +197,7 @@ for (d in comparison_dates) {
     }
   }
 
-  # Overall
+  # Overall — weight ETRs country levels by total country imports
   etrs_overall <- sum(comparison$etrs_level * comparison$imports) / sum(comparison$imports)
   cat(sprintf('  %-15s %7.2f%% %7.2f%% %+7.2f\n',
               'OVERALL', overall_etr * 100, etrs_overall * 100, (overall_etr - etrs_overall) * 100))
