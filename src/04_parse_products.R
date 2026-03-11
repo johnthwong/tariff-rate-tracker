@@ -78,7 +78,7 @@ parse_products <- function(json_path) {
     base_rate <- parse_rate(general)
     has_complex <- !is_simple_rate(general) && general != ''
 
-    if (is.na(base_rate) && trimws(general) == '') {
+    if (is.na(base_rate) && trimws(general) == '' && indent > 0) {
       # Statistical suffix: inherit from nearest parent
       for (i in seq(indent - 1, 0, by = -1)) {
         parent_rate <- rate_stack[[as.character(i)]]

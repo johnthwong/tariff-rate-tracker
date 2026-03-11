@@ -1259,22 +1259,19 @@ calculate_rates_for_revision <- function(
       unique()
 
     if (length(active_301_codes) > 0) {
-      # Build HTS8 -> 301 rate lookup using generation-based stacking:
-      # MAX within generation (original Trump 9903.88.xx / Biden 9903.91-92.xx),
-      # SUM across generations (both duties apply simultaneously)
+      # Build HTS8 -> 301 rate lookup:
+      # MAX within each list (if a product appears on multiple ch99 codes within
+      # the same generation, take the highest rate), then MAX across generations.
+      # Biden modifications supersede Trump rates on overlapping products (8 HTS8
+      # codes), not stack. For non-overlapping products only one generation applies.
       s301_lookup <- s301_products %>%
         filter(ch99_code %in% active_301_codes) %>%
         inner_join(
           s301_rate_lookup,
           by = c('ch99_code' = 'ch99_pattern')
         ) %>%
-        mutate(
-          generation = if_else(grepl('^9903\\.88\\.', ch99_code), 'original', 'biden')
-        ) %>%
-        group_by(hts8, generation) %>%
-        summarise(gen_rate = max(s301_rate), .groups = 'drop') %>%
         group_by(hts8) %>%
-        summarise(blanket_301 = sum(gen_rate), .groups = 'drop')
+        summarise(blanket_301 = max(s301_rate), .groups = 'drop')
 
       if (nrow(s301_lookup) > 0) {
         # Update rate_301 for existing China product-country pairs
