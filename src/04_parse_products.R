@@ -39,9 +39,27 @@ parse_products <- function(json_path) {
   hts_raw <- fromJSON(json_path, simplifyDataFrame = FALSE)
   message('  Total items: ', length(hts_raw))
 
+  # Build a rate inheritance stack: for statistical suffixes (empty general field),
+
+  # inherit the MFN rate from the nearest parent in the indent hierarchy.
+  # ~59% of HTS10 products are statistical suffixes with empty general fields.
+  rate_stack <- list()  # indent level -> parsed rate (numeric or NA)
+  n_inherited <- 0L
+
   # Process each item
   products <- map_dfr(hts_raw, function(item) {
     htsno <- item$htsno %||% ''
+    general <- item$general %||% ''
+    indent <- as.integer(item$indent %||% 0)
+
+    # Update rate stack for any item with a rate (parents and products alike)
+    parsed <- parse_rate(general)
+    if (!is.na(parsed) || (is_simple_rate(general) || tolower(trimws(general)) == 'free')) {
+      rate_stack[[as.character(indent)]] <<- parsed
+      # Clear deeper indent levels (new parent resets children)
+      deeper <- names(rate_stack)[as.integer(names(rate_stack)) > indent]
+      for (d in deeper) rate_stack[[d]] <<- NULL
+    }
 
     # Skip if not a valid 10-digit HTS code
     if (!is_valid_hts10(htsno)) {
@@ -54,12 +72,23 @@ parse_products <- function(json_path) {
     }
 
     hts10 <- normalize_hts(htsno)
-    general <- item$general %||% ''
     description <- item$description %||% ''
 
-    # Parse rate
+    # Parse rate — inherit from parent if empty
     base_rate <- parse_rate(general)
     has_complex <- !is_simple_rate(general) && general != ''
+
+    if (is.na(base_rate) && trimws(general) == '') {
+      # Statistical suffix: inherit from nearest parent
+      for (i in seq(indent - 1, 0, by = -1)) {
+        parent_rate <- rate_stack[[as.character(i)]]
+        if (!is.null(parent_rate)) {
+          base_rate <- parent_rate
+          n_inherited <<- n_inherited + 1L
+          break
+        }
+      }
+    }
 
     # Extract Chapter 99 references
     ch99_refs <- extract_chapter99_refs(item$footnotes)
@@ -78,6 +107,9 @@ parse_products <- function(json_path) {
   message('  Parsed products: ', nrow(products))
   message('  With Chapter 99 refs: ', sum(products$n_ch99_refs > 0))
   message('  With complex rates: ', sum(products$has_complex_rate))
+  message('  Inherited parent rate: ', n_inherited, ' (',
+          round(n_inherited / nrow(products) * 100, 1), '%)')
+  message('  With NA base_rate: ', sum(is.na(products$base_rate)))
 
   return(products)
 }
