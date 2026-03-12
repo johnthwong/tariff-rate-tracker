@@ -348,7 +348,39 @@ load_policy_params <- function(yaml_path = here('config', 'policy_params.yaml'))
     )
   }
 
+  # Local paths (optional user-specific file locations)
+  params$LOCAL_PATHS <- load_local_paths()
+
   return(params)
+}
+
+
+#' Load optional local paths configuration
+#'
+#' Reads config/local_paths.yaml if present. Returns a named list of paths,
+#' with NULL for any unset entries. Never required for core build.
+#'
+#' @param yaml_path Path to local_paths.yaml
+#' @return Named list with import_weights, tpc_benchmark, tariff_etrs_repo
+load_local_paths <- function(yaml_path = here('config', 'local_paths.yaml')) {
+  defaults <- list(
+    import_weights = NULL,
+    tpc_benchmark = 'data/tpc/tariff_by_flow_day.csv',
+    tariff_etrs_repo = NULL
+  )
+
+  if (!file.exists(yaml_path)) return(defaults)
+
+  raw <- tryCatch(read_yaml(yaml_path), error = function(e) {
+    warning('Failed to parse local_paths.yaml: ', conditionMessage(e))
+    return(list())
+  })
+
+  # Merge with defaults (YAML nulls become R NULLs)
+  for (nm in names(defaults)) {
+    if (!is.null(raw[[nm]])) defaults[[nm]] <- raw[[nm]]
+  }
+  return(defaults)
 }
 
 

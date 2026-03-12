@@ -457,13 +457,19 @@ export_daily_slice <- function(ts, date_range, countries = NULL, products = NULL
 # Reusable Wrappers (called by 00_build_timeseries.R post-build)
 # =============================================================================
 
-#' Load import weights from Tariff-ETRs cache
+#' Load import weights for daily series weighting
 #'
-#' @param imports_path Path to hs10_by_country_gtap RDS
+#' @param imports_path Path to hs10_by_country_gtap RDS (default: from local_paths config)
 #' @return Tibble with hs10, cty_code, imports; or NULL if unavailable
-load_import_weights <- function(
-  imports_path = here('..', 'Tariff-ETRs', 'cache', 'hs10_by_country_gtap_2024_con.rds')
-) {
+load_import_weights <- function(imports_path = NULL) {
+  if (is.null(imports_path)) {
+    local_paths <- load_local_paths()
+    imports_path <- local_paths$import_weights
+  }
+  if (is.null(imports_path)) {
+    message('Import weights not configured in config/local_paths.yaml — computing unweighted means only')
+    return(NULL)
+  }
   if (!file.exists(imports_path)) {
     message('Import weights not found — computing unweighted means only')
     return(NULL)

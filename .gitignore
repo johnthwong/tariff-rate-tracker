@@ -3,6 +3,9 @@
 .RData
 .Rproj.user/
 
+# Local config (user-specific paths — use local_paths.yaml.example as template)
+config/local_paths.yaml
+
 # Data files (large)
 data/hts_archives/*.json
 data/processed/

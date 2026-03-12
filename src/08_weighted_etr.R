@@ -10,7 +10,7 @@
 #   - products_raw.csv: Base rates and Ch99 footnote references
 #   - ieepa_country_rates.csv: IEEPA surcharge/floor rates by country
 #   - usmca_products.csv: USMCA eligibility per HTS10
-#   - Tariff-ETRs cache: 2024 Census import weights (HS10 x country x GTAP)
+#   - Import weights: 2024 Census import data (HS10 x country x GTAP) — path from config/local_paths.yaml
 #   - country_partner_mapping.csv: Census code -> partner group
 #   - TPC tariff_by_flow_day.csv: TPC benchmark rates for comparison
 #   - census_codes.csv: Census country code-to-name mapping
@@ -666,11 +666,23 @@ plot_etrs <- function(etrs, tpc_etrs, output_dir) {
 #' @param policy_params Optional policy params list (from load_policy_params())
 #' @return ETR results (invisible)
 run_weighted_etr <- function(ts = NULL, policy_params = NULL) {
+  # Resolve import weights path from local_paths config
+  local_paths <- if (!is.null(policy_params)) policy_params$LOCAL_PATHS else load_local_paths()
+  imports_path <- local_paths$import_weights
+  if (is.null(imports_path)) {
+    message('Import weights not configured in config/local_paths.yaml — skipping weighted ETR.')
+    return(invisible(NULL))
+  }
+  if (!file.exists(imports_path)) {
+    message('Import weights file not found: ', imports_path, ' — skipping weighted ETR.')
+    return(invisible(NULL))
+  }
+
   data <- load_data(
     products_path = here('data', 'processed', 'products_raw.csv'),
     ieepa_path    = here('data', 'processed', 'ieepa_country_rates.csv'),
     usmca_path    = here('data', 'processed', 'usmca_products.csv'),
-    imports_path  = here('..', 'Tariff-ETRs', 'cache', 'hs10_by_country_gtap_2024_con.rds'),
+    imports_path  = imports_path,
     partner_path  = here('resources', 'country_partner_mapping.csv')
   )
 

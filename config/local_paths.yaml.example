@@ -1,0 +1,26 @@
+# =============================================================================
+# Local Paths — User-Specific File Locations
+# =============================================================================
+# This file is OPTIONAL. The core tariff build runs without it.
+# It provides paths for files not shipped in the repo (private data,
+# external import weights, comparison repo locations).
+#
+# Copy this template and fill in paths relevant to your setup.
+# Paths can be absolute or relative to the project root.
+# Set a value to null to skip that input.
+# =============================================================================
+
+# 2024 Census import weights (HS10 x country x GTAP sector RDS)
+# Required for: weighted ETR (08_weighted_etr.R), weighted daily series (09_daily_series.R)
+# Without this: unweighted means only; weighted outputs skipped
+import_weights: null
+
+# TPC benchmark data (CSV with HTS10 x country tariff rates)
+# Required for: validation (07_validate_tpc.R), ETR comparison overlay
+# Without this: TPC comparison skipped; core tariff series unaffected
+tpc_benchmark: data/tpc/tariff_by_flow_day.csv
+
+# Tariff-ETRs repo location (for cross-repo comparison only)
+# Required for: comparison workflows
+# Without this: comparison skipped; core build unaffected
+tariff_etrs_repo: null
