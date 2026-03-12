@@ -1,6 +1,6 @@
 # Tariff-Rate-Tracker vs Tariff-ETRs Comparison
 
-**Last updated:** 2026-03-11
+**Last updated:** 2026-03-12
 **Tariff-ETRs scenario:** 2-21_temp (3 dates: 2026-01-01, 2026-02-24, 2026-07-24)
 **Tracker build:** Mar 11, 2026 (full R pipeline rebuild with S122 zeroing fix + copper 50% rate + parse_ch99_rate regex fix)
 
@@ -142,13 +142,13 @@ TPC benchmark provides product-level rates at 5 dates during the IEEPA period. I
 
 | Date | Tracker | TPC | Diff (pp) | Rev |
 |------|---------|-----|-----------|-----|
-| 2025-03-17 | 10.42% | 7.99% | +2.44 | rev_6 |
-| 2025-04-17 | 15.20% | 23.48% | -8.28 | rev_10 |
-| 2025-07-17 | 16.43% | 15.35% | +1.08 | rev_17 |
-| 2025-10-17 | 16.19% | 18.20% | -2.01 | rev_18 |
-| 2025-11-17 | 15.93% | 16.14% | -0.21 | rev_32 |
+| 2025-03-17 | 10.43% | 8.00% | +2.43 | rev_6 |
+| 2025-04-17 | 15.21% | 23.49% | -8.28 | rev_10 |
+| 2025-07-17 | 16.54% | 15.37% | +1.17 | rev_17 |
+| 2025-10-17 | 16.29% | 18.23% | -1.94 | rev_18 |
+| 2025-11-17 | 16.03% | 16.16% | -0.13 | rev_32 |
 
-The tracker is within ~1pp of TPC at the latest two dates. The rev_10 outlier (-8.28pp) reflects the April 9 reciprocal suspension period — the tracker may understate the brief window when high Liberation Day rates were active.
+The tracker is within ~1pp of TPC at the three non-Liberation-Day dates. The rev_10 outlier (-8.28pp) reflects an HTS encoding gap: country-specific Liberation Day reciprocal rates (EU 20%, Japan 24%, India 26%, etc.) were announced via EO on April 2 but never published as individual country entries in the USITC HTS JSON before being suspended on April 5. See the README [Validation section](../README.md#liberation-day-divergence--828pp-at-rev_10) for full details.
 
 ### Within-2pp product-level match rates
 

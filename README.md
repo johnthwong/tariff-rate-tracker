@@ -104,7 +104,7 @@ Section 232 and Section 301 tariffs are unaffected by the SCOTUS ruling (separat
 | File | Purpose |
 |------|---------|
 | `config/policy_params.yaml` | All policy constants: country codes, authority ranges, 232 coverage, floor rates, 301 rates, Section 122 expiry. Single source of truth. |
-| `config/revision_dates.csv` | Maps 39 HTS revisions to effective dates and TPC validation dates. Manually curated. |
+| `config/revision_dates.csv` | Maps 39 HTS revisions to effective dates, TPC validation dates, and optional `tpc_policy_revision` overrides. Manually curated. |
 | `config/scenarios.yaml` | Counterfactual scenario definitions (baseline, no_ieepa, no_301, no_232, pre_2025, etc.). |
 | `config/local_paths.yaml` | **Optional.** User-specific paths for external files (import weights, TPC benchmark, Tariff-ETRs repo). Gitignored; copy from `local_paths.yaml.example`. Not required for core build. |
 
