@@ -91,24 +91,15 @@ build_daily_aggregates <- function(ts, date_range = NULL, imports = NULL,
   # China code for net authority decomposition
   CTY_CHINA <- if (!is.null(policy_params)) policy_params$CTY_CHINA %||% '5700' else '5700'
 
-  # --- Section 122 expiry: split intervals if needed ---
-  s122_expiry <- NULL
-  if (!is.null(policy_params$SECTION_122) &&
-      !policy_params$SECTION_122$finalized &&
-      'rate_s122' %in% names(ts)) {
-    s122_expiry <- as.Date(policy_params$SECTION_122$expiry_date)
-  }
+  # --- Policy expiry split points (Section 122, Swiss framework, etc.) ---
+  # Uses shared helpers from helpers.R to detect all finalized=false overrides
 
   # Helper: compute aggregates for one revision interval (or sub-interval)
-  compute_agg_overall <- function(revision, valid_from, valid_until, zero_s122 = FALSE) {
+  compute_agg_overall <- function(revision, valid_from, valid_until, sub_start = valid_from) {
     rev_data <- ts %>% filter(revision == !!revision)
-    if (zero_s122 && 'rate_s122' %in% names(rev_data)) {
-      rev_data <- rev_data %>%
-        mutate(
-          total_additional = total_additional - rate_s122,
-          total_rate = total_rate - rate_s122,
-          rate_s122 = 0
-        )
+    rev_data <- apply_expiry_zeroing(rev_data, sub_start, policy_params)
+    if (any(c('rate_s122', 'rate_ieepa_recip') %in% names(rev_data))) {
+      rev_data <- apply_stacking_rules(rev_data)
     }
     row <- tibble(
       revision = revision,
@@ -121,15 +112,9 @@ build_daily_aggregates <- function(ts, date_range = NULL, imports = NULL,
     )
     if (has_weights) {
       wt_data <- ts_weighted %>% filter(revision == !!revision)
-      if (zero_s122 && 'rate_s122' %in% names(wt_data)) {
-        wt_data <- wt_data %>%
-          mutate(
-            total_additional = total_additional - rate_s122,
-            total_rate = total_rate - rate_s122,
-            rate_s122 = 0
-          )
-      }
+      wt_data <- apply_expiry_zeroing(wt_data, sub_start, policy_params)
       if (nrow(wt_data) > 0) {
+        wt_data <- apply_stacking_rules(wt_data)
         row$weighted_etr <- sum(wt_data$total_rate * wt_data$imports) / total_imports
         row$weighted_etr_additional <- sum(wt_data$total_additional * wt_data$imports) / total_imports
         row$matched_imports_b <- sum(wt_data$imports) / 1e9
@@ -144,16 +129,10 @@ build_daily_aggregates <- function(ts, date_range = NULL, imports = NULL,
     return(row)
   }
 
-  compute_agg_country <- function(revision, valid_from, valid_until, zero_s122 = FALSE) {
+  compute_agg_country <- function(revision, valid_from, valid_until, sub_start = valid_from) {
     rev_data <- ts %>% filter(revision == !!revision)
-    if (zero_s122 && 'rate_s122' %in% names(rev_data)) {
-      rev_data <- rev_data %>%
-        mutate(
-          total_additional = total_additional - rate_s122,
-          total_rate = total_rate - rate_s122,
-          rate_s122 = 0
-        )
-    }
+    rev_data <- apply_expiry_zeroing(rev_data, sub_start, policy_params)
+    rev_data <- apply_stacking_rules(rev_data)
     row <- rev_data %>%
       group_by(country) %>%
       summarise(
@@ -164,14 +143,8 @@ build_daily_aggregates <- function(ts, date_range = NULL, imports = NULL,
       mutate(revision = revision, valid_from = valid_from, valid_until = valid_until)
     if (has_weights) {
       wt_data <- ts_weighted %>% filter(revision == !!revision)
-      if (zero_s122 && 'rate_s122' %in% names(wt_data)) {
-        wt_data <- wt_data %>%
-          mutate(
-            total_additional = total_additional - rate_s122,
-            total_rate = total_rate - rate_s122,
-            rate_s122 = 0
-          )
-      }
+      wt_data <- apply_expiry_zeroing(wt_data, sub_start, policy_params)
+      wt_data <- apply_stacking_rules(wt_data)
       country_total_imp <- imports %>%
         group_by(cty_code) %>%
         summarise(country_total_imports = sum(imports), .groups = 'drop') %>%
@@ -194,11 +167,9 @@ build_daily_aggregates <- function(ts, date_range = NULL, imports = NULL,
     return(row)
   }
 
-  compute_agg_authority <- function(revision, valid_from, valid_until, zero_s122 = FALSE) {
+  compute_agg_authority <- function(revision, valid_from, valid_until, sub_start = valid_from) {
     rev_data <- ts %>% filter(revision == !!revision)
-    if (zero_s122 && 'rate_s122' %in% names(rev_data)) {
-      rev_data <- rev_data %>% mutate(rate_s122 = 0)
-    }
+    rev_data <- apply_expiry_zeroing(rev_data, sub_start, policy_params)
 
     # Use shared net authority decomposition from helpers.R
     net_data <- compute_net_authority_contributions(rev_data, cty_china = CTY_CHINA)
@@ -212,13 +183,12 @@ build_daily_aggregates <- function(ts, date_range = NULL, imports = NULL,
       mean_ieepa = mean(net_data$net_ieepa),
       mean_fentanyl = mean(net_data$net_fentanyl),
       mean_s122 = mean(net_data$net_s122),
+      mean_section_201 = mean(net_data$net_section_201),
       mean_other = mean(net_data$net_other)
     )
     if (has_weights) {
       wt_data <- ts_weighted %>% filter(revision == !!revision)
-      if (zero_s122 && 'rate_s122' %in% names(wt_data)) {
-        wt_data <- wt_data %>% mutate(rate_s122 = 0)
-      }
+      wt_data <- apply_expiry_zeroing(wt_data, sub_start, policy_params)
       if (nrow(wt_data) > 0) {
         wt_net <- compute_net_authority_contributions(wt_data, cty_china = CTY_CHINA)
         row$etr_232 <- sum(wt_net$net_232 * wt_net$imports) / total_imports
@@ -226,60 +196,45 @@ build_daily_aggregates <- function(ts, date_range = NULL, imports = NULL,
         row$etr_ieepa <- sum(wt_net$net_ieepa * wt_net$imports) / total_imports
         row$etr_fentanyl <- sum(wt_net$net_fentanyl * wt_net$imports) / total_imports
         row$etr_s122 <- sum(wt_net$net_s122 * wt_net$imports) / total_imports
+        row$etr_section_201 <- sum(wt_net$net_section_201 * wt_net$imports) / total_imports
         row$etr_other <- sum(wt_net$net_other * wt_net$imports) / total_imports
       } else {
-        row$etr_232 <- row$etr_301 <- row$etr_ieepa <- row$etr_fentanyl <- row$etr_s122 <- row$etr_other <- 0
+        row$etr_232 <- row$etr_301 <- row$etr_ieepa <- row$etr_fentanyl <- 0
+        row$etr_s122 <- row$etr_section_201 <- row$etr_other <- 0
       }
     }
     return(row)
   }
 
-  # --- Per-revision aggregates (with s122 expiry splitting) ---
-  agg_overall <- rev_intervals %>%
-    pmap_dfr(function(revision, valid_from, valid_until) {
-      if (!is.null(s122_expiry) && valid_from <= s122_expiry && valid_until > s122_expiry) {
-        # Split: [valid_from, expiry] with s122 active, [expiry+1, valid_until] with s122 zeroed
-        bind_rows(
-          compute_agg_overall(revision, valid_from, s122_expiry, zero_s122 = FALSE),
-          compute_agg_overall(revision, s122_expiry + 1, valid_until, zero_s122 = TRUE)
-        )
-      } else if (!is.null(s122_expiry) && valid_from > s122_expiry) {
-        compute_agg_overall(revision, valid_from, valid_until, zero_s122 = TRUE)
-      } else {
-        compute_agg_overall(revision, valid_from, valid_until)
-      }
-    })
+  # --- Per-revision aggregates (with generic expiry splitting) ---
+  # Generic interval splitter: splits a revision interval at all expiry dates
+  # and calls the aggregation function for each sub-interval
+  split_and_aggregate <- function(agg_fn) {
+    rev_intervals %>%
+      pmap_dfr(function(revision, valid_from, valid_until) {
+        splits <- get_expiry_split_points(valid_from, valid_until, policy_params)
+        if (length(splits) == 0) {
+          return(agg_fn(revision, valid_from, valid_until))
+        }
+        # Build sub-intervals: [valid_from, split1], [split1+1, split2], ..., [splitN+1, valid_until]
+        boundaries <- c(valid_from, splits + 1)
+        ends <- c(splits, valid_until)
+        pmap_dfr(list(boundaries, ends), function(s, e) {
+          agg_fn(revision, s, e, sub_start = s)
+        })
+      })
+  }
 
-  agg_by_country <- rev_intervals %>%
-    pmap_dfr(function(revision, valid_from, valid_until) {
-      if (!is.null(s122_expiry) && valid_from <= s122_expiry && valid_until > s122_expiry) {
-        bind_rows(
-          compute_agg_country(revision, valid_from, s122_expiry, zero_s122 = FALSE),
-          compute_agg_country(revision, s122_expiry + 1, valid_until, zero_s122 = TRUE)
-        )
-      } else if (!is.null(s122_expiry) && valid_from > s122_expiry) {
-        compute_agg_country(revision, valid_from, valid_until, zero_s122 = TRUE)
-      } else {
-        compute_agg_country(revision, valid_from, valid_until)
-      }
-    })
+  agg_overall <- split_and_aggregate(compute_agg_overall)
+  agg_by_country <- split_and_aggregate(compute_agg_country)
+  agg_by_authority <- split_and_aggregate(compute_agg_authority)
 
-  agg_by_authority <- rev_intervals %>%
-    pmap_dfr(function(revision, valid_from, valid_until) {
-      if (!is.null(s122_expiry) && valid_from <= s122_expiry && valid_until > s122_expiry) {
-        bind_rows(
-          compute_agg_authority(revision, valid_from, s122_expiry, zero_s122 = FALSE),
-          compute_agg_authority(revision, s122_expiry + 1, valid_until, zero_s122 = TRUE)
-        )
-      } else if (!is.null(s122_expiry) && valid_from > s122_expiry) {
-        compute_agg_authority(revision, valid_from, valid_until, zero_s122 = TRUE)
-      } else {
-        compute_agg_authority(revision, valid_from, valid_until)
-      }
-    })
-
-  if (!is.null(s122_expiry)) {
-    message('  Section 122 expiry split at ', s122_expiry)
+  # Log any expiry splits that occurred
+  if (!is.null(policy_params)) {
+    adjustments <- collect_expiry_adjustments(policy_params)
+    for (adj in adjustments) {
+      message('  ', adj$label, ' expiry split at ', adj$expiry_date)
+    }
   }
 
   # --- Expand revision-level aggregates to daily ---
@@ -355,7 +310,7 @@ expand_to_daily <- function(ts, date_range, countries, products) {
   calendar <- tibble(date = seq(date_range[1], date_range[2], by = 'day'))
 
   expanded <- subset %>%
-    inner_join(calendar, by = character(), relationship = 'many-to-many') %>%
+    cross_join(calendar) %>%
     filter(date >= valid_from, date <= valid_until)
 
   message('Expanded ', nrow(subset), ' interval rows to ', nrow(expanded), ' daily rows')
@@ -364,6 +319,137 @@ expand_to_daily <- function(ts, date_range, countries, products) {
           ', Days: ', n_distinct(expanded$date))
 
   return(expanded)
+}
+
+
+# =============================================================================
+# Daily Slice Export
+# =============================================================================
+
+#' Export a filtered slice of the daily timeseries
+#'
+#' Extracts product-country-date level data from the interval-encoded timeseries
+#' for a specified date range, with optional country/product filters.
+#' Applies post-interval adjustments (Section 122 expiry, Swiss framework expiry).
+#'
+#' Safety: requires either explicit filters OR full_export = TRUE to prevent
+#' accidental full expansion (~4.5M rows/revision x 730 days).
+#'
+#' @param ts Interval-encoded timeseries tibble
+#' @param date_range Length-2 Date vector (start, end)
+#' @param countries Optional character vector of country codes
+#' @param products Optional character vector of HTS10 codes (or prefixes)
+#' @param policy_params Policy params list (for post-interval adjustments)
+#' @param output_path Output file path (.csv or .parquet). NULL = return only.
+#' @param full_export Set TRUE to export without filters (safety override)
+#' @param columns Optional character vector of columns to include in output.
+#'   Default: narrow schema (date, hts10, country, rate columns, revision).
+#' @return Exported tibble (invisibly if output_path is given)
+export_daily_slice <- function(ts, date_range, countries = NULL, products = NULL,
+                                policy_params = NULL, output_path = NULL,
+                                full_export = FALSE, columns = NULL) {
+  date_range <- as.Date(date_range)
+  stopifnot(length(date_range) == 2, date_range[1] <= date_range[2])
+
+  # Safety check
+  if (is.null(countries) && is.null(products) && !full_export) {
+    stop('export_daily_slice: must provide countries, products, or set full_export = TRUE.\n',
+         'A full export produces billions of rows. Pass full_export = TRUE if intended.')
+  }
+
+  # Filter timeseries
+  subset <- ts
+  if (!is.null(countries)) subset <- subset %>% filter(country %in% countries)
+  if (!is.null(products)) {
+    # Support both exact codes and prefix matching
+    if (any(nchar(products) < 10)) {
+      prefix_pattern <- paste0('^(', paste(products, collapse = '|'), ')')
+      subset <- subset %>% filter(grepl(prefix_pattern, hts10))
+    } else {
+      subset <- subset %>% filter(hts10 %in% products)
+    }
+  }
+
+  if (nrow(subset) == 0) {
+    warning('No matching rows for the requested filters')
+    return(tibble())
+  }
+
+  # Clip intervals to requested date range
+  subset <- subset %>%
+    filter(valid_until >= date_range[1], valid_from <= date_range[2])
+
+  # Collect expiry split points across the full date range
+  split_dates <- if (!is.null(policy_params)) {
+    adjustments <- collect_expiry_adjustments(policy_params)
+    exp_dates <- map(adjustments, ~ as.Date(.$expiry_date))
+    exp_dates <- exp_dates[exp_dates >= date_range[1] & exp_dates <= date_range[2]]
+    sort(unique(as.Date(unlist(exp_dates), origin = '1970-01-01')))
+  } else {
+    as.Date(character())
+  }
+
+  # Expand intervals to daily, applying expiry adjustments per sub-interval
+  calendar <- tibble(date = seq(date_range[1], date_range[2], by = 'day'))
+
+  expanded <- subset %>%
+    cross_join(calendar) %>%
+    filter(date >= valid_from, date <= valid_until)
+
+  # Apply post-interval adjustments (bulk by date partitions)
+  if (length(split_dates) > 0 && nrow(expanded) > 0) {
+    # Partition rows and apply zeroing to rows past each expiry
+    for (adj in collect_expiry_adjustments(policy_params)) {
+      exp <- as.Date(adj$expiry_date)
+      if (adj$column %in% names(expanded)) {
+        if (!is.null(adj$countries)) {
+          expanded <- expanded %>%
+            mutate(!!adj$column := if_else(
+              date > exp & country %in% adj$countries, 0, .data[[adj$column]]))
+        } else {
+          expanded <- expanded %>%
+            mutate(!!adj$column := if_else(date > exp, 0, .data[[adj$column]]))
+        }
+      }
+    }
+    # Recompute totals
+    expanded <- apply_stacking_rules(expanded)
+  }
+
+  # Select output columns
+  default_columns <- c('date', 'hts10', 'country', 'base_rate',
+                        'rate_232', 'rate_301', 'rate_ieepa_recip', 'rate_ieepa_fent',
+                        'rate_s122', 'rate_section_201', 'rate_other',
+                        'total_additional', 'total_rate', 'revision')
+  out_cols <- if (!is.null(columns)) columns else default_columns
+  out_cols <- intersect(out_cols, names(expanded))
+  result <- expanded %>% select(all_of(out_cols))
+
+  n_rows <- nrow(result)
+  message('Exported ', n_rows, ' daily rows (',
+          n_distinct(result$country), ' countries, ',
+          n_distinct(result$hts10), ' products, ',
+          n_distinct(result$date), ' days)')
+
+  # Write output
+  if (!is.null(output_path)) {
+    ext <- tools::file_ext(output_path)
+    dir_path <- dirname(output_path)
+    if (!dir.exists(dir_path)) dir.create(dir_path, recursive = TRUE)
+
+    if (ext == 'parquet' && requireNamespace('arrow', quietly = TRUE)) {
+      arrow::write_parquet(result, output_path)
+      message('Wrote ', output_path, ' (Parquet, ', round(file.size(output_path) / 1e6, 1), ' MB)')
+    } else {
+      if (ext == 'parquet') message('arrow package not available, falling back to CSV')
+      csv_path <- if (ext == 'parquet') sub('\\.parquet$', '.csv', output_path) else output_path
+      write_csv(result, csv_path)
+      message('Wrote ', csv_path, ' (CSV, ', round(file.size(csv_path) / 1e6, 1), ' MB)')
+    }
+    return(invisible(result))
+  }
+
+  return(result)
 }
 
 

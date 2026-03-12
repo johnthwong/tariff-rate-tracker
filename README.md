@@ -147,7 +147,7 @@ Each row in the snapshot/timeseries contains:
 | `revision` | chr | e.g., `rev_7` |
 | `effective_date` | Date | From revision_dates.csv |
 | `valid_from` | Date | Interval start (timeseries only) |
-| `valid_until` | Date | Interval end (timeseries only) |
+| `valid_until` | Date | Interval end (timeseries only; final revision extends to `series_horizon.end_date`) |
 
 ---
 
@@ -264,6 +264,33 @@ Rscript src/quality_report.R
 ```
 
 The default mode checks for a previous build, identifies new revisions, downloads missing JSON, builds the timeseries incrementally, and runs all downstream scripts.
+
+### Querying and Exporting Daily Data
+
+The canonical dataset is the interval-encoded timeseries (`rate_timeseries.rds`), where rates are piecewise-constant between revision dates. Daily data is derived from this on demand:
+
+```r
+source('src/helpers.R')
+source('src/09_daily_series.R')
+
+ts <- readRDS('data/timeseries/rate_timeseries.rds')
+pp <- load_policy_params()
+
+# Point-in-time query (single date, all products/countries)
+snapshot <- get_rates_at_date(ts, '2026-06-15', policy_params = pp)
+
+# Export a filtered daily slice (e.g., China products for June 2026)
+export_daily_slice(ts, c('2026-06-01', '2026-06-30'),
+                   countries = '5700', policy_params = pp,
+                   output_path = 'output/exports/china_june.csv')
+
+# Export by product prefix (all countries, one HS chapter)
+export_daily_slice(ts, c('2025-01-01', '2025-12-31'),
+                   products = '72', policy_params = pp,
+                   output_path = 'output/exports/steel_2025.parquet')
+```
+
+**Why on-demand slicing instead of a pre-built daily panel?** A full daily expansion is ~3.5 billion rows (20K products x 240 countries x 730 days). The interval file is the same data at ~0.1% of the size. For most use cases — model inputs, event studies, country/product analysis — `export_daily_slice()` produces the needed subset in seconds. A pre-materialized partitioned Parquet dataset (see `docs/daily_series_recommendations.md`) would serve batch pipelines that need the full panel, but this has not been implemented because no current downstream consumer requires it. If that changes, the interval-to-daily expansion logic is already built and the partitioning strategy is documented.
 
 ### Manual Data-Prep Workflow
 

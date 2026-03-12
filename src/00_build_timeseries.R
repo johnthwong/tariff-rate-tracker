@@ -294,6 +294,17 @@ build_full_timeseries <- function(
     arrange(effective_date, revision, country, hts10)
 
   # Add temporal intervals (valid_from / valid_until) from revision ordering
+  # Final revision extends to configurable horizon (default: 2026-12-31), not Sys.Date()
+  policy_params <- load_policy_params()
+  horizon_end <- policy_params$SERIES_HORIZON_END %||% Sys.Date()
+  # Guard: horizon cannot be earlier than the final revision's effective_date
+  last_eff <- max(rev_dates$effective_date[rev_dates$revision %in% unique(timeseries$revision)])
+  if (horizon_end < last_eff) {
+    warning('series_horizon.end_date (', horizon_end,
+            ') is earlier than last revision (', last_eff, '). Using last revision date.')
+    horizon_end <- last_eff
+  }
+
   rev_intervals <- rev_dates %>%
     filter(revision %in% unique(timeseries$revision)) %>%
     arrange(effective_date) %>%
@@ -301,7 +312,7 @@ build_full_timeseries <- function(
       valid_from = effective_date,
       valid_until = lead(effective_date) - 1
     ) %>%
-    mutate(valid_until = if_else(is.na(valid_until), Sys.Date(), valid_until)) %>%
+    mutate(valid_until = if_else(is.na(valid_until), horizon_end, valid_until)) %>%
     select(revision, valid_from, valid_until)
 
   timeseries <- timeseries %>%

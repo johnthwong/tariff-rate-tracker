@@ -332,6 +332,13 @@ load_policy_params <- function(yaml_path = here('config', 'policy_params.yaml'))
     params$S232_COUNTRY_EXEMPTIONS <- list()
   }
 
+  # Series horizon
+  if (!is.null(params$series_horizon$end_date)) {
+    params$SERIES_HORIZON_END <- as.Date(params$series_horizon$end_date)
+  } else {
+    params$SERIES_HORIZON_END <- Sys.Date()
+  }
+
   # Section 122 (Trade Act §122, 150-day statutory limit)
   if (!is.null(params$section_122)) {
     params$SECTION_122 <- list(
@@ -505,7 +512,8 @@ get_available_revisions_all_years <- function(all_revisions, archive_dir = here(
 #' Canonical column vector for rate output
 RATE_SCHEMA <- c(
   'hts10', 'country', 'base_rate', 'statutory_base_rate',
-  'rate_232', 'rate_301', 'rate_ieepa_recip', 'rate_ieepa_fent', 'rate_s122', 'rate_other',
+  'rate_232', 'rate_301', 'rate_ieepa_recip', 'rate_ieepa_fent',
+  'rate_s122', 'rate_section_201', 'rate_other',
   'metal_share',
   'total_additional', 'total_rate',
   'usmca_eligible', 'revision', 'effective_date',
@@ -524,7 +532,7 @@ enforce_rate_schema <- function(df) {
   defaults <- list(
     hts10 = NA_character_, country = NA_character_,
     base_rate = 0, statutory_base_rate = 0, rate_232 = 0, rate_301 = 0,
-    rate_ieepa_recip = 0, rate_ieepa_fent = 0, rate_s122 = 0, rate_other = 0,
+    rate_ieepa_recip = 0, rate_ieepa_fent = 0, rate_s122 = 0, rate_section_201 = 0, rate_other = 0,
     metal_share = 1.0,
     total_additional = 0, total_rate = 0,
     usmca_eligible = FALSE, revision = NA_character_,
@@ -540,7 +548,7 @@ enforce_rate_schema <- function(df) {
 
   # Fill NAs in numeric rate columns (bind_rows can introduce NAs)
   rate_cols <- c('base_rate', 'statutory_base_rate', 'rate_232', 'rate_301', 'rate_ieepa_recip',
-                 'rate_ieepa_fent', 'rate_s122', 'rate_other',
+                 'rate_ieepa_fent', 'rate_s122', 'rate_section_201', 'rate_other',
                  'total_additional', 'total_rate')
   for (col in rate_cols) {
     if (col %in% names(df)) {
@@ -638,19 +646,20 @@ apply_stacking_rules <- function(df, cty_china = '5700', stacking_method = 'mutu
 
 #' Compute net authority contributions from snapshot rate columns
 #'
-#' Derives net_232, net_ieepa, net_fentanyl, net_301, net_s122, net_other from
-#' the timeseries rate columns using mutual-exclusion stacking rules.
-#' Net contributions sum to total_additional.
+#' Derives per-authority net contributions from the timeseries rate columns
+#' using mutual-exclusion stacking rules. Net contributions sum to total_additional.
 #'
 #' @param df Data frame with rate_232, rate_301, rate_ieepa_recip,
-#'   rate_ieepa_fent, rate_s122, rate_other, metal_share, country columns
+#'   rate_ieepa_fent, rate_s122, rate_section_201, rate_other, metal_share, country columns
 #' @param cty_china Census code for China (default: '5700')
 #' @param stacking_method 'mutual_exclusion' (default) or 'tpc_additive'
-#' @return df with net_232, net_ieepa, net_fentanyl, net_301, net_s122, net_other added
+#' @return df with net_232, net_ieepa, net_fentanyl, net_301, net_s122,
+#'   net_section_201, net_other added
 compute_net_authority_contributions <- function(df, cty_china = '5700',
                                                 stacking_method = 'mutual_exclusion') {
-  # Ensure rate_s122 exists (backwards compat with old snapshots)
+  # Ensure optional columns exist (backwards compat with old snapshots)
   if (!'rate_s122' %in% names(df)) df$rate_s122 <- 0
+  if (!'rate_section_201' %in% names(df)) df$rate_section_201 <- 0
   if (!'rate_other' %in% names(df)) df$rate_other <- 0
   if (!'metal_share' %in% names(df)) df$metal_share <- 1.0
 
@@ -664,6 +673,7 @@ compute_net_authority_contributions <- function(df, cty_china = '5700',
           net_fentanyl = rate_ieepa_fent,
           net_301 = rate_301,
           net_s122 = rate_s122,
+          net_section_201 = rate_section_201,
           net_other = rate_other
         )
     )
@@ -681,6 +691,7 @@ compute_net_authority_contributions <- function(df, cty_china = '5700',
       ),
       net_301 = if_else(country == cty_china, rate_301, 0),
       net_s122 = if_else(rate_232 > 0, rate_s122 * nonmetal_share, rate_s122),
+      net_section_201 = rate_section_201,
       net_other = rate_other
     ) %>%
     select(-nonmetal_share)
@@ -1133,6 +1144,139 @@ load_metal_content <- function(metal_cfg = NULL, hts10_codes = character(0),
 
 
 # =============================================================================
+# Post-Interval Policy Adjustments
+# =============================================================================
+
+#' Collect date-bounded policy overrides that require post-interval adjustment
+#'
+#' Returns a list of adjustments with expiry dates and the zeroing action to apply.
+#' Used by both point queries and interval-splitting aggregate paths.
+#'
+#' @param policy_params Policy params list from load_policy_params()
+#' @return List of lists, each with `expiry_date`, `column`, and `label`
+collect_expiry_adjustments <- function(policy_params) {
+  adjustments <- list()
+
+  # Section 122 expiry
+  if (!is.null(policy_params$SECTION_122) &&
+      !policy_params$SECTION_122$finalized) {
+    adjustments <- c(adjustments, list(list(
+      expiry_date = as.Date(policy_params$SECTION_122$expiry_date),
+      column = 'rate_s122',
+      label = 'Section 122'
+    )))
+  }
+
+  # Swiss framework expiry (reverts floor override for CH/LI)
+  if (!is.null(policy_params$SWISS_FRAMEWORK) &&
+      !policy_params$SWISS_FRAMEWORK$finalized) {
+    adjustments <- c(adjustments, list(list(
+      expiry_date = as.Date(policy_params$SWISS_FRAMEWORK$expiry_date),
+      column = 'rate_ieepa_recip',
+      countries = policy_params$SWISS_FRAMEWORK$countries,
+      label = 'Swiss framework'
+    )))
+  }
+
+  return(adjustments)
+}
+
+
+#' Apply date-bounded policy expirations to a rate snapshot (point mode)
+#'
+#' Zeroes expired rate columns and recomputes totals via apply_stacking_rules().
+#' For Swiss framework, zeroes the floor IEEPA rate for CH/LI only (conservative:
+#' the pre-floor surcharge rate is not stored, so we revert to 0 rather than
+#' guessing the original rate).
+#'
+#' @param snapshot Rate snapshot tibble
+#' @param query_date Date for the point query
+#' @param policy_params Policy params list from load_policy_params()
+#' @return Adjusted snapshot with recomputed totals
+apply_post_interval_adjustments_point <- function(snapshot, query_date, policy_params) {
+  if (is.null(policy_params) || nrow(snapshot) == 0) return(snapshot)
+
+  adjustments <- collect_expiry_adjustments(policy_params)
+  needs_restacking <- FALSE
+
+  for (adj in adjustments) {
+    if (query_date > adj$expiry_date && adj$column %in% names(snapshot)) {
+      if (!is.null(adj$countries)) {
+        # Country-scoped adjustment (Swiss framework)
+        snapshot <- snapshot %>%
+          mutate(!!adj$column := if_else(country %in% adj$countries, 0, .data[[adj$column]]))
+      } else {
+        # Global adjustment (Section 122)
+        snapshot[[adj$column]] <- 0
+      }
+      needs_restacking <- TRUE
+    }
+  }
+
+  if (needs_restacking) {
+    snapshot <- apply_stacking_rules(snapshot)
+  }
+
+  return(snapshot)
+}
+
+
+#' Get expiry split points within a revision interval
+#'
+#' Returns a sorted vector of dates at which policy adjustments take effect
+#' within the given interval. Used by build_daily_aggregates() to split
+#' revision intervals into sub-intervals with different policy states.
+#'
+#' @param valid_from Interval start date
+#' @param valid_until Interval end date
+#' @param policy_params Policy params list from load_policy_params()
+#' @return Sorted Date vector of split points (each is the last active day before zeroing)
+get_expiry_split_points <- function(valid_from, valid_until, policy_params) {
+  if (is.null(policy_params)) return(as.Date(character()))
+
+  adjustments <- collect_expiry_adjustments(policy_params)
+  split_dates <- as.Date(character())
+
+  for (adj in adjustments) {
+    exp <- as.Date(adj$expiry_date)
+    if (valid_from <= exp && valid_until > exp) {
+      split_dates <- c(split_dates, exp)
+    }
+  }
+
+  return(sort(unique(split_dates)))
+}
+
+
+#' Apply expiry zeroing to a snapshot for a given sub-interval
+#'
+#' Given a sub-interval start date, zeros any columns whose expiry_date < sub_start.
+#'
+#' @param rev_data Revision data tibble
+#' @param sub_start Start date of the sub-interval
+#' @param policy_params Policy params list
+#' @return Adjusted rev_data
+apply_expiry_zeroing <- function(rev_data, sub_start, policy_params) {
+  if (is.null(policy_params)) return(rev_data)
+
+  adjustments <- collect_expiry_adjustments(policy_params)
+
+  for (adj in adjustments) {
+    if (sub_start > adj$expiry_date && adj$column %in% names(rev_data)) {
+      if (!is.null(adj$countries)) {
+        rev_data <- rev_data %>%
+          mutate(!!adj$column := if_else(country %in% adj$countries, 0, .data[[adj$column]]))
+      } else {
+        rev_data[[adj$column]] <- 0
+      }
+    }
+  }
+
+  return(rev_data)
+}
+
+
+# =============================================================================
 # Point-in-Time Rate Query
 # =============================================================================
 
@@ -1142,9 +1286,8 @@ load_metal_content <- function(metal_cfg = NULL, hts10_codes = character(0),
 #' valid_from <= query_date <= valid_until. Returns one revision's
 #' worth of data (same shape as a single snapshot).
 #'
-#' If policy_params is provided and contains SECTION_122 with finalized=FALSE,
-#' rates are adjusted for dates after the s122 expiry: rate_s122 is zeroed
-#' and total_additional / total_rate are recomputed.
+#' Applies post-interval adjustments for any finalized=false policy overrides
+#' (Section 122, Swiss framework) past their expiry dates.
 #'
 #' @param ts Timeseries tibble with valid_from/valid_until columns
 #' @param query_date Date (or character coercible to Date)
@@ -1167,16 +1310,8 @@ get_rates_at_date <- function(ts, query_date, policy_params = NULL) {
             min(ts$valid_from), ' to ', max(ts$valid_until))
   }
 
-  # Zero out s122 if past expiry and not finalized (Congress hasn't extended)
-  if (!is.null(policy_params$SECTION_122) &&
-      !policy_params$SECTION_122$finalized &&
-      query_date > policy_params$SECTION_122$expiry_date &&
-      'rate_s122' %in% names(snapshot) &&
-      nrow(snapshot) > 0) {
-    snapshot <- snapshot %>%
-      mutate(rate_s122 = 0)
-    snapshot <- apply_stacking_rules(snapshot)
-  }
+  # Apply all date-bounded policy expirations
+  snapshot <- apply_post_interval_adjustments_point(snapshot, query_date, policy_params)
 
   return(snapshot)
 }

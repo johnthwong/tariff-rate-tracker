@@ -393,6 +393,14 @@ section_122:
   finalized: false              # set true if Congress extends
   exempt_products: 'resources/s122_exempt_products.csv'
 
+# --- Series time horizon ---
+# End date for timeseries valid_until on the final revision.
+# Controls how far forward daily series, ETR queries, and exports extend.
+# The last observed HTS revision is assumed to remain in force through this date,
+# subject to date-bounded policy overrides (Section 122 expiry, Swiss framework).
+series_horizon:
+  end_date: '2026-12-31'
+
 # --- Validation thresholds ---
 validation_thresholds:
   exact: 0.005
