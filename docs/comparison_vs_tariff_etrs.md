@@ -8,13 +8,15 @@
 
 ## Overall ETR Comparison
 
-| Date | Tracker | Tariff-ETRs | Diff (pp) | Regime |
-|------|---------|-------------|-----------|--------|
-| 2026-01-01 | 16.02% | 14.25% | **+1.77** | IEEPA + fentanyl + 232 + 301 |
-| 2026-02-24 | 12.01% | 10.49% | **+1.53** | S122 + 232 + 301 (IEEPA zeroed) |
-| 2026-07-24 | 7.62% | 7.29% | **+0.33** | 232 + 301 + MFN only |
+| Date | Tracker | Tariff-ETRs | TPC | Regime |
+|------|---------|-------------|-----|--------|
+| 2026-01-01 | 16.02% | 14.25% | 17.3% | IEEPA + fentanyl + 232 + 301 |
+| 2026-02-24 | 12.01% | 10.49% | 12.1% | S122 + 232 + 301 (IEEPA zeroed) |
+| 2026-07-24 | 7.62% | 7.29% | 9.1% | 232 + 301 + MFN only |
 
-Both use total imports ($3,124B) as denominator, treating unmatched products as 0% tariff. All three dates show the tracker above ETRs. The Feb 24 gap (+1.53pp) is larger than Jul 24 (+0.33pp) because copper 232 products interact with S122 through metal_share stacking — copper's metal_share=1.0 means S122 applies only to the nonmetal share (zero), so S122 revenue on copper is zero in the tracker but nonzero in ETRs.
+TPC rates from [Tracking Trump Tariffs](https://taxpolicycenter.org/features/tracking-trump-tariffs). At all three dates the tracker sits between ETRs (low) and TPC (high). The tracker is within 1.3pp of TPC at Jan and Feb, and within 1.5pp at Jul. ETRs is 2–3pp below TPC at Jan/Feb and 1.8pp below at Jul — consistent with the USMCA over-exemption (E1) and 301 under-counting (E2) divergences identified below.
+
+Both the tracker and ETRs use total imports ($3,124B) as denominator, treating unmatched products as 0% tariff. The Feb 24 gap (tracker vs ETRs +1.53pp) is larger than Jul 24 (+0.33pp) because copper 232 products interact with S122 through metal_share stacking — copper's metal_share=1.0 means S122 applies only to the nonmetal share (zero), so S122 revenue on copper is zero in the tracker but nonzero in ETRs.
 
 ### Denominator note
 
