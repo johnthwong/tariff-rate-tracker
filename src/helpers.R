@@ -643,8 +643,16 @@ apply_stacking_rules <- function(df, cty_china = '5700', stacking_method = 'mutu
   } else {
     df$rate_s122[is.na(df$rate_s122)] <- 0
   }
-  if (!'rate_section_201' %in% names(df)) df$rate_section_201 <- 0
-  if (!'metal_share' %in% names(df)) df$metal_share <- 1.0
+  if (!'rate_section_201' %in% names(df)) {
+    df$rate_section_201 <- 0
+  } else {
+    df$rate_section_201[is.na(df$rate_section_201)] <- 0
+  }
+  if (!'metal_share' %in% names(df)) {
+    df$metal_share <- 1.0
+  } else {
+    df$metal_share[is.na(df$metal_share)] <- 1.0
+  }
 
   # TPC additive: all authorities stack with no mutual exclusion
   if (stacking_method == 'tpc_additive') {
@@ -880,7 +888,7 @@ add_blanket_pairs <- function(rates, products, covered_hts10, country_rates,
     left_join(country_rates, by = 'country') %>%
     mutate(
       rate_232 = 0, rate_301 = 0, rate_ieepa_recip = 0,
-      rate_ieepa_fent = 0, rate_s122 = 0, rate_other = 0
+      rate_ieepa_fent = 0, rate_s122 = 0, rate_section_201 = 0, rate_other = 0
     )
 
   new_pairs[[rate_col]] <- new_pairs$blanket_rate

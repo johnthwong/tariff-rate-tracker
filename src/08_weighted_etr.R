@@ -47,7 +47,7 @@ POLICY_DATES <- if (!is.null(.pp_10) && !is.null(.pp_10$WEIGHTED_ETR_POLICY_DATE
     '2025-10-17',  'Phase 2',
     '2025-11-17',  'Nov 2025',
     '2026-02-25',  'Current'
-  )
+  ) %>% mutate(date = as.Date(date))
 }
 
 # Section 301 + Biden acceleration rates
@@ -210,6 +210,7 @@ load_tpc_data <- function(tpc_path, census_codes_path,
     pivot_longer(cols = all_of(date_cols), names_to = 'date', values_to = 'tpc_rate') %>%
     mutate(
       tpc_rate = as.numeric(tpc_rate),
+      date = as.Date(date),
       name_lower = tolower(country),
       cty_code = coalesce(TPC_NAME_FIXES[name_lower], name_lookup[name_lower])
     ) %>%
@@ -315,11 +316,10 @@ compute_weighted_etrs <- function(data, policy_params = NULL) {
       snapshot <- get_rates_at_date(ts, date, policy_params = policy_params)
 
       # Compute net authority contributions from snapshot rate columns
-      # Note: rename total_additional -> total_rate because ETR measures
-      # additional tariffs only (excludes MFN base_rate)
+      # Use total_rate (base + additional) for comparability with TPC benchmark
       snapshot_net <- snapshot %>%
         compute_net_authority_contributions(cty_china = CTY_CHINA) %>%
-        select(hts10, country, total_rate = total_additional,
+        select(hts10, country, total_rate,
                net_232, net_ieepa, net_fentanyl, net_301, net_s122, net_section_201, net_other)
 
       # Join snapshot rates with import flows
