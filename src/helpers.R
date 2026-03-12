@@ -284,6 +284,19 @@ load_policy_params <- function(yaml_path = here('config', 'policy_params.yaml'))
   params$FLOOR_RATE <- params$floor_rates$floor_rate
   params$FLOOR_COUNTRIES <- unlist(params$floor_rates$floor_countries)
 
+  # Weighted ETR reporting config
+  if (!is.null(params$weighted_etr)) {
+    if (!is.null(params$weighted_etr$policy_dates)) {
+      params$WEIGHTED_ETR_POLICY_DATES <- tibble(
+        date = as.Date(map_chr(params$weighted_etr$policy_dates, 'date')),
+        label = map_chr(params$weighted_etr$policy_dates, 'label')
+      )
+    }
+    if (!is.null(params$weighted_etr$tpc_name_fixes)) {
+      params$TPC_NAME_FIXES <- unlist(params$weighted_etr$tpc_name_fixes)
+    }
+  }
+
   # IEEPA invalidation date (SCOTUS ruling)
   if (!is.null(params$ieepa_invalidation_date)) {
     params$IEEPA_INVALIDATION_DATE <- as.Date(params$ieepa_invalidation_date)

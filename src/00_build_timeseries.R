@@ -56,7 +56,7 @@ source(here('src', '07_validate_tpc.R'))
 #' @param output_dir Directory for time series outputs
 #' @param revision_dates_path Path to revision_dates.csv
 #' @param census_codes_path Path to census_codes.csv
-#' @param tpc_path Path to TPC validation data
+#' @param tpc_path Path to TPC validation data; defaults to local_paths config
 #' @param scenario Scenario name (default: 'baseline')
 #' @param start_from NULL for full backfill; revision ID for incremental
 #' @return List with metadata and final timeseries path
@@ -65,7 +65,7 @@ build_full_timeseries <- function(
   output_dir = 'data/timeseries',
   revision_dates_path = 'config/revision_dates.csv',
   census_codes_path = 'resources/census_codes.csv',
-  tpc_path = 'data/tpc/tariff_by_flow_day.csv',
+  tpc_path = NULL,
   scenario = 'baseline',
   start_from = NULL,
   stacking_method = 'mutual_exclusion'
@@ -90,6 +90,9 @@ build_full_timeseries <- function(
 
   # ---- Setup ----
   ensure_dir(output_dir)
+  if (is.null(tpc_path)) {
+    tpc_path <- load_local_paths()$tpc_benchmark
+  }
 
   # Load revision dates
   rev_dates <- load_revision_dates(revision_dates_path)

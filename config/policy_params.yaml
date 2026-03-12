@@ -297,6 +297,53 @@ section_301_rates:
   - ch99_pattern: '9903.92.10'
     s301_rate: 0.25
 
+# --- Weighted ETR reporting and comparison defaults ---
+# These are reporting-time convenience parameters, not tariff policy logic.
+# They are still centralized here so date labels and benchmark harmonization
+# do not drift across scripts.
+weighted_etr:
+  policy_dates:
+    - date: '2025-03-17'
+      label: Fentanyl
+    - date: '2025-04-17'
+      label: Liberation Day
+    - date: '2025-07-17'
+      label: S232 increase
+    - date: '2025-10-17'
+      label: Phase 2
+    - date: '2025-11-17'
+      label: Nov 2025
+    - date: '2026-02-25'
+      label: Current
+  tpc_name_fixes:
+    christmas island: '6024'
+    "cote d'ivoire": '7480'
+    "côte d`ivoire": '7480'
+    "curaçao": '2777'
+    curacao: '2777'
+    "czechia (czech republic)": '4351'
+    "democratic republic of the congo": '7660'
+    "eswatini (swaziland)": '7950'
+    "falkland islands": '3720'
+    "gaza strip": '5082'
+    germany: '4280'
+    "heard and mcdonald islands": '6029'
+    laos: '5530'
+    macau: '5660'
+    moldova: '4641'
+    "myanmar (burma)": '5460'
+    "north korea": '5790'
+    "republic of the congo": '7630'
+    samoa: '6150'
+    "são tomé and príncipe": '7644'
+    "sao tome and principe": '7644'
+    "south korea": '5800'
+    syria: '5020'
+    tanzania: '7830'
+    "vatican city": '4752'
+    "west bank": '5083'
+    yemen: '5210'
+
 # --- Section 301 product lists (blanket coverage) ---
 # Products covered by 301 are defined by US Note 20/21/31 product lists,
 # NOT by individual product footnotes. Sourced from USITC "China Tariffs"

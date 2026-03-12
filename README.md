@@ -4,6 +4,8 @@ Daily statutory U.S. tariff rates at the HTS-10 × country level, built from USI
 
 The tracker processes 39 HTS revisions (January 2025 through February 2026) to construct a panel of ~4.5 million product-country tariff rates per revision. This process uses HTS data sources, combined with ancillary data and economic assumptions detailed below, to estimate tariff rates. Outputs are designed for use with The Budget Lab at Yale [Tariff-Model](https://github.com/Budget-Lab-Yale/Tariff-Model).
 
+For build/setup details, use [docs/build.md](docs/build.md). For a source-by-source input inventory, use [docs/data_inputs.md](docs/data_inputs.md). For non-official modeling assumptions, use [docs/assumptions.md](docs/assumptions.md).
+
 ---
 
 ## Table of Contents
@@ -235,7 +237,7 @@ This reduces the import-weighted average base rate from ~4% (statutory) to ~2% (
 
 | File | Purpose |
 |------|---------|
-| `run_comparisons.R` | Orchestrator for all validation/comparison workflows. Checks data availability, runs TPC validation and weighted ETR comparison. Flags: `--tpc`, `--etrs`, `--etr`. |
+| `run_comparisons.R` | Orchestrator for optional validation/comparison workflows. Runs TPC validation and weighted ETR comparison when external inputs are configured. `--etrs` remains a reserved follow-up for cross-repo comparison. |
 
 ### Standalone Tools
 
@@ -254,6 +256,8 @@ This reduces the import-weighted average base rate from ~4% (statutory) to ~2% (
 ## Usage
 
 ### First-Time Setup
+
+The detailed first-run guide now lives in [docs/build.md](docs/build.md). The short version is:
 
 ```bash
 # 1. Check environment (packages, config, resources, data)
@@ -296,7 +300,7 @@ The default mode checks for a previous build, identifies new revisions, download
 
 ### Comparison Workflows
 
-Validation against TPC and Tariff-ETRs benchmarks is separate from the core build:
+Validation is separate from the core build. The currently supported comparison workflows are TPC validation and weighted ETR reporting with optional TPC overlay:
 
 ```bash
 # Run all available comparisons (TPC validation + weighted ETR overlay)
@@ -309,7 +313,7 @@ Rscript src/run_comparisons.R --tpc
 Rscript src/run_comparisons.R --etr
 ```
 
-Comparison outputs go to `output/comparisons/`. These require TPC benchmark data and/or import weights configured in `config/local_paths.yaml`.
+Comparison outputs go to `output/comparisons/`. These require TPC benchmark data and/or import weights configured in `config/local_paths.yaml`. Cross-repo Tariff-ETRs comparison remains a follow-up task and is not yet fully wired into `run_comparisons.R`.
 
 ### Querying and Exporting Daily Data
 

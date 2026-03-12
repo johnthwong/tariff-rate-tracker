@@ -36,15 +36,19 @@ CTY_CANADA <- if (!is.null(.pp_10)) .pp_10$CTY_CANADA else '1220'
 CTY_MEXICO <- if (!is.null(.pp_10)) .pp_10$CTY_MEXICO else '2010'
 
 # Policy regime snapshot dates (aligned to TPC benchmark dates)
-POLICY_DATES <- tribble(
-  ~date,         ~label,
-  '2025-03-17',  'Fentanyl',
-  '2025-04-17',  'Liberation Day',
-  '2025-07-17',  'S232 increase',
-  '2025-10-17',  'Phase 2',
-  '2025-11-17',  'Nov 2025',
-  '2026-02-25',  'Current'
-)
+POLICY_DATES <- if (!is.null(.pp_10) && !is.null(.pp_10$WEIGHTED_ETR_POLICY_DATES)) {
+  .pp_10$WEIGHTED_ETR_POLICY_DATES
+} else {
+  tribble(
+    ~date,         ~label,
+    '2025-03-17',  'Fentanyl',
+    '2025-04-17',  'Liberation Day',
+    '2025-07-17',  'S232 increase',
+    '2025-10-17',  'Phase 2',
+    '2025-11-17',  'Nov 2025',
+    '2026-02-25',  'Current'
+  )
+}
 
 # Section 301 + Biden acceleration rates
 SECTION_301_RATES <- if (!is.null(.pp_10)) .pp_10$SECTION_301_RATES else tribble(
@@ -56,42 +60,40 @@ SECTION_301_RATES <- if (!is.null(.pp_10)) .pp_10$SECTION_301_RATES else tribble
   '9903.91.11', 0.25
 )
 
-SECTION_232_CHAPTERS <- if (!is.null(.pp_10)) .pp_10$SECTION_232_CHAPTERS else c('72', '73', '76')
-
-EU_FLOOR_RATE    <- if (!is.null(.pp_10)) .pp_10$EU_FLOOR_RATE    else 0.15
-FLOOR_RATE       <- if (!is.null(.pp_10)) .pp_10$FLOOR_RATE       else 0.15
-FLOOR_COUNTRIES  <- if (!is.null(.pp_10)) .pp_10$FLOOR_COUNTRIES  else c('5880', '5800')
-
 # TPC country name overrides (names that don't exact-match census_codes.csv)
-TPC_NAME_FIXES <- c(
-  'christmas island' = '6024',
-  "cote d'ivoire" = '7480',
-  "c\u00f4te d`ivoire" = '7480',
-  'cura\u00e7ao' = '2777',
-  'curacao' = '2777',
-  'czechia (czech republic)' = '4351',
-  'democratic republic of the congo' = '7660',
-  'eswatini (swaziland)' = '7950',
-  'falkland islands' = '3720',
-  'gaza strip' = '5082',
-  'germany' = '4280',
-  'heard and mcdonald islands' = '6029',
-  'laos' = '5530',
-  'macau' = '5660',
-  'moldova' = '4641',
-  'myanmar (burma)' = '5460',
-  'north korea' = '5790',
-  'republic of the congo' = '7630',
-  'samoa' = '6150',
-  's\u00e3o tom\u00e9 and pr\u00edncipe' = '7644',
-  'sao tome and principe' = '7644',
-  'south korea' = '5800',
-  'syria' = '5020',
-  'tanzania' = '7830',
-  'vatican city' = '4752',
-  'west bank' = '5083',
-  'yemen' = '5210'
-)
+TPC_NAME_FIXES <- if (!is.null(.pp_10) && !is.null(.pp_10$TPC_NAME_FIXES)) {
+  .pp_10$TPC_NAME_FIXES
+} else {
+  c(
+    'christmas island' = '6024',
+    "cote d'ivoire" = '7480',
+    "c\u00f4te d`ivoire" = '7480',
+    'cura\u00e7ao' = '2777',
+    'curacao' = '2777',
+    'czechia (czech republic)' = '4351',
+    'democratic republic of the congo' = '7660',
+    'eswatini (swaziland)' = '7950',
+    'falkland islands' = '3720',
+    'gaza strip' = '5082',
+    'germany' = '4280',
+    'heard and mcdonald islands' = '6029',
+    'laos' = '5530',
+    'macau' = '5660',
+    'moldova' = '4641',
+    'myanmar (burma)' = '5460',
+    'north korea' = '5790',
+    'republic of the congo' = '7630',
+    'samoa' = '6150',
+    's\u00e3o tom\u00e9 and pr\u00edncipe' = '7644',
+    'sao tome and principe' = '7644',
+    'south korea' = '5800',
+    'syria' = '5020',
+    'tanzania' = '7830',
+    'vatican city' = '4752',
+    'west bank' = '5083',
+    'yemen' = '5210'
+  )
+}
 
 
 # =============================================================================
@@ -708,10 +710,10 @@ run_weighted_etr <- function(ts = NULL, policy_params = NULL) {
   )
 
   # Load TPC comparison (optional — skipped if TPC file missing)
-  tpc_path <- here('data', 'tpc', 'tariff_by_flow_day.csv')
+  tpc_path <- local_paths$tpc_benchmark
   tpc_etrs <- NULL
 
-  if (file.exists(tpc_path)) {
+  if (!is.null(tpc_path) && file.exists(tpc_path)) {
     tryCatch({
       tpc_weighted <- load_tpc_data(
         tpc_path         = tpc_path,

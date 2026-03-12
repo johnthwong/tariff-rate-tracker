@@ -76,7 +76,7 @@ if (sys.nframe() == 0) {
     cat('WARNING: Some required packages failed to install.\n')
     quit(status = 1)
   } else {
-    cat('Done. Run `Rscript src/check_environment.R` to verify full setup.\n')
+    cat('Done. Run `Rscript src/preflight.R` to verify full setup.\n')
     quit(status = 0)
   }
 }

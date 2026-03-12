@@ -2,8 +2,8 @@
 # Run Comparison Workflows
 # =============================================================================
 #
-# Orchestrator for all validation/comparison workflows. Checks for availability
-# of external data (TPC benchmark, Tariff-ETRs) and runs only what's possible.
+# Orchestrator for optional validation/comparison workflows. Checks for
+# availability of external data and runs only what's possible.
 #
 # This is SEPARATE from the core build. The core tariff series does not depend
 # on TPC or Tariff-ETRs — those are validation benchmarks only.
@@ -11,7 +11,7 @@
 # Usage:
 #   Rscript src/run_comparisons.R              # Run all available comparisons
 #   Rscript src/run_comparisons.R --tpc        # TPC validation only
-#   Rscript src/run_comparisons.R --etrs       # Tariff-ETRs comparison only
+#   Rscript src/run_comparisons.R --etrs       # Reserved for future cross-repo comparison
 #
 # Outputs:
 #   output/comparisons/tpc/       — TPC validation reports
@@ -202,9 +202,12 @@ if (sys.nframe() == 0) {
     file.exists(local_paths$tpc_benchmark)
   weights_available <- !is.null(local_paths$import_weights) &&
     file.exists(local_paths$import_weights)
+  etrs_repo_available <- !is.null(local_paths$tariff_etrs_repo) &&
+    dir.exists(local_paths$tariff_etrs_repo)
 
   message('TPC benchmark: ', if (tpc_available) 'available' else 'not available')
   message('Import weights: ', if (weights_available) 'available' else 'not available')
+  message('Tariff-ETRs repo: ', if (etrs_repo_available) 'configured' else 'not configured')
   message('')
 
   if (run_tpc && tpc_available) {
@@ -226,10 +229,9 @@ if (sys.nframe() == 0) {
   }
 
   if (run_etrs) {
-    etrs_path <- local_paths$tariff_etrs_repo
-    if (!is.null(etrs_path) && dir.exists(etrs_path)) {
-      message('\nTariff-ETRs comparison not yet implemented in this orchestrator.')
-      message('Use src/compare_etrs.R directly for now.')
+    if (etrs_repo_available) {
+      message('\nTariff-ETRs cross-repo comparison is not implemented in run_comparisons.R yet.')
+      message('The repo path is configured correctly, but this remains a follow-up task.')
     } else {
       message('\nTariff-ETRs repo not configured — skipping ETRs comparison.')
     }
