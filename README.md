@@ -104,6 +104,7 @@ Section 232 and Section 301 tariffs are unaffected by the SCOTUS ruling (separat
 | `config/policy_params.yaml` | All policy constants: country codes, authority ranges, 232 coverage, floor rates, 301 rates, Section 122 expiry. Single source of truth. |
 | `config/revision_dates.csv` | Maps 39 HTS revisions to effective dates and TPC validation dates. Manually curated. |
 | `config/scenarios.yaml` | Counterfactual scenario definitions (baseline, no_ieepa, no_301, no_232, pre_2025, etc.). |
+| `config/local_paths.yaml` | **Optional.** User-specific paths for external files (import weights, TPC benchmark, Tariff-ETRs repo). Gitignored; copy from `local_paths.yaml.example`. Not required for core build. |
 
 ### Outputs
 
@@ -201,7 +202,7 @@ This reduces the import-weighted average base rate from ~4% (statutory) to ~2% (
 
 | File | Purpose |
 |------|---------|
-| `00_build_timeseries.R` | Main entry point. Iterates over all HTS revisions, builds per-revision rate snapshots, computes deltas, runs TPC validation, and combines into a long-format time series. Supports `--full` (clean rebuild), `--start-from` (incremental), `--build-only` (skip downstream), and auto-update (default). |
+| `00_build_timeseries.R` | Main entry point. Iterates over all HTS revisions, builds per-revision rate snapshots, computes deltas, runs TPC validation, and combines into a long-format time series. Supports `--full` (clean rebuild), `--start-from` (incremental), `--build-only` (skip downstream), `--core-only` (skip weighted outputs), and auto-update (default). |
 
 ### Build Pipeline (sourced by `00_build`)
 
@@ -230,10 +231,18 @@ This reduces the import-weighted average base rate from ~4% (statutory) to ~2% (
 | `helpers.R` | Shared utilities: rate parsing, HTS normalization, footnote extraction, file I/O, policy params loading, stacking rules, `get_rates_at_date()`, revision management |
 | `logging.R` | Structured logging (`init_logging`, `log_info`/`warn`/`error`/`debug`) |
 
+### Comparison Workflows
+
+| File | Purpose |
+|------|---------|
+| `run_comparisons.R` | Orchestrator for all validation/comparison workflows. Checks data availability, runs TPC validation and weighted ETR comparison. Flags: `--tpc`, `--etrs`, `--etr`. |
+
 ### Standalone Tools
 
 | File | Purpose |
 |------|---------|
+| `preflight.R` | Environment checker: verifies R packages, config files, resource files, HTS JSON, and optional external data. Reports run-mode readiness. |
+| `install_dependencies.R` | Installs required (and optionally all) R packages. Flag: `--all`. |
 | `scrape_us_notes.R` | Parses US Note 20/21/31 product lists, floor exemptions, and Note 36 copper product list from Chapter 99 PDF. Generates static resource files. Run manually when USITC updates PDFs. Flags: `--copper`, `--floor-exemptions`, `--all`. |
 | `apply_scenarios.R` | Counterfactual scenario system: zeros out selected authority columns, recomputes totals. Config in `config/scenarios.yaml`. |
 | `diagnostics.R` | Validation utilities: 301 coverage gaps, China IEEPA tracking, per-revision summary, `decompose_tpc_discrepancies()` |
@@ -244,12 +253,32 @@ This reduces the import-weighted average base rate from ~4% (statutory) to ~2% (
 
 ## Usage
 
+### First-Time Setup
+
+```bash
+# 1. Check environment (packages, config, resources, data)
+Rscript src/preflight.R
+
+# 2. Install missing R packages
+Rscript src/install_dependencies.R        # Required only
+Rscript src/install_dependencies.R --all   # Required + optional
+
+# 3. (Optional) Configure external file paths for weighted outputs
+#    Copy config/local_paths.yaml.example to config/local_paths.yaml
+#    and set import_weights path. Not needed for core build.
+```
+
+### Building
+
 ```bash
 # Auto-update (default): detect new revisions → download → build → daily → ETR → quality
 Rscript src/00_build_timeseries.R
 
 # Full rebuild from scratch
 Rscript src/00_build_timeseries.R --full
+
+# Core only: build + unweighted daily series + quality (no import weights needed)
+Rscript src/00_build_timeseries.R --full --core-only
 
 # Incremental from a specific revision
 Rscript src/00_build_timeseries.R --start-from rev_25
@@ -263,7 +292,24 @@ Rscript src/08_weighted_etr.R
 Rscript src/quality_report.R
 ```
 
-The default mode checks for a previous build, identifies new revisions, downloads missing JSON, builds the timeseries incrementally, and runs all downstream scripts.
+The default mode checks for a previous build, identifies new revisions, downloads missing JSON, builds the timeseries incrementally, and runs all downstream scripts. Weighted ETR and TPC comparison require external files configured in `config/local_paths.yaml`; without them, these steps are skipped gracefully.
+
+### Comparison Workflows
+
+Validation against TPC and Tariff-ETRs benchmarks is separate from the core build:
+
+```bash
+# Run all available comparisons (TPC validation + weighted ETR overlay)
+Rscript src/run_comparisons.R
+
+# TPC point-in-time validation only
+Rscript src/run_comparisons.R --tpc
+
+# Weighted ETR with TPC overlay only
+Rscript src/run_comparisons.R --etr
+```
+
+Comparison outputs go to `output/comparisons/`. These require TPC benchmark data and/or import weights configured in `config/local_paths.yaml`.
 
 ### Querying and Exporting Daily Data
 

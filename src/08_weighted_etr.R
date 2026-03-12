@@ -450,8 +450,9 @@ aggregate_etrs <- function(results, imports_gtap, total_imports, partner_totals)
 # Plotting
 # =============================================================================
 
-plot_etrs <- function(etrs, tpc_etrs, output_dir) {
+plot_etrs <- function(etrs, tpc_etrs = NULL, output_dir) {
   if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
+  has_tpc <- !is.null(tpc_etrs)
 
   theme_etr <- theme_minimal(base_size = 12) +
     theme(
@@ -463,19 +464,22 @@ plot_etrs <- function(etrs, tpc_etrs, output_dir) {
   source_colors <- c('Yale Budget Lab' = '#2c3e50', 'TPC' = '#e74c3c')
   source_linetypes <- c('Yale Budget Lab' = 'solid', 'TPC' = 'dashed')
 
-  # --- Plot 1: Overall ETR time series (ours + TPC) ---
-  overall_combined <- bind_rows(
-    etrs$overall %>%
-      select(date, label, etr) %>%
-      mutate(source = 'Yale Budget Lab'),
-    tpc_etrs$overall %>%
-      left_join(POLICY_DATES, by = 'date') %>%
-      mutate(
-        label = factor(label, levels = POLICY_DATES$label),
-        source = 'TPC'
-      ) %>%
-      rename(etr = etr_tpc)
-  )
+  # --- Plot 1: Overall ETR time series (ours + TPC if available) ---
+  overall_combined <- etrs$overall %>%
+    select(date, label, etr) %>%
+    mutate(source = 'Yale Budget Lab')
+  if (has_tpc) {
+    overall_combined <- bind_rows(
+      overall_combined,
+      tpc_etrs$overall %>%
+        left_join(POLICY_DATES, by = 'date') %>%
+        mutate(
+          label = factor(label, levels = POLICY_DATES$label),
+          source = 'TPC'
+        ) %>%
+        rename(etr = etr_tpc)
+    )
+  }
 
   p1 <- ggplot(overall_combined,
                aes(x = label, y = etr * 100, color = source,
@@ -499,19 +503,22 @@ plot_etrs <- function(etrs, tpc_etrs, output_dir) {
          width = 8, height = 5, dpi = 150)
   message('Saved etr_overall.png')
 
-  # --- Plot 2: ETR by partner (faceted, ours + TPC) ---
-  partner_combined <- bind_rows(
-    etrs$by_partner %>%
-      select(date, label, partner, etr) %>%
-      mutate(source = 'Yale Budget Lab'),
-    tpc_etrs$by_partner %>%
-      left_join(POLICY_DATES, by = 'date') %>%
-      mutate(
-        label = factor(label, levels = POLICY_DATES$label),
-        source = 'TPC'
-      ) %>%
-      rename(etr = etr_tpc)
-  )
+  # --- Plot 2: ETR by partner (faceted, ours + TPC if available) ---
+  partner_combined <- etrs$by_partner %>%
+    select(date, label, partner, etr) %>%
+    mutate(source = 'Yale Budget Lab')
+  if (has_tpc) {
+    partner_combined <- bind_rows(
+      partner_combined,
+      tpc_etrs$by_partner %>%
+        left_join(POLICY_DATES, by = 'date') %>%
+        mutate(
+          label = factor(label, levels = POLICY_DATES$label),
+          source = 'TPC'
+        ) %>%
+        rename(etr = etr_tpc)
+    )
+  }
 
   # Nice partner labels
   partner_labels <- c(
@@ -574,23 +581,27 @@ plot_etrs <- function(etrs, tpc_etrs, output_dir) {
     ) %>%
     filter(etr > 1e-6)  # hide authorities with negligible contribution
 
-  tpc_total_overlay <- tpc_etrs$overall %>%
-    left_join(POLICY_DATES, by = 'date') %>%
-    mutate(label = factor(label, levels = POLICY_DATES$label))
-
   p3 <- ggplot() +
     geom_col(data = auth_long,
              aes(x = label, y = etr * 100, fill = authority),
-             position = 'stack') +
-    geom_line(data = tpc_total_overlay,
-              aes(x = label, y = etr_tpc * 100, group = 1),
-              linewidth = 1.2, linetype = 'dashed', color = '#e74c3c') +
-    geom_point(data = tpc_total_overlay,
-               aes(x = label, y = etr_tpc * 100),
-               size = 3, shape = 4, stroke = 1.5, color = '#e74c3c') +
+             position = 'stack')
+  if (has_tpc) {
+    tpc_total_overlay <- tpc_etrs$overall %>%
+      left_join(POLICY_DATES, by = 'date') %>%
+      mutate(label = factor(label, levels = POLICY_DATES$label))
+    p3 <- p3 +
+      geom_line(data = tpc_total_overlay,
+                aes(x = label, y = etr_tpc * 100, group = 1),
+                linewidth = 1.2, linetype = 'dashed', color = '#e74c3c') +
+      geom_point(data = tpc_total_overlay,
+                 aes(x = label, y = etr_tpc * 100),
+                 size = 3, shape = 4, stroke = 1.5, color = '#e74c3c')
+  }
+  p3 <- p3 +
     labs(
       title = 'Import-Weighted ETR by Authority',
-      subtitle = 'Stacked bars = Yale Budget Lab decomposition; dashed line = TPC total',
+      subtitle = if (has_tpc) 'Stacked bars = Yale Budget Lab decomposition; dashed line = TPC total'
+                 else 'Stacked bars = Yale Budget Lab decomposition',
       x = NULL, y = 'Weighted Average ETR (%)',
       fill = 'Authority'
     ) +
@@ -615,16 +626,20 @@ plot_etrs <- function(etrs, tpc_etrs, output_dir) {
     slice_max(order_by = total_imports, n = 15) %>%
     pull(gtap_code)
 
-  sector_combined <- bind_rows(
-    etrs$by_gtap %>%
-      filter(date == max(date), gtap_code %in% top_sectors) %>%
-      select(gtap_code, etr) %>%
-      mutate(source = 'Yale Budget Lab'),
-    tpc_etrs$by_gtap %>%
-      filter(date == max(date), gtap_code %in% top_sectors) %>%
-      select(gtap_code, etr = etr_tpc) %>%
-      mutate(source = 'TPC')
-  ) %>%
+  sector_combined <- etrs$by_gtap %>%
+    filter(date == max(date), gtap_code %in% top_sectors) %>%
+    select(gtap_code, etr) %>%
+    mutate(source = 'Yale Budget Lab')
+  if (has_tpc) {
+    sector_combined <- bind_rows(
+      sector_combined,
+      tpc_etrs$by_gtap %>%
+        filter(date == max(date), gtap_code %in% top_sectors) %>%
+        select(gtap_code, etr = etr_tpc) %>%
+        mutate(source = 'TPC')
+    )
+  }
+  sector_combined <- sector_combined %>%
     mutate(gtap_code = fct_reorder(gtap_code, etr, .fun = max))
 
   p4 <- ggplot(sector_combined,
@@ -692,43 +707,61 @@ run_weighted_etr <- function(ts = NULL, policy_params = NULL) {
     etr_data$total_imports, etr_data$partner_totals
   )
 
-  # Load TPC comparison
-  tpc_weighted <- load_tpc_data(
-    tpc_path         = here('data', 'tpc', 'tariff_by_flow_day.csv'),
-    census_codes_path = here('resources', 'census_codes.csv'),
-    imports_agg      = data$imports_agg,
-    imports_gtap     = data$imports_gtap,
-    partners         = data$partners
-  )
-  tpc_etrs <- aggregate_tpc(tpc_weighted, data$imports_gtap)
+  # Load TPC comparison (optional — skipped if TPC file missing)
+  tpc_path <- here('data', 'tpc', 'tariff_by_flow_day.csv')
+  tpc_etrs <- NULL
 
-  message('\n=== TPC Overall Weighted ETR ===')
-  tpc_etrs$overall %>%
-    left_join(POLICY_DATES, by = 'date') %>%
-    mutate(etr_pct = round(etr_tpc * 100, 2)) %>%
-    select(date, label, etr_pct) %>%
-    print()
+  if (file.exists(tpc_path)) {
+    tryCatch({
+      tpc_weighted <- load_tpc_data(
+        tpc_path         = tpc_path,
+        census_codes_path = here('resources', 'census_codes.csv'),
+        imports_agg      = data$imports_agg,
+        imports_gtap     = data$imports_gtap,
+        partners         = data$partners
+      )
+      tpc_etrs <- aggregate_tpc(tpc_weighted, data$imports_gtap)
 
-  # Plot with TPC overlay
+      message('\n=== TPC Overall Weighted ETR ===')
+      tpc_etrs$overall %>%
+        left_join(POLICY_DATES, by = 'date') %>%
+        mutate(etr_pct = round(etr_tpc * 100, 2)) %>%
+        select(date, label, etr_pct) %>%
+        print()
+    }, error = function(e) {
+      message('TPC comparison failed: ', conditionMessage(e))
+    })
+  } else {
+    message('TPC benchmark file not found — ETR outputs will omit TPC comparison columns.')
+  }
+
+  # Plot (with or without TPC overlay)
   plots <- plot_etrs(etrs, tpc_etrs, here('output', 'etr'))
 
-  # Save CSVs with TPC columns
-  write_csv(
-    etrs$overall %>% left_join(tpc_etrs$overall, by = 'date'),
-    here('output', 'etr', 'etr_overall.csv')
-  )
-  write_csv(
-    etrs$by_partner %>% left_join(tpc_etrs$by_partner, by = c('date', 'partner')),
-    here('output', 'etr', 'etr_by_partner.csv')
-  )
-  write_csv(
-    etrs$by_authority %>% left_join(tpc_etrs$overall, by = 'date'),
-    here('output', 'etr', 'etr_by_authority.csv')
-  )
-  write_csv(
-    etrs$by_gtap %>% left_join(tpc_etrs$by_gtap, by = c('date', 'gtap_code')),
-    here('output', 'etr', 'etr_by_gtap.csv')
-  )
+  # Save CSVs (with TPC columns if available)
+  if (!is.null(tpc_etrs)) {
+    write_csv(
+      etrs$overall %>% left_join(tpc_etrs$overall, by = 'date'),
+      here('output', 'etr', 'etr_overall.csv')
+    )
+    write_csv(
+      etrs$by_partner %>% left_join(tpc_etrs$by_partner, by = c('date', 'partner')),
+      here('output', 'etr', 'etr_by_partner.csv')
+    )
+    write_csv(
+      etrs$by_authority %>% left_join(tpc_etrs$overall, by = 'date'),
+      here('output', 'etr', 'etr_by_authority.csv')
+    )
+    write_csv(
+      etrs$by_gtap %>% left_join(tpc_etrs$by_gtap, by = c('date', 'gtap_code')),
+      here('output', 'etr', 'etr_by_gtap.csv')
+    )
+  } else {
+    write_csv(etrs$overall, here('output', 'etr', 'etr_overall.csv'))
+    write_csv(etrs$by_partner, here('output', 'etr', 'etr_by_partner.csv'))
+    write_csv(etrs$by_authority, here('output', 'etr', 'etr_by_authority.csv'))
+    write_csv(etrs$by_gtap, here('output', 'etr', 'etr_by_gtap.csv'))
+  }
   message('\nAll ETR outputs saved to output/etr/')
 
   return(invisible(etrs))
