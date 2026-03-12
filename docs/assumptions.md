@@ -10,7 +10,7 @@ This document catalogs methodological assumptions derived from non-official sour
 
 **Source:** Tariff-ETRs legal interpretation. Confirmed by reverse-engineering TPC methodology through rate comparison.
 
-**Evidence:** Running `test_tpc_comparison.R --tpc-stacking` (additive mode) isolates data discrepancies from this methodological difference.
+**Evidence:** Running `tests/test_tpc_comparison.R --tpc-stacking` (additive mode) isolates data discrepancies from this methodological difference.
 
 **Implementation:** `src/helpers.R:apply_stacking_rules()`, `stacking_method` parameter (default `'mutual_exclusion'`).
 

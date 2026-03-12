@@ -249,7 +249,7 @@ This reduces the import-weighted average base rate from ~4% (statutory) to ~2% (
 | `apply_scenarios.R` | Counterfactual scenario system: zeros out selected authority columns, recomputes totals. Config in `config/scenarios.yaml`. |
 | `diagnostics.R` | Validation utilities: 301 coverage gaps, China IEEPA tracking, per-revision summary, `decompose_tpc_discrepancies()` |
 | `revision_changelog.R` | Diffs Ch99 entries across all revisions, builds policy timeline |
-| `test_tpc_comparison.R` | Standalone TPC comparison across all 5 validation dates with detailed diagnostics |
+| `tests/test_tpc_comparison.R` | Standalone TPC comparison across all 5 validation dates with detailed diagnostics |
 
 ---
 
@@ -505,7 +505,7 @@ Comparison against TPC benchmark data, matched by revision-to-TPC-date:
 | rev_18 | 2025-10-17 | 79.9% | 16.29% | 18.23% | -1.94 |
 | rev_32 | 2025-11-17 | 84.9% | 16.03% | 16.16% | -0.13 |
 
-Regenerate with: `Rscript src/test_tpc_comparison.R`
+Regenerate with: `Rscript tests/test_tpc_comparison.R`
 
 The within-2pp match rate improved significantly after the March 2026 base rate inheritance fix (+9.3pp at rev_18, +11.1pp at rev_32). The tracker is within ~1pp of TPC at the three non-Liberation-Day dates.
 
