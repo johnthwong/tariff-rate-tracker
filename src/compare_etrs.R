@@ -123,18 +123,12 @@ for (d in comparison_dates) {
   }
 
   if (needs_reconstruct) {
-    # After zeroing stacking-sensitive components, reconstruct total_additional.
-    # rate_232 is already metal_share-scaled; rate_301/rate_section_201 are full value.
-    # Zeroed components (s122, ieepa) contribute 0. This is correct because the
-    # remaining components (232, 301, 201) don't interact through stacking rules.
-    rate_cols <- intersect(
-      c('rate_232', 'rate_301', 'rate_ieepa_recip', 'rate_ieepa_fent',
-        'rate_s122', 'rate_other', 'rate_section_201'),
-      names(rates)
-    )
-    rates$total_additional <- rowSums(rates[, rate_cols, drop = FALSE], na.rm = TRUE)
-    rates$total_rate <- rates$base_rate + rates$total_additional
-    cat('  Reconstructed total_rate from remaining components\n')
+    # Re-apply stacking rules after zeroing. Cannot use naive rowSums because
+    # mutual exclusion scales rate_s122/rate_ieepa_recip by nonmetal_share
+    # on 232 products — rowSums would overcount s122 on steel/aluminum.
+    cty_china <- if (!is.null(pp)) pp$CTY_CHINA %||% '5700' else '5700'
+    rates <- apply_stacking_rules(rates, cty_china = cty_china)
+    cat('  Reconstructed total_rate via apply_stacking_rules()\n')
   }
 
   # Join with imports
