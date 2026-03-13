@@ -1,215 +1,250 @@
-# Tariff Rate Tracker: Methodology Summary
+# Methodology
 
-## Overview
+This document is the canonical description of the tariff regime, the repo's modeling choices, the production outputs, the benchmark comparisons, and the main open questions.
 
-The Tariff Rate Tracker constructs statutory U.S. tariff rates at the HTS-10 x country level by parsing Harmonized Tariff Schedule (HTS) JSON archives published by the U.S. International Trade Commission (USITC). It processes all 39 HTS revisions from January 2025 through January 2026 to build a complete time series of tariff rates, then aggregates these into import-weighted effective tariff rates (ETRs) using 2024 Census trade data. Tax Policy Center (TPC) benchmark data is used for validation only — never as a rate input.
+## Scope
 
-The system produces ~4.5 million product-country rate observations per revision snapshot, covering ~19,768 HTS-10 products across 240 countries.
+The tracker constructs statutory U.S. tariff rates at the `HTS-10 x country` level by processing USITC HTS revisions. The current repo covers 39 revisions from January 1, 2025 through February 25, 2026, and extends the final interval through December 31, 2026 using the configured series horizon.
 
----
+The production series is built from:
 
-## Data Sources
+- HTS JSON archives
+- committed repo resources
+- documented policy parameters in `config/policy_params.yaml`
+- optional product-share and weighting inputs that are not benchmark outputs
 
-| Source | Description | Coverage |
-|--------|-------------|----------|
-| **USITC HTS JSON** | Official tariff schedule; base MFN rates, Chapter 99 additional duties, product footnotes, special program codes | 39 revisions (basic through 2026_rev_4), ~35,500 items per revision |
-| **USITC Chapter 99 PDF** | US Notes text enumerating product lists for Section 301, floor country exemptions | 767 pages; parsed by `scrape_us_notes.R` |
-| **Census 2024 Import Data** | Import values by HTS-10 x country x GTAP sector | ~$2.9 trillion total; used for ETR weighting |
-| **Tariff-ETRs USMCA Shares** | GTAP sector-level USMCA utilization fractions for CA/MX | 47 GTAP sectors; used for weighted USMCA exemption |
-| **TPC Benchmark** | HTS-10 x country tariff rates at 5 snapshot dates | ~339K rows; validation only |
+TPC and Tariff-ETRs are used for validation and comparison only.
 
----
+## Tariff-regime history
 
-## Rate Calculation Methodology
+### Pre-2025 baseline
 
-### Tariff Authorities
+At the start of 2025, the modeled baseline already included:
 
-The system tracks six distinct tariff authorities that can stack on a single product-country pair:
+- statutory MFN base rates
+- Section 232 tariffs on steel and aluminum
+- Section 301 tariffs on China, including pre-2025 Biden-era accelerations
+- Section 201 safeguard duties
 
-| Authority | Legal Basis | Scope | Rate Range |
-|-----------|------------|-------|------------|
-| **Section 232** | Trade Expansion Act | Steel (ch72-73), aluminum (ch76), autos (heading 8703), copper (80 HTS10 codes from US Note 36(b): ch74 + ch8544), aluminum derivatives (~130 products) | 25–50% (steel/aluminum/copper 50% post-June 2025; autos 25%; UK deals 25%) |
-| **Section 301** | Trade Act of 1974 | ~11,000 HTS-8 products from China (Lists 1-4B + Biden) | 7.5%-100% by list |
-| **IEEPA Reciprocal** | International Emergency Economic Powers Act | All products for ~238 countries (blanket) | 10%-50% (surcharge or 15% floor) |
-| **IEEPA Fentanyl** | IEEPA | All products for Canada, Mexico, China/HK | 10%-40% (with product carve-outs) |
-| **Section 122** | Trade Act of 1974 | All countries (150-day statutory limit, effective 2026-02-24) | 10–25% |
-| **Section 201** | Trade Act of 1974 §201 | Safeguard tariffs (solar panels 9903.45.xx, washing machines 9903.40.xx) | Variable |
-| **Other** | Various | Miscellaneous Ch99 entries | Variable |
+### 2025-2026 sequence modeled by the repo
 
-### Three Mechanisms for Linking Duties to Products
+- January 2025: China and Hong Kong fentanyl tariffs begin.
+- February 2025: Canada and Mexico fentanyl tariffs begin.
+- March 2025: Section 232 autos and derivative expansions arrive; legacy 232 country exemptions end.
+- April 2025: Phase 1 reciprocal tariffs and the China escalation sequence appear in HTS revisions.
+- April 2025: The Geneva de-escalation sequence returns China to the universal baseline and suspends the China-specific reciprocal entry.
+- May to July 2025: 232 steel and aluminum rates increase; auto parts and copper programs expand; Canada's fentanyl rate increases.
+- August to November 2025: Phase 2 reciprocal rates, negotiated floor structures, and 301 crane provisions are added.
+- January 2026: Swiss and Liechtenstein floor treatment and 2026-era 301 accelerations enter the schedule.
+- February 2026: IEEPA is invalidated, and Section 122 becomes the post-IEEPA blanket authority.
 
-1. **Footnote references** — Product-level footnotes in the HTS JSON reference specific Chapter 99 entries (e.g., "See 9903.88.15"). Used for Section 301 and some fentanyl entries.
+The revision-by-revision chronology lives in [revision_changelog.md](revision_changelog.md).
 
-2. **Chapter/heading blanket coverage** — Entire HTS chapters or headings are covered regardless of footnotes. Used for Section 232 (steel ch72-73, aluminum ch76, autos heading 8703). Copper uses a specific product list from US Note 36(b) (80 HTS10 codes).
+## Production outputs
 
-3. **Universal country-level application** — Blanket tariffs applied to all products for listed countries. Used for IEEPA reciprocal (Phase 1 and Phase 2) and IEEPA fentanyl. Country-specific rates parsed from Chapter 99 entry descriptions.
+### Core production dataset
 
-### Product-Level Exemptions (from External Resource Files)
+The canonical output is the interval-encoded timeseries in `data/timeseries/rate_timeseries.rds`.
 
-Several categories of products are exempt from otherwise-blanket tariffs. These exemptions are defined in US Notes to Chapter 99 and cannot be extracted from the HTS JSON API, so they are maintained as resource files:
+Each row is a product-country observation with:
 
-| Exemption | File | Count | Effect |
-|-----------|------|-------|--------|
-| General IEEPA exempt (Annex A + carve-outs + Ch98 + ITA prefixes) | `ieepa_exempt_products.csv` | ~4,325 HTS-10 | Zero IEEPA reciprocal for all countries |
-| Floor country product exemptions | `floor_exempt_products.csv` | ~1,697 HTS-8 across 4 country groups | Zero IEEPA reciprocal for EU/Japan/Korea/Swiss |
-| Section 301 product lists | `s301_product_lists.csv` | ~12,200 entries (~11,000 HTS-8) | Defines which products receive 301 duty; generation-based stacking |
-| Section 232 derivatives | `s232_derivative_products.csv` | ~130 HTS prefixes | Defines aluminum articles outside ch76 |
-| Fentanyl carve-outs | `fentanyl_carveout_products.csv` | 308 HTS-8 | Lower fentanyl rate (10% vs 25-35%) |
+- component rates by authority
+- total additional duty
+- total rate
+- the HTS revision in force
+- `valid_from` and `valid_until`
 
-### IEEPA Rate Types
+Daily outputs are derived from this interval representation rather than stored as a full product-country-day panel by default.
 
-Countries subject to IEEPA reciprocal fall into three rate types:
+### Derived outputs
 
-- **Surcharge**: A flat additional duty (e.g., India +50%, Bangladesh +20%). Applied directly.
-- **Floor**: A minimum total tariff rate (e.g., EU/Japan/S. Korea/Switzerland at 15%). The additional duty is `max(0, floor_rate - base_rate)`, so products already above the floor receive no additional duty.
-- **Passthrough**: No additional duty (e.g., countries at the 10% universal baseline after the Geneva Agreement pause).
+- Daily aggregate series by overall, country, and authority
+- Filtered daily product-country extracts on demand
+- Weighted ETR outputs when local import weights are configured
+- Sensitivity variants and diagnostic outputs
 
-### Stacking Rules
+## Operational model
 
-Tariff authorities stack according to mutual exclusion rules aligned with the Tariff-ETRs methodology:
+### Step 1: parse revision inputs
 
-```
-Section 232 takes precedence over IEEPA reciprocal.
+For each HTS revision, the pipeline parses:
 
-China with 232:     232 + recip*nonmetal + fentanyl + 301 + s122*nonmetal + section_201 + other
-China without 232:  reciprocal + fentanyl + 301 + s122 + section_201 + other
-Others with 232:    232 + (recip + fentanyl + s122)*nonmetal + 301 + section_201 + other
-Others without 232: reciprocal + fentanyl + s122 + 301 + section_201 + other
+- Chapter 99 entries and additional-duty rates
+- product lines and footnote references
+- special program fields
+- IEEPA country-rate entries
+- Section 232 program entries
+- USMCA eligibility signals
 
-Total rate = base_rate + total_additional
-```
+### Step 2: construct product-country rates
 
-For base Section 232 products (steel, aluminum, autos, copper), `metal_share = 1.0` and `nonmetal_share = 0`, so IEEPA is fully excluded. For derivative 232 products (aluminum-containing articles outside ch76), `metal_share = 0.50` (default), so IEEPA applies to the remaining 50%.
+The main rate builder combines several linking mechanisms:
 
-Note: `rate_301` is the MAX across all active Ch99 entries for a given HTS-8 code. For the 8 products that appear on both Trump-era and Biden-era lists, Biden rates are always ≥ the corresponding Trump rate, so MAX achieves the correct supersession. This matches Tariff-ETRs, which partitions products into exclusive rate buckets.
+1. Footnote references for product-specific Chapter 99 provisions.
+2. Blanket chapter or heading coverage for authorities like Section 232.
+3. Product lists maintained outside the JSON when US Notes are not machine-readable.
+4. Country-wide blanket programs such as IEEPA reciprocal, fentanyl, and Section 122.
 
-USMCA exemption: For Canadian and Mexican products, tariff rates are multiplied by `(1 - usmca_share)`, where `usmca_share` is the product-level USMCA utilization rate from USITC DataWeb SPI data (programs "S"/"S+"). Year-specific shares are available for 2024 and 2025 (~40K product-country pairs each), selectable via `usmca_shares.year` in `policy_params.yaml` (default: 2025). Products not imported from CA/MX retain full tariff (share = 0). For Section 232 auto/MHD products, the USMCA share is further scaled by `us_auto_content_share` (0.40). Falls back to binary eligibility (S/S+ in HTS `special` field) if DataWeb shares are unavailable. Applied to IEEPA reciprocal, IEEPA fentanyl, Section 122, and Section 232 auto/MHD programs.
+### Step 3: adjust base rates and exemptions
 
-### Calculation Pipeline
+The repo tracks both:
 
-For each of the 39 HTS revisions:
+- `statutory_base_rate`
+- `base_rate`, after MFN exemption-share adjustment
 
-1. Parse Chapter 99 entries (rates, authority classification, country scope)
-2. Parse product lines (base MFN rates, Chapter 99 footnote references)
-3. Extract policy parameters (IEEPA country rates, fentanyl rates, 232 rates, USMCA eligibility)
-4. Calculate rates:
-   - a. Footnote-based rates (vectorized join of products x Ch99 entries x countries)
-   - b. IEEPA reciprocal (blanket for ~238 countries, minus exempt products and floor country exemptions)
-   - c. IEEPA fentanyl (blanket for CA/MX/CN with product carve-outs)
-   - d. Section 232 base (chapter/heading blanket)
-   - e. Section 232 derivatives (product list + metal content scaling)
-   - f. Section 301 (blanket for China from product list)
-   - g. USMCA exemptions
-5. Apply stacking rules (mutual exclusion, nonmetal share scaling)
-6. Enforce rate schema and save snapshot
+Canada and Mexico are handled separately through product-level USMCA utilization shares rather than the general MFN exemption-share adjustment.
 
----
+### Step 4: apply authority-specific logic
 
-## Effective Tariff Rate (ETR) Methodology
+The production code tracks these authorities:
 
-Import-weighted ETRs are computed as:
+- Section 232
+- Section 301
+- IEEPA reciprocal
+- IEEPA fentanyl
+- Section 122
+- Section 201
+- other residual Chapter 99 provisions
 
-```
-ETR = sum(rate_i * imports_i) / sum(imports_i)
-```
+### Step 5: stack component rates into totals
 
-where `rate_i` is the total statutory tariff rate for product-country pair `i` and `imports_i` is the 2024 Census import value. ETRs are computed at five dimensions:
+The default production rule is `mutual_exclusion`, implemented in `helpers.R::apply_stacking_rules()`.
 
-- **Overall**: Single weighted average across all products and countries
-- **By partner**: Weighted ETR per trading partner (China, Canada, Mexico, EU, Japan, UK, FTA partners, Rest of World)
-- **By authority**: Decomposed weighted contribution of each tariff authority (232, 301, IEEPA, fentanyl)
-- **By GTAP sector**: Weighted ETR using HTS-10 to GTAP sector crosswalk
+In words:
 
-Point-in-time rate queries use interval encoding: each rate observation has `valid_from` and `valid_until` dates, and `get_rates_at_date(ts, date)` filters to the active revision for any calendar date.
+- Section 232 takes precedence over IEEPA reciprocal on the metal-covered portion.
+- For derivative 232 products, IEEPA can still apply to the non-metal portion.
+- Fentanyl, Section 301, Section 122, Section 201, and other provisions then contribute according to the modeled authority rules.
 
----
+An alternative `tpc_additive` mode exists for diagnostic comparison only.
 
-## Validation Against TPC
+## Key modeling choices
 
-Rates are compared at the HTS-10 x country level against TPC benchmark data at 5 snapshot dates corresponding to major policy events:
+### Section 232
 
-| Revision | Policy Event | TPC Date | Within 2pp | Tracker ETR | TPC ETR | Diff (pp) |
-|----------|-------------|----------|------------|-------------|---------|-----------|
-| rev_6 | 232 Autos | 2025-03-17 | 82.3% | 10.42% | 7.99% | +2.44 |
-| rev_10 | Liberation Day | 2025-04-17 | 93.1% | 15.20% | 23.48% | -8.28 |
-| rev_17 | 232 Increase | 2025-07-17 | 90.6% | 16.43% | 15.35% | +1.08 |
-| rev_18 | Phase 2 | 2025-10-17 | 79.9% | 16.19% | 18.20% | -2.01 |
-| rev_32 | Floor Countries | 2025-11-17 | 84.9% | 15.93% | 16.14% | -0.21 |
+Section 232 is modeled through a mix of:
 
-The within-2pp match rate improved significantly after the March 2026 base rate inheritance fix (+9.3pp at rev_18, +11.1pp at rev_32). The rev_10 ETR outlier (-8.28pp) reflects the April 9 reciprocal suspension period. The tracker is within ~1pp of TPC at the latest two dates.
+- blanket chapter coverage
+- heading or prefix coverage
+- explicit product lists for derivatives, copper, auto parts, and MHD products
 
----
+Derivative products use a configurable metal-share estimate. The default is the BEA-based HS10 metal-share file.
 
-## Known Gaps and Limitations
+### Section 301
 
-### Remaining gaps
+Section 301 coverage is driven by `resources/s301_product_lists.csv` plus rate mappings in `policy_params.yaml`.
 
-**Section 301 exclusions (9903.89.xx).** Some 9903.89.xx entries define product exclusions from Lists 1–4A that are not parsed. Excluded products may incorrectly receive the base 301 rate. Low impact (~61 products).
+For products that map to multiple active 301 Ch99 entries, the current production rule is:
 
-**EU/Japan/Korea floor rate residual (~4pp vs TPC).** Two components: (1) *Duty-free treatment* (~38% of gap rows) — the tracker defaults to applying IEEPA to all products including those with 0% MFN base rate; TPC excludes duty-free products. The `dutyfree_nonzero` alternative series quantifies this effect. (2) *Continuous rate residual* (~62% of gap rows) — TPC assigns rates spanning 1–14% for products where the tracker applies a flat 15% floor, suggesting product-level methodology beyond the simple floor formula.
+- take the maximum active 301 rate for the product's HTS8 code
 
-### Methodological differences vs TPC (not bugs)
+This treats overlapping generations as supersession rather than additive stacking.
 
-**China+232 reciprocal stacking (~920 products, ~25pp gap).** TPC stacks IEEPA reciprocal on top of Section 232. We apply mutual exclusion per Tariff-ETRs: 232 takes precedence, so reciprocal contributes 0pp on base 232 products. The `tpc_stacking` alternative series reproduces TPC's additive behavior for comparison.
+### IEEPA reciprocal and floor treatment
 
-**China IEEPA reciprocal rate (34% vs ~25%).** The statutory rate from 9903.01.63 is 34%. TPC shows ~25%, likely reflecting timing of the US-China bilateral agreement encoding. The tracker correctly reads the HTS JSON suspension markers.
+IEEPA reciprocal rates are parsed from HTS Chapter 99 entries and classified into surcharge, floor, or passthrough behavior.
 
-### Resolved
+The repo currently defaults to:
 
-- **USMCA utilization rates:** Product-level USITC DataWeb SPI data (S/S+) replaces binary eligibility. Year-specific shares for 2024 and 2025, selectable via `usmca_shares.year`.
-- **Copper 232 product coverage:** Parsed US Note 36(b) — 80 HTS10 codes match ETRs exactly.
-- **Ch87 auto USMCA content scaling:** Added `us_auto_content_share = 0.4` to scale 232 auto USMCA exemptions.
-- **Base rate inheritance:** Statistical suffixes inherit MFN from parent indent (11,558 products fixed).
-- **301 Biden supersession:** Biden rates supersede Trump on 8 overlapping products via MAX aggregation.
+- applying reciprocal tariffs to all products, including duty-free products
 
----
+This is configurable through `ieepa_duty_free_treatment`. Benchmark comparisons show that changing to `nonzero_base_only` improves TPC agreement for some floor-country cases.
 
-## Figure: Average ETR by Day (2025)
+### USMCA utilization
 
-The daily weighted ETR time series can be plotted with TPC benchmark points overlaid using the following R code:
+The production model uses product-level USMCA utilization shares from USITC DataWeb resources committed in `resources/`.
 
-```r
-library(tidyverse)
+This is now a core modeling input, not a Tariff-ETRs benchmark input.
 
-# Load daily series and TPC comparison data
-daily <- read_csv('output/daily/daily_overall.csv')
-tpc_etr <- read_csv('output/etr/etr_overall.csv')
+### Section 122
 
-# Filter to 2025 only
-daily_2025 <- daily %>%
-  filter(date >= '2025-01-01', date <= '2025-12-31')
+Section 122 is treated as a temporary post-IEEPA blanket authority with a configurable expiry date and `finalized` flag.
 
-tpc_points <- tpc_etr %>%
-  transmute(date = as.Date(date), etr_tpc = etr_tpc * 100)
+The repo enforces Section 122 timing in three places:
 
-# Plot
-ggplot() +
-  geom_line(
-    data = daily_2025,
-    aes(x = as.Date(date), y = weighted_etr * 100),
-    color = '#2c5f8a', linewidth = 1
-  ) +
-  geom_point(
-    data = tpc_points,
-    aes(x = date, y = etr_tpc),
-    color = '#d63333', size = 3, shape = 16
-  ) +
-  scale_x_date(date_breaks = '1 month', date_labels = '%b') +
-  scale_y_continuous(limits = c(0, NA), labels = function(x) paste0(x, '%')) +
-  labs(
-    title = 'Average Effective Tariff Rate (2025)',
-    subtitle = 'Daily weighted ETR (line) with TPC benchmark points (dots)',
-    x = NULL,
-    y = 'Import-Weighted ETR',
-    caption = 'Source: Yale Budget Lab Tariff Rate Tracker (HTS-derived); TPC for validation'
-  ) +
-  theme_minimal(base_size = 12) +
-  theme(
-    plot.title = element_text(face = 'bold'),
-    panel.grid.minor = element_blank()
-  )
+- build-time per-revision rate construction
+- daily aggregate splitting and zeroing
+- point-in-time and filtered daily queries
 
-ggsave('output/etr/etr_daily_2025.png', width = 10, height = 6, dpi = 150)
-```
+## Assumptions and parameter choices
 
-This produces a line chart of the daily import-weighted ETR through 2025, showing the step-function jumps at each policy change (fentanyl tariffs in January, Liberation Day in April, 232 increase in July, Phase 2 in August, floor country frameworks in November), with TPC's five benchmark estimates plotted as red dots for comparison.
+All major policy and modeling parameters live in `config/policy_params.yaml`.
+
+The main non-official assumptions are cataloged in [assumptions.md](assumptions.md), including:
+
+- mutual exclusion versus additive stacking
+- derivative metal-share estimation
+- product-level USMCA utilization
+- resource-file-based exemption and product lists
+- duty-free treatment choices
+
+## Outputs and interpretation
+
+### Revision-level panel
+
+The revision panel is the legal-in-effect dataset. It answers:
+
+- what statutory tariff rate applied to a given product-country pair
+- under which revision and date interval
+- which component authorities contributed to that rate
+
+### Daily aggregates
+
+Daily outputs are derived by broadcasting piecewise-constant revision intervals across calendar days, with explicit handling for date-bounded overrides such as Section 122 expiry.
+
+### Weighted ETRs
+
+Weighted ETRs are reporting outputs, not separate production logic. They use local import weights when available and summarize the product-country panel by:
+
+- overall
+- partner
+- authority
+- GTAP sector
+
+## Validation and external comparison
+
+### TPC
+
+TPC is used for point-in-time product-country validation and for contextual comparison of weighted aggregates.
+
+The repo's strongest agreement with TPC tends to occur in relatively stable periods. The largest recurring residuals are:
+
+- Liberation Day timing and encoding differences
+- floor-country residuals
+- Section 232 plus reciprocal stacking differences
+
+### Tariff-ETRs
+
+Tariff-ETRs comparison is useful for cross-repo reconciliation, especially around:
+
+- USMCA treatment
+- Section 232 coverage
+- denominator choices in ETR reporting
+
+The main current takeaways from the tracked comparison work are:
+
+- product-level USMCA shares are a meaningful tracker-side improvement
+- copper and several auto-related gaps were resolved
+- some remaining differences appear methodological rather than parser bugs
+
+## Open modeling questions
+
+### Section 301 exclusions
+
+The repo still does not fully parse `9903.89.xx` exclusion logic. Some products may incorrectly retain a base 301 rate when they should be excluded.
+
+### Floor-country residuals
+
+Even after accounting for duty-free treatment choices, some floor-country differences versus TPC remain unexplained. This may reflect a different product-level methodology on the benchmark side or an unmodeled exemption path on the tracker side.
+
+### Liberation Day timing
+
+The repo is intentionally tied to published HTS revisions. That means very short-lived announced policies that never become fully encoded in the HTS will remain only partially represented.
+
+### Comparison-runner completeness
+
+The repo has a comparison runner, but the Tariff-ETRs cross-repo path is not yet fully implemented inside `run_comparisons.R`.
+
+## What this methodology does not claim
+
+The repo does not estimate incidence, effective collection rates, or behavioral responses. It models statutory tariff rates as encoded in the HTS and related documented assumptions.

@@ -1,6 +1,6 @@
 # Non-Official Assumptions
 
-This document catalogs methodological assumptions derived from non-official sources — i.e., choices and data inputs that are **not** directly from HTS JSON, Federal Register text, or statutory language. Each entry notes the assumption, its source, and where it is implemented.
+This document is an appendix to [methodology.md](methodology.md). It catalogs methodological assumptions derived from non-official sources — i.e., choices and data inputs that are **not** directly from HTS JSON, Federal Register text, or statutory language. Each entry notes the assumption, its source, and where it is implemented.
 
 ---
 

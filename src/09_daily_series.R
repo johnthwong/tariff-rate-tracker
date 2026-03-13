@@ -287,8 +287,10 @@ build_daily_aggregates <- function(ts, date_range = NULL, imports = NULL,
 #' @param date_range Length-2 Date vector (start, end)
 #' @param countries Character vector of country codes to include
 #' @param products Character vector of HTS10 codes to include
+#' @param policy_params Optional policy params list. If supplied, applies the
+#'   same post-interval expiry adjustments used by export_daily_slice().
 #' @return Tibble with one row per date x product x country
-expand_to_daily <- function(ts, date_range, countries, products) {
+expand_to_daily <- function(ts, date_range, countries, products, policy_params = NULL) {
   date_range <- as.Date(date_range)
 
   stopifnot(
@@ -297,24 +299,24 @@ expand_to_daily <- function(ts, date_range, countries, products) {
     length(date_range) == 2
   )
 
-  # Filter to requested subset
+  expanded <- export_daily_slice(
+    ts = ts,
+    date_range = date_range,
+    countries = countries,
+    products = products,
+    policy_params = policy_params,
+    full_export = FALSE,
+    output_path = NULL,
+    columns = NULL
+  )
+
   subset <- ts %>%
     filter(
       country %in% countries,
-      hts10 %in% products
+      hts10 %in% products,
+      valid_until >= date_range[1],
+      valid_from <= date_range[2]
     )
-
-  if (nrow(subset) == 0) {
-    warning('No matching rows for the requested countries/products')
-    return(tibble())
-  }
-
-  # Expand each row across its valid date range, clipped to requested range
-  calendar <- tibble(date = seq(date_range[1], date_range[2], by = 'day'))
-
-  expanded <- subset %>%
-    cross_join(calendar) %>%
-    filter(date >= valid_from, date <= valid_until)
 
   message('Expanded ', nrow(subset), ' interval rows to ', nrow(expanded), ' daily rows')
   message('  Countries: ', n_distinct(expanded$country),

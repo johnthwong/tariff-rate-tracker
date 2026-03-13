@@ -4,6 +4,24 @@ Verified timeline of Chapter 99 policy changes across all 39 HTS revision points
 
 ---
 
+## Operational Notes
+
+These are the main policy items that still matter operationally when interpreting the later revisions and the forward extension through the end of 2026.
+
+### Swiss and Liechtenstein framework
+
+The Swiss and Liechtenstein floor framework is represented both by native HTS entries in later revisions and by a date-bounded override for earlier revisions inside the framework window. The governing parameters live in `config/policy_params.yaml` under `swiss_framework`.
+
+### Section 122
+
+Section 122 becomes the post-IEEPA blanket authority in the February 25, 2026 revision sequence. The repo treats it as temporary unless `section_122.finalized` is set to `true`, and enforces expiry in the build, daily outputs, and point-in-time queries.
+
+### Semiconductor tariffs
+
+Semiconductor tariff entries are handled through the normal Chapter 99 parsing path and do not require a separate override layer in the code.
+
+---
+
 ## Summary Table
 
 | Revision | Effective | Ch99 | Added | Rate Chg | Suspensions | Policy Event |

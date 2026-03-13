@@ -6,7 +6,7 @@
 # Uses base R stopifnot() assertions — no external test framework required.
 #
 # Usage:
-#   Rscript tests/test_daily_series.R
+#   Rscript tests/run_tests_daily_series.R
 #
 # =============================================================================
 
@@ -254,10 +254,10 @@ run_test('apply_expiry_zeroing zeros s122 after expiry', {
 
 
 # =============================================================================
-# Test 7: export_daily_slice
+# Test 7: product-country-day expansion paths
 # =============================================================================
 
-message('\n--- Test 7: export_daily_slice ---')
+message('\n--- Test 7: product-country-day expansion paths ---')
 
 run_test('export_daily_slice requires filter or full_export', {
   ts <- make_test_ts()
@@ -288,6 +288,29 @@ run_test('export_daily_slice applies s122 expiry', {
   after_expiry <- result %>% filter(date > as.Date('2026-07-23'))
   if (nrow(before_expiry) > 0) stopifnot(any(before_expiry$rate_s122 > 0))
   if (nrow(after_expiry) > 0) stopifnot(all(after_expiry$rate_s122 == 0))
+})
+
+run_test('expand_to_daily applies the same expiry logic as export_daily_slice', {
+  ts <- make_test_ts()
+  pp <- make_test_policy_params()
+  expanded <- expand_to_daily(
+    ts,
+    c('2026-07-20', '2026-07-27'),
+    countries = '4280',
+    products = c('7208100000', '8703230000'),
+    policy_params = pp
+  ) %>%
+    arrange(date, hts10, country)
+  exported <- export_daily_slice(
+    ts,
+    c('2026-07-20', '2026-07-27'),
+    countries = '4280',
+    products = c('7208100000', '8703230000'),
+    policy_params = pp
+  ) %>%
+    arrange(date, hts10, country)
+  stopifnot(nrow(expanded) == nrow(exported))
+  stopifnot(identical(expanded, exported))
 })
 
 
