@@ -827,7 +827,7 @@ calculate_rates_for_revision <- function(
       has_auto_parts_ch99 <- any(grepl('^9903\\.94\\.0[5-9]', ch99_data$ch99_code))
       heading_gates <- list(
         autos_passenger  = s232_rates$auto_rate > 0,
-        autos_light      = s232_rates$auto_rate > 0,
+        autos_light_trucks = s232_rates$auto_rate > 0,
         auto_parts       = has_auto_parts_ch99,
         copper           = s232_rates$copper_rate > 0,
         softwood         = s232_rates$wood_rate > 0 || s232_rates$wood_furniture_rate > 0,

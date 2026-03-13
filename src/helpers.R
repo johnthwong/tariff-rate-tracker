@@ -685,10 +685,10 @@ apply_stacking_rules <- function(df, cty_china = '5700', stacking_method = 'mutu
         country == cty_china ~
           rate_ieepa_recip + rate_ieepa_fent + rate_301 + rate_s122 + rate_section_201 + rate_other,
 
-        # Others with 232: 232 + (recip + fentanyl + s122)*nonmetal + 301 + s201 + other
+        # Others with 232: 232 + recip*nonmetal + fentanyl + s122*nonmetal + 301 + s201 + other
         rate_232 > 0 ~
-          rate_232 + (rate_ieepa_recip + rate_ieepa_fent + rate_s122) * nonmetal_share +
-          rate_301 + rate_section_201 + rate_other,
+          rate_232 + rate_ieepa_recip * nonmetal_share + rate_ieepa_fent +
+          rate_s122 * nonmetal_share + rate_301 + rate_section_201 + rate_other,
 
         # Others without 232: reciprocal + fentanyl + s122 + 301 + s201 + other
         TRUE ~ rate_ieepa_recip + rate_ieepa_fent + rate_s122 + rate_301 + rate_section_201 + rate_other
@@ -743,11 +743,7 @@ compute_net_authority_contributions <- function(df, cty_china = '5700',
       nonmetal_share = if_else(rate_232 > 0 & metal_share < 1.0, 1 - metal_share, 0),
       net_232 = if_else(rate_232 > 0, rate_232, 0),
       net_ieepa = if_else(rate_232 > 0, rate_ieepa_recip * nonmetal_share, rate_ieepa_recip),
-      net_fentanyl = case_when(
-        country == cty_china ~ rate_ieepa_fent,
-        rate_232 > 0 ~ rate_ieepa_fent * nonmetal_share,
-        TRUE ~ rate_ieepa_fent
-      ),
+      net_fentanyl = rate_ieepa_fent,
       net_301 = if_else(country == cty_china, rate_301, 0),
       net_s122 = if_else(rate_232 > 0, rate_s122 * nonmetal_share, rate_s122),
       net_section_201 = rate_section_201,
