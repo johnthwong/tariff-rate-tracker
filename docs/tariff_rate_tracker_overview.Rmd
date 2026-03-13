@@ -113,24 +113,32 @@ The tracker draws on several categories of inputs:
    The current build processes
    `r nrow(revision_dates)` revisions.
 
-2. **Committed resource files** maintained in the repository. These
+2. **USITC revision metadata** via the REST API
+   (`hts.usitc.gov/reststop/releaseList`). The tracker automatically
+   discovers new HTS revisions and appends them to the revision schedule.
+   New entries are flagged for manual review because the API returns
+   publication dates, which typically lag the policy effective date by
+   days to weeks. A SHA-256 hash check on the Chapter 99 PDF provides an
+   additional change-detection signal between formal revisions.
+
+3. **Committed resource files** maintained in the repository. These
    include product lists for Section 301 (China), Section 232 derivatives
    and copper, IEEPA-exempt products, fentanyl carve-outs, floor-country
    exemptions, and USMCA product-level utilization shares from USITC
    DataWeb.
 
-3. **Policy parameters** in a single YAML configuration file, encoding
+4. **Policy parameters** in a single YAML configuration file, encoding
    tariff authority classifications, country-specific rate structures,
    stacking rules, and date-bounded overrides (e.g., Section 122 expiry,
    the Swiss framework agreement).
 
-4. **Census import data** (2024) for computing import-weighted ETRs.
+5. **Census import data** (2024) for computing import-weighted ETRs.
    These weights are optional---the core build produces unweighted
    aggregates without them.
 
 ## Processing pipeline
 
-The pipeline runs in six stages for each HTS revision:
+The pipeline runs in seven stages for each HTS revision:
 
 1. **Parse Chapter 99 entries**: extract additional-duty rates, classify
    each entry by tariff authority (Section 232, 301, IEEPA reciprocal,
@@ -140,24 +148,31 @@ The pipeline runs in six stages for each HTS revision:
    lines with base MFN rates, footnote references, and special program
    fields.
 
-3. **Build product-country rates**: link products to duties via three
+3. **Extract policy parameters**: parse Chapter 99 data to determine
+   country-specific rate structures, Section 232 rates (including
+   blanket vs. country-deal separation for autos), IEEPA phase
+   structures, and floor-country applicability.
+
+4. **Build product-country rates**: link products to duties via three
    mechanisms---footnote references (product-specific Ch99 provisions),
    blanket chapter/heading coverage (Section 232), and product list
    matching (Section 301, IEEPA exemptions).
 
-4. **Apply stacking rules**: compute the total tariff for each
+5. **Apply stacking rules**: compute the total tariff for each
    product-country pair. Section 232 takes precedence over IEEPA
    reciprocal on the metal-covered portion; other authorities stack
    according to documented mutual-exclusion rules.
 
-5. **Apply USMCA and exemptions**: reduce rates for Canadian and Mexican
+6. **Apply USMCA and exemptions**: reduce rates for Canadian and Mexican
    products proportional to their product-level USMCA utilization share.
    Apply MFN preference adjustments, floor-country product exemptions,
    and IEEPA-exempt product lists.
 
-6. **Aggregate to daily series**: broadcast the piecewise-constant
+7. **Aggregate to daily series**: broadcast the piecewise-constant
    revision intervals across calendar days, splitting at policy expiry
-   dates (e.g., Section 122's 150-day statutory limit).
+   dates (e.g., Section 122's 150-day statutory limit). Both
+   exposed-pairs (tariffed only) and all-pairs (full Cartesian panel)
+   denominators are computed.
 
 ```{r policy-timeline}
 # Key policy events for annotation
@@ -460,6 +475,21 @@ statutory limit on Section 122 authority, zeroing rates after the expiry
 date in the build, daily outputs, and point-in-time queries. A
 configuration flag allows the expiry to be overridden if Congress
 extends the authority.
+
+**Section 232 auto deal separation.** The tracker distinguishes between
+blanket Section 232 auto tariffs (applied to all countries or all except
+a list) and country-specific deal entries (e.g., bilateral trade
+agreements). In revisions where only deal entries exist and no blanket
+auto tariff has been established, non-deal countries correctly receive a
+zero auto rate rather than inheriting the deal rate as a global tariff.
+
+**Automated revision discovery.** The tracker fetches the USITC release
+list via REST API to detect new HTS revisions automatically. Because the
+API returns publication dates rather than policy effective dates, new
+entries are flagged for manual review and the build is blocked until the
+correct policy date is confirmed. A separate SHA-256 hash check on the
+Chapter 99 PDF provides early detection of amendments between formal
+revisions.
 
 ## Relative to Tax Policy Center (TPC) estimates
 

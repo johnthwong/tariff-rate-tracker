@@ -22,6 +22,7 @@ OPTIONAL <- c(
   'pdftools',    # Chapter 99 US Notes PDF parsing (scrape_us_notes.R)
   'digest',      # Chapter 99 PDF change detection (01_scrape_revision_dates.R)
   'arrow',       # Parquet export (09_daily_series.R export_daily_slice)
+  'openxlsx',    # Excel workbook export (09_daily_series.R save_daily_workbook)
   'httr'         # HTTP utilities (optional download fallbacks)
 )
 
