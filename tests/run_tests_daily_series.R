@@ -506,6 +506,61 @@ run_test('NULL gate lookup bypasses check (regression guard)', {
 
 
 # =============================================================================
+# Test 12: Country applicability fail-closed
+# =============================================================================
+
+message('\n--- Test 12: Country applicability fail-closed ---')
+
+source(here('src', '06_calculate_rates.R'))
+
+run_test('unknown country_type does not apply', {
+  result <- check_country_applies('5700', 'unknown', c(), c())
+  stopifnot(result == FALSE)
+})
+
+run_test('NA country_type does not apply', {
+  result <- check_country_applies('5700', NA_character_, c(), c())
+  stopifnot(result == FALSE)
+})
+
+run_test('all country_type still applies', {
+  result <- check_country_applies('5700', 'all', c(), c())
+  stopifnot(result == TRUE)
+})
+
+run_test('specific country_type applies to listed country', {
+  result <- check_country_applies('5700', 'specific', c('CN', '5700'), c())
+  stopifnot(result == TRUE)
+})
+
+run_test('specific country_type does not apply to unlisted country', {
+  result <- check_country_applies('4280', 'specific', c('CN'), c())
+  stopifnot(result == FALSE)
+})
+
+run_test('all_except excludes exempt countries', {
+  result_exempt <- check_country_applies('1220', 'all_except', c(), c('CA', '1220'))
+  result_other <- check_country_applies('5700', 'all_except', c(), c('CA', '1220'))
+  stopifnot(result_exempt == FALSE)
+  stopifnot(result_other == TRUE)
+})
+
+run_test('no unknown country_type in current ch99 data', {
+  ch99_path <- here('data', 'processed', 'chapter99_rates.rds')
+  if (!file.exists(ch99_path)) {
+    message('    (skipped — ch99 data not found)')
+    return(invisible())
+  }
+  ch99 <- readRDS(ch99_path)
+  n_unknown <- sum(ch99$country_type == 'unknown', na.rm = TRUE)
+  if (n_unknown > 0) {
+    stop(n_unknown, ' Ch99 entries have unknown country_type — parser needs updating')
+  }
+  stopifnot(n_unknown == 0)
+})
+
+
+# =============================================================================
 # Summary
 # =============================================================================
 

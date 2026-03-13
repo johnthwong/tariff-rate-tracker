@@ -261,7 +261,36 @@ run_quality_report <- function(
   }
   write_csv(anomalies, file.path(output_dir, 'anomalies.csv'))
 
-  # 4. Summary metadata
+  # 4. Unknown country applicability check
+  message('\n--- Country Applicability Check ---')
+  ch99_path <- here('data', 'processed', 'chapter99_rates.rds')
+  unknown_country_rows <- tibble()
+  if (file.exists(ch99_path)) {
+    ch99 <- readRDS(ch99_path)
+    if ('country_type' %in% names(ch99)) {
+      unknown_country_rows <- ch99 %>% filter(country_type == 'unknown')
+      if (nrow(unknown_country_rows) > 0) {
+        message('WARNING: ', nrow(unknown_country_rows),
+                ' Ch99 entries with unknown country applicability (fail-closed, will not apply):')
+        for (r in seq_len(min(nrow(unknown_country_rows), 10))) {
+          message('  ', unknown_country_rows$ch99_code[r], ' (',
+                  unknown_country_rows$authority[r], '): ',
+                  substr(unknown_country_rows$description[r], 1, 80))
+        }
+        if (nrow(unknown_country_rows) > 10) {
+          message('  ... and ', nrow(unknown_country_rows) - 10, ' more')
+        }
+        write_csv(unknown_country_rows,
+                  file.path(output_dir, 'unknown_country_type.csv'))
+      } else {
+        message('All Ch99 entries have resolved country applicability.')
+      }
+    }
+  } else {
+    message('Ch99 data not found at ', ch99_path, ' — skipping check.')
+  }
+
+  # 5. Summary metadata
   report <- list(
     run_time = Sys.time(),
     timeseries_path = timeseries_path,
@@ -269,9 +298,11 @@ run_quality_report <- function(
     n_revisions = n_distinct(ts$revision),
     n_missing_columns = sum(!schema$present),
     n_anomalies = nrow(anomalies),
+    n_unknown_country = nrow(unknown_country_rows),
     schema_check = schema,
     revision_quality = rev_quality,
-    anomalies = anomalies
+    anomalies = anomalies,
+    unknown_country = unknown_country_rows
   )
   saveRDS(report, file.path(output_dir, 'quality_report.rds'))
 

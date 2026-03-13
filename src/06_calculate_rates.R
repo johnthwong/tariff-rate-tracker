@@ -194,7 +194,7 @@ calculate_rates_fast <- function(products, ch99_data, countries, stacking_method
 check_country_applies <- function(country, country_type, countries, exempt) {
   # Defensive checks
   if (length(country) == 0 || is.na(country)) return(FALSE)
-  if (length(country_type) == 0 || is.na(country_type)) return(TRUE)
+  if (length(country_type) == 0 || is.na(country_type)) return(FALSE)
 
   # Convert Census to ISO for matching
   country_iso <- names(ISO_TO_CENSUS)[match(country, ISO_TO_CENSUS)]
@@ -205,7 +205,7 @@ check_country_applies <- function(country, country_type, countries, exempt) {
     'all' = TRUE,
     'all_except' = !(country_iso %in% exempt),
     'specific' = country_iso %in% countries || country %in% countries,
-    'unknown' = TRUE,  # Assume applies if unknown
+    'unknown' = FALSE,  # Fail-closed: parser miss should not promote to global
     FALSE
   )
 }
