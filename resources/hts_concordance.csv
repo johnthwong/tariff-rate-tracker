@@ -1,0 +1,436 @@
+old_hts10,new_hts10,revision_from,revision_to,change_type,description_old,description_new,similarity
+NA,4420190000,basic,rev_1,added,NA,other,NA
+NA,9401696031,basic,rev_1,added,NA,other,NA
+0901110045,0901110035,rev_15,rev_16,many_to_many,certified organic,certified organic,1
+0901120015,0901110035,rev_15,rev_16,many_to_many,certified organic,certified organic,1
+0901210035,0901110035,rev_15,rev_16,many_to_many,certified organic,certified organic,1
+0901110055,0901110040,rev_15,rev_16,many_to_many,other,other,1
+0901120025,0901110040,rev_15,rev_16,many_to_many,other,other,1
+0901210045,0901110040,rev_15,rev_16,many_to_many,other,other,1
+0901220045,0901110040,rev_15,rev_16,many_to_many,other,other,1
+0901220060,0901110040,rev_15,rev_16,many_to_many,other,other,1
+0901110045,0901110050,rev_15,rev_16,many_to_many,certified organic,certified organic,1
+0901120015,0901110050,rev_15,rev_16,many_to_many,certified organic,certified organic,1
+0901210035,0901110050,rev_15,rev_16,many_to_many,certified organic,certified organic,1
+0901110055,0901110065,rev_15,rev_16,many_to_many,other,other,1
+0901120025,0901110065,rev_15,rev_16,many_to_many,other,other,1
+0901210045,0901110065,rev_15,rev_16,many_to_many,other,other,1
+0901220045,0901110065,rev_15,rev_16,many_to_many,other,other,1
+0901220060,0901110065,rev_15,rev_16,many_to_many,other,other,1
+0901110045,0901120020,rev_15,rev_16,many_to_many,certified organic,certified organic,1
+0901120015,0901120020,rev_15,rev_16,many_to_many,certified organic,certified organic,1
+0901210035,0901120020,rev_15,rev_16,many_to_many,certified organic,certified organic,1
+0901110055,0901120035,rev_15,rev_16,many_to_many,other,other,1
+0901120025,0901120035,rev_15,rev_16,many_to_many,other,other,1
+0901210045,0901120035,rev_15,rev_16,many_to_many,other,other,1
+0901220045,0901120035,rev_15,rev_16,many_to_many,other,other,1
+0901220060,0901120035,rev_15,rev_16,many_to_many,other,other,1
+0901110045,0901120040,rev_15,rev_16,many_to_many,certified organic,certified organic,1
+0901120015,0901120040,rev_15,rev_16,many_to_many,certified organic,certified organic,1
+0901210035,0901120040,rev_15,rev_16,many_to_many,certified organic,certified organic,1
+0901110055,0901120055,rev_15,rev_16,many_to_many,other,other,1
+0901120025,0901120055,rev_15,rev_16,many_to_many,other,other,1
+0901210045,0901120055,rev_15,rev_16,many_to_many,other,other,1
+0901220045,0901120055,rev_15,rev_16,many_to_many,other,other,1
+0901220060,0901120055,rev_15,rev_16,many_to_many,other,other,1
+0901110045,0901120060,rev_15,rev_16,many_to_many,certified organic,certified organic,1
+0901120015,0901120060,rev_15,rev_16,many_to_many,certified organic,certified organic,1
+0901210035,0901120060,rev_15,rev_16,many_to_many,certified organic,certified organic,1
+0901110055,0901120075,rev_15,rev_16,many_to_many,other,other,1
+0901120025,0901120075,rev_15,rev_16,many_to_many,other,other,1
+0901210045,0901120075,rev_15,rev_16,many_to_many,other,other,1
+0901220045,0901120075,rev_15,rev_16,many_to_many,other,other,1
+0901220060,0901120075,rev_15,rev_16,many_to_many,other,other,1
+0901110045,0901210015,rev_15,rev_16,many_to_many,certified organic,certified organic,1
+0901120015,0901210015,rev_15,rev_16,many_to_many,certified organic,certified organic,1
+0901210035,0901210015,rev_15,rev_16,many_to_many,certified organic,certified organic,1
+0901110055,0901210020,rev_15,rev_16,many_to_many,other,other,1
+0901120025,0901210020,rev_15,rev_16,many_to_many,other,other,1
+0901210045,0901210020,rev_15,rev_16,many_to_many,other,other,1
+0901220045,0901210020,rev_15,rev_16,many_to_many,other,other,1
+0901220060,0901210020,rev_15,rev_16,many_to_many,other,other,1
+0901110045,0901210025,rev_15,rev_16,many_to_many,certified organic,certified organic,1
+0901120015,0901210025,rev_15,rev_16,many_to_many,certified organic,certified organic,1
+0901210035,0901210025,rev_15,rev_16,many_to_many,certified organic,certified organic,1
+0901110055,0901210029,rev_15,rev_16,many_to_many,other,other,1
+0901120025,0901210029,rev_15,rev_16,many_to_many,other,other,1
+0901210045,0901210029,rev_15,rev_16,many_to_many,other,other,1
+0901220045,0901210029,rev_15,rev_16,many_to_many,other,other,1
+0901220060,0901210029,rev_15,rev_16,many_to_many,other,other,1
+0901110045,0901210040,rev_15,rev_16,many_to_many,certified organic,certified organic,1
+0901120015,0901210040,rev_15,rev_16,many_to_many,certified organic,certified organic,1
+0901210035,0901210040,rev_15,rev_16,many_to_many,certified organic,certified organic,1
+0901110055,0901210049,rev_15,rev_16,many_to_many,other,other,1
+0901120025,0901210049,rev_15,rev_16,many_to_many,other,other,1
+0901210045,0901210049,rev_15,rev_16,many_to_many,other,other,1
+0901220045,0901210049,rev_15,rev_16,many_to_many,other,other,1
+0901220060,0901210049,rev_15,rev_16,many_to_many,other,other,1
+0901110055,0901220055,rev_15,rev_16,many_to_many,other,other,1
+0901120025,0901220055,rev_15,rev_16,many_to_many,other,other,1
+0901210045,0901220055,rev_15,rev_16,many_to_many,other,other,1
+0901220045,0901220055,rev_15,rev_16,many_to_many,other,other,1
+0901220060,0901220055,rev_15,rev_16,many_to_many,other,other,1
+0901110045,0901220065,rev_15,rev_16,many_to_many,certified organic,certified organic,1
+0901120015,0901220065,rev_15,rev_16,many_to_many,certified organic,certified organic,1
+0901210035,0901220065,rev_15,rev_16,many_to_many,certified organic,certified organic,1
+0901110055,0901220070,rev_15,rev_16,many_to_many,other,other,1
+0901120025,0901220070,rev_15,rev_16,many_to_many,other,other,1
+0901210045,0901220070,rev_15,rev_16,many_to_many,other,other,1
+0901220045,0901220070,rev_15,rev_16,many_to_many,other,other,1
+0901220060,0901220070,rev_15,rev_16,many_to_many,other,other,1
+0901110045,0901220075,rev_15,rev_16,many_to_many,certified organic,certified organic,1
+0901120015,0901220075,rev_15,rev_16,many_to_many,certified organic,certified organic,1
+0901210035,0901220075,rev_15,rev_16,many_to_many,certified organic,certified organic,1
+0901110055,0901220080,rev_15,rev_16,many_to_many,other,other,1
+0901120025,0901220080,rev_15,rev_16,many_to_many,other,other,1
+0901210045,0901220080,rev_15,rev_16,many_to_many,other,other,1
+0901220045,0901220080,rev_15,rev_16,many_to_many,other,other,1
+0901220060,0901220080,rev_15,rev_16,many_to_many,other,other,1
+0901110055,0901220090,rev_15,rev_16,many_to_many,other,other,1
+0901120025,0901220090,rev_15,rev_16,many_to_many,other,other,1
+0901210045,0901220090,rev_15,rev_16,many_to_many,other,other,1
+0901220045,0901220090,rev_15,rev_16,many_to_many,other,other,1
+0901220060,0901220090,rev_15,rev_16,many_to_many,other,other,1
+2827399000,2827399050,rev_15,rev_16,rename,other,other,1
+2836995000,2836995050,rev_15,rev_16,rename,other,other,1
+2842909000,2842909050,rev_15,rev_16,rename,other,other,1
+2930904395,2930904390,rev_15,rev_16,rename,other,other,1
+7113195090,7113195095,rev_15,rev_16,rename,other,other,1
+7308200020,7308200030,rev_15,rev_16,split,"tubular, whether or not tapered, and sectional components thereof","tubular, whether or not tapered, and sectional components thereof",1
+7308200020,7308200035,rev_15,rev_16,split,"tubular, whether or not tapered, and sectional components thereof","tubular wind turbine towers, whether or not tapered, and sectional components thereof",0.75
+7310210050,7310210075,rev_15,rev_16,rename,other,other,1
+8309900090,8309900025,rev_15,rev_16,split,other,other,1
+8309900090,8309900085,rev_15,rev_16,split,other,other,1
+8418100075,8418100085,rev_15,rev_16,rename,other,other,1
+8483405050,8483405080,rev_15,rev_16,many_to_many,other,other,1
+8483905090,8483405080,rev_15,rev_16,many_to_many,other,other,1
+8483405050,8483905080,rev_15,rev_16,many_to_many,other,other,1
+8483905090,8483905080,rev_15,rev_16,many_to_many,other,other,1
+8501640121,8501640110,rev_15,rev_16,rename,for wind-powered generating sets classified within 8502.31.00,for wind-powered generating sets classified within 8502.31.00,1
+8501640130,8501640135,rev_15,rev_16,rename,"exceeding 10,000 kva but not exceeding 40,000 kva","exceeding 10,000 kva but not exceeding 40,000 kva",1
+8501640150,8501640155,rev_15,rev_16,rename,other,other,1
+8542390060,8542390090,rev_15,rev_16,rename,other,other,1
+9401999081,9401999070,rev_15,rev_16,rename,other,other,1
+2825600000,NA,rev_15,rev_16,dropped,germanium oxides and zirconium dioxide,NA,NA
+7013371010,NA,rev_15,rev_16,dropped,crystalline or non-lead crystal,NA,NA
+7013371090,NA,rev_15,rev_16,dropped,other,NA,NA
+7013994010,NA,rev_15,rev_16,dropped,crystalline or non-lead crystal,NA,NA
+7013994090,NA,rev_15,rev_16,dropped,other,NA,NA
+7601106030,NA,rev_15,rev_16,dropped,of greater than 99.8 percent aluminum,NA,NA
+7612901030,NA,rev_15,rev_16,dropped,cans of a capacity not exceeding 355 ml,NA,NA
+8309900010,NA,rev_15,rev_16,dropped,of aluminum,NA,NA
+8412909081,NA,rev_15,rev_16,dropped,wind turbine blades and hubs,NA,NA
+8607301000,NA,rev_15,rev_16,dropped,for vehicles of heading 8605 or 8606,NA,NA
+NA,0901220040,rev_15,rev_16,added,NA,arabica,NA
+NA,0901220050,rev_15,rev_16,added,NA,robusta,NA
+NA,2825600010,rev_15,rev_16,added,NA,germanium dioxide,NA
+NA,2825600020,rev_15,rev_16,added,NA,zirconium dioxide,NA
+NA,2825600050,rev_15,rev_16,added,NA,other,NA
+NA,2827399010,rev_15,rev_16,added,NA,of lithium,NA
+NA,2836995010,rev_15,rev_16,added,NA,zirconium carbonates,NA
+NA,2842909010,rev_15,rev_16,added,NA,selenides and tellurides,NA
+NA,2930904330,rev_15,rev_16,added,NA,terbufos (iso),NA
+NA,7013371001,rev_15,rev_16,added,NA,valued not over $0.30 each,NA
+NA,7013994001,rev_15,rev_16,added,NA,valued not over $0.30 each,NA
+NA,7113195091,rev_15,rev_16,added,NA,"articles of jewelry, of gold, other than rope, curb, cable, chain, necklaces, neck chains or clasps",NA
+NA,7310210070,rev_15,rev_16,added,NA,"containers of a circular cross section, of a capacity not exceeding 11.4 liters, of a kind used for aerosols",NA
+NA,7601106040,rev_15,rev_16,added,NA,of 99.9 percent aluminum or greater,NA
+NA,7601106045,rev_15,rev_16,added,NA,of greater than 99.8 percent but less than 99.9 percent,NA
+NA,7612901040,rev_15,rev_16,added,NA,"with a circular cross section, of a kind used for aerosols",NA
+NA,7612901045,rev_15,rev_16,added,NA,other,NA
+NA,8309900020,rev_15,rev_16,added,NA,for cans of a kind used for the conveyance of beverages as described in statistical note 1 to this chapter,NA
+NA,8309900080,rev_15,rev_16,added,NA,of steel,NA
+NA,8412909070,rev_15,rev_16,added,NA,"wind turbine blades, imported in accordance with statistical note 2 of this chapter",NA
+NA,8412909075,rev_15,rev_16,added,NA,wind turbine hubs,NA
+NA,8418100080,rev_15,rev_16,added,NA,refrigerators with a top freezer compartment,NA
+NA,8483405020,rev_15,rev_16,added,NA,"gear boxes and speed changers for wind turbines, as described in statistical note 6 to this chapter",NA
+NA,8483905020,rev_15,rev_16,added,NA,parts of gear boxes and speed changers for wind turbines,NA
+NA,8542390070,rev_15,rev_16,added,NA,"with adjustable performance characteristics, not elsewhere specified or included",NA
+NA,8607301010,rev_15,rev_16,added,NA,assembled freight rail couplers,NA
+NA,8607301050,rev_15,rev_16,added,NA,freight rail coupler parts,NA
+NA,8607301090,rev_15,rev_16,added,NA,other,NA
+NA,9401993030,rev_15,rev_16,added,NA,"mechanically collapsible sofa bed seat deck components, covered or uncovered as  described in statistical note 2 to this  chapter",NA
+NA,9401999030,rev_15,rev_16,added,NA,"mechanically collapsible sofa bed seat deck components, covered or uncovered as described in statistical note 2 to this chapter",NA
+9401993030,NA,rev_16,rev_17,dropped,"mechanically collapsible sofa bed seat deck components, covered or uncovered as  described in statistical note 2 to this  chapter",NA,NA
+0201305085,0201305097,2026_rev_1,2026_rev_2,rename,other,other,1
+0202305085,0202305097,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+0202308000,0202305097,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+0202305085,0202308025,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+0202308000,0202308025,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+0811100070,0811100085,2026_rev_1,2026_rev_2,split,other,other,1
+0811100070,0811902027,2026_rev_1,2026_rev_2,split,other,other,1
+0811100070,0811905090,2026_rev_1,2026_rev_2,split,other,other,1
+0811100070,0811905290,2026_rev_1,2026_rev_2,split,other,other,1
+1513190000,1513190090,2026_rev_1,2026_rev_2,rename,other,other,1
+2008999190,2008991090,2026_rev_1,2026_rev_2,split,other,other,1
+2008999190,2008999155,2026_rev_1,2026_rev_2,split,other,other,1
+2008999190,2008999195,2026_rev_1,2026_rev_2,split,other,other,1
+2009790020,2009790060,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+2009897091,2009790060,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+2009790020,2009897097,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+2009897091,2009897097,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+2009790020,2009897099,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+2009897091,2009897099,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+2202999120,2202999135,2026_rev_1,2026_rev_2,split,other,other,1
+2202999120,2202999190,2026_rev_1,2026_rev_2,split,other,other,1
+2404121000,2404120590,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+2404191000,2404120590,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+2404121000,2404121090,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+2404191000,2404121090,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+2404121000,2404190590,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+2404191000,2404190590,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+2404121000,2404191090,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+2404191000,2404191090,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+2918165050,2918165090,2026_rev_1,2026_rev_2,rename,other,other,1
+3001900190,3001900195,2026_rev_1,2026_rev_2,rename,other,other,1
+3004200075,3004105049,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004390050,3004105049,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004909214,3004105049,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004909221,3004105049,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004909259,3004105049,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004909289,3004105049,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004909291,3004105049,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004200075,3004200083,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004390050,3004200083,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004909214,3004200083,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004909221,3004200083,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004909259,3004200083,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004909289,3004200083,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004909291,3004200083,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004200075,3004320060,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004390050,3004320060,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004909214,3004320060,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004909221,3004320060,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004909259,3004320060,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004909289,3004320060,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004909291,3004320060,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004200075,3004390055,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004390050,3004390055,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004909214,3004390055,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004909221,3004390055,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004909259,3004390055,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004909289,3004390055,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004909291,3004390055,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004200075,3004909210,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004390050,3004909210,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004909214,3004909210,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004909221,3004909210,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004909259,3004909210,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004909289,3004909210,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004909291,3004909210,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004200075,3004909230,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004390050,3004909230,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004909214,3004909230,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004909221,3004909230,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004909259,3004909230,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004909289,3004909230,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004909291,3004909230,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004200075,3004909243,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004390050,3004909243,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004909214,3004909243,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004909221,3004909243,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004909259,3004909243,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004909289,3004909243,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004909291,3004909243,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004200075,3004909246,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004390050,3004909246,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004909214,3004909246,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004909221,3004909246,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004909259,3004909246,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004909289,3004909246,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004909291,3004909246,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004200075,3004909249,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004390050,3004909249,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004909214,3004909249,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004909221,3004909249,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004909259,3004909249,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004909289,3004909249,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004909291,3004909249,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004200075,3004909251,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004390050,3004909251,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004909214,3004909251,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004909221,3004909251,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004909259,3004909251,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004909289,3004909251,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004909291,3004909251,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004200075,3004909260,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004390050,3004909260,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004909214,3004909260,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004909221,3004909260,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004909259,3004909260,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004909289,3004909260,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004909291,3004909260,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004200075,3004909267,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004390050,3004909267,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004909214,3004909267,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004909221,3004909267,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004909259,3004909267,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004909289,3004909267,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004909291,3004909267,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004909284,3004909271,2026_rev_1,2026_rev_2,rename,containing albuterol sulfate,containing albuterol sulfate,1
+3004200075,3004909273,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004390050,3004909273,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004909214,3004909273,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004909221,3004909273,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004909259,3004909273,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004909289,3004909273,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3004909291,3004909273,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+3504005000,3504005050,2026_rev_1,2026_rev_2,split,other,other,1
+3504005000,3504005080,2026_rev_1,2026_rev_2,split,other,other,1
+3801900000,3801900050,2026_rev_1,2026_rev_2,rename,other,other,1
+7602000095,7602000055,2026_rev_1,2026_rev_2,rename,"recyclable aluminum from industrial processes, including turnings, borings, shavings, filings, clippings and chips","recyclable aluminum from industrial processes, including turnings, borings, shavings, filings, clippings and chips",1
+7602000097,7602000065,2026_rev_1,2026_rev_2,rename,other recyclable aluminum,other recyclable aluminum,1
+7602000098,7602000075,2026_rev_1,2026_rev_2,rename,other,other,1
+8431491090,8431491080,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+8431499030,8431491080,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+8431499044,8431491080,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+8431499095,8431491080,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+8431491090,8431499034,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+8431499030,8431499034,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+8431499044,8431499034,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+8431499095,8431499034,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+8431491090,8431499041,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+8431499030,8431499041,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+8431499044,8431499041,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+8431499095,8431499041,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+8431491090,8431499094,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+8431499030,8431499094,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+8431499044,8431499094,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+8431499095,8431499094,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+8460240010,8460230055,2026_rev_1,2026_rev_2,rename,"external cylindrical, including universal","external cylindrical, including universal",1
+8460240030,8460230065,2026_rev_1,2026_rev_2,rename,internal cylindrical,internal cylindrical,1
+8460230080,8460230075,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+8460240050,8460230075,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+8460230080,8460240080,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+8460240050,8460240080,2026_rev_1,2026_rev_2,many_to_many,other,other,1
+8482910020,8482910030,2026_rev_1,2026_rev_2,rename,other,other,1
+8507600020,8507600090,2026_rev_1,2026_rev_2,rename,other,other,1
+8541290095,8541900080,2026_rev_1,2026_rev_2,rename,other,other,1
+8541290075,8541290055,2026_rev_1,2026_rev_2,rename,with an operating frequency not less than 30 mhz,with an operating frequency less than 30 mhz,0.8888888888888888
+9401999070,9401999085,2026_rev_1,2026_rev_2,rename,other,other,1
+0709510100,NA,2026_rev_1,2026_rev_2,dropped,mushrooms of the genus agaricus,NA,NA
+0709700000,NA,2026_rev_1,2026_rev_2,dropped,"spinach, new zealand spinach and orache spinach (garden spinach)",NA,NA
+0710809724,NA,2026_rev_1,2026_rev_2,dropped,in containers each holding more than 1.4 kg,NA,NA
+0804306000,NA,2026_rev_1,2026_rev_2,dropped,reduced in size,NA,NA
+0804508010,NA,2026_rev_1,2026_rev_2,dropped,mangoes,NA,NA
+0811902024,NA,2026_rev_1,2026_rev_2,dropped,wild,NA,NA
+0811905000,NA,2026_rev_1,2026_rev_2,dropped,pineapples,NA,NA
+0811905200,NA,2026_rev_1,2026_rev_2,dropped,mangoes,NA,NA
+1104120000,NA,2026_rev_1,2026_rev_2,dropped,of oats,NA,NA
+1801000000,NA,2026_rev_1,2026_rev_2,dropped,"cocoa beans, whole or broken, raw or roasted",NA,NA
+2008991000,NA,2026_rev_1,2026_rev_2,dropped,avocados,NA,NA
+2404120500,NA,2026_rev_1,2026_rev_2,dropped,mixtures containing 5 percent or more by weight of one or more aromatic or modified aromatic substances,NA,NA
+2404190500,NA,2026_rev_1,2026_rev_2,dropped,mixtures containing 5 percent or more by weight of one or more aromatic or modified aromatic substances,NA,NA
+2933910000,NA,2026_rev_1,2026_rev_2,dropped,"alprazolam (inn), camazepam (inn), chlordiazepoxide (inn), clonazepam (inn), clorazepate, delorazepam (inn), diazepam (inn), estazolam (inn), ethyl loflazepate (inn), fludiazepam (inn), flunitrazepam (inn), flurazepam (inn), halazepam (inn), lorazepam (inn), lormetazepam (inn), mazindol (inn), medazepam (inn), midazolam (inn), nimetazepam (inn), nitrazepam (inn), nordazepam (inn), oxazepam (inn), pinazepam (inn), prazepam (inn), pyrovalerone (inn), temazepam (inn), tetrazepam (inn) and triazolam (inn); salts thereof",NA,NA
+3004105045,NA,2026_rev_1,2026_rev_2,dropped,combination antibiotics,NA,NA
+3004320000,NA,2026_rev_1,2026_rev_2,dropped,"containing corticosteroid hormones, their derivatives or structural analogues",NA,NA
+3004909202,NA,2026_rev_1,2026_rev_2,dropped,antivirals,NA,NA
+3004909231,NA,2026_rev_1,2026_rev_2,dropped,for oral suspension,NA,NA
+3004909280,NA,2026_rev_1,2026_rev_2,dropped,antihistamines,NA,NA
+3815120000,NA,2026_rev_1,2026_rev_2,dropped,with precious metal or precious metal compounds as the active substance,NA,NA
+7306301000,NA,2026_rev_1,2026_rev_2,dropped,having a wall thickness of less than 1.65 mm,NA,NA
+7602000035,NA,2026_rev_1,2026_rev_2,dropped,recyclable used beverage containers,NA,NA
+8301600000,NA,2026_rev_1,2026_rev_2,dropped,parts,NA,NA
+8301700000,NA,2026_rev_1,2026_rev_2,dropped,keys presented separately,NA,NA
+8415908025,NA,2026_rev_1,2026_rev_2,dropped,air conditioning evaporator coils,NA,NA
+8415908065,NA,2026_rev_1,2026_rev_2,dropped,of heat pumps,NA,NA
+8541900000,NA,2026_rev_1,2026_rev_2,dropped,parts,NA,NA
+NA,0201305091,2026_rev_1,2026_rev_2,added,NA,certified organic,NA
+NA,0202305091,2026_rev_1,2026_rev_2,added,NA,certified organic,NA
+NA,0202308015,2026_rev_1,2026_rev_2,added,NA,certified organic,NA
+NA,0709510110,2026_rev_1,2026_rev_2,added,NA,certified organic,NA
+NA,0709510150,2026_rev_1,2026_rev_2,added,NA,other,NA
+NA,0709700010,2026_rev_1,2026_rev_2,added,NA,certified organic,NA
+NA,0709700050,2026_rev_1,2026_rev_2,added,NA,other,NA
+NA,0710809723,2026_rev_1,2026_rev_2,added,NA,certified organic,NA
+NA,0710809725,2026_rev_1,2026_rev_2,added,NA,other,NA
+NA,0804306010,2026_rev_1,2026_rev_2,added,NA,certified organic,NA
+NA,0804306090,2026_rev_1,2026_rev_2,added,NA,other,NA
+NA,0804508020,2026_rev_1,2026_rev_2,added,NA,certified organic,NA
+NA,0804508040,2026_rev_1,2026_rev_2,added,NA,other,NA
+NA,0811100075,2026_rev_1,2026_rev_2,added,NA,certified organic,NA
+NA,0811902025,2026_rev_1,2026_rev_2,added,NA,certified organic,NA
+NA,0811905010,2026_rev_1,2026_rev_2,added,NA,certified organic,NA
+NA,0811905210,2026_rev_1,2026_rev_2,added,NA,certified organic,NA
+NA,1104120010,2026_rev_1,2026_rev_2,added,NA,certified organic,NA
+NA,1104120090,2026_rev_1,2026_rev_2,added,NA,other,NA
+NA,1513190030,2026_rev_1,2026_rev_2,added,NA,certified organic,NA
+NA,1801000010,2026_rev_1,2026_rev_2,added,NA,certified organic,NA
+NA,1801000090,2026_rev_1,2026_rev_2,added,NA,other,NA
+NA,2008991010,2026_rev_1,2026_rev_2,added,NA,certified organic,NA
+NA,2008999150,2026_rev_1,2026_rev_2,added,NA,certified organic,NA
+NA,2009790040,2026_rev_1,2026_rev_2,added,NA,certified organic,NA
+NA,2009897095,2026_rev_1,2026_rev_2,added,NA,certified organic,NA
+NA,2202999130,2026_rev_1,2026_rev_2,added,NA,certified organic,NA
+NA,2404120510,2026_rev_1,2026_rev_2,added,NA,disposable electronic cigarettes (e-cigarettes) and similar disposable personal electronic vaporizing devices containing nicotine,NA
+NA,2404121010,2026_rev_1,2026_rev_2,added,NA,disposable electronic cigarettes (e-cigarettes) and similar disposable personal electronic vaporizing devices containing nicotine,NA
+NA,2404190510,2026_rev_1,2026_rev_2,added,NA,disposable electronic cigarettes (e-cigarettes) and similar disposable personal electronic vaporizing devices containing nicotine,NA
+NA,2404191010,2026_rev_1,2026_rev_2,added,NA,disposable electronic cigarettes (e-cigarettes) and similar disposable personal electronic vaporizing devices containing nicotine,NA
+NA,2918165020,2026_rev_1,2026_rev_2,added,NA,calcium gluconate,NA
+NA,2933910010,2026_rev_1,2026_rev_2,added,NA,lorazepam (inn); salts thereof,NA
+NA,2933910050,2026_rev_1,2026_rev_2,added,NA,other,NA
+NA,3001900165,2026_rev_1,2026_rev_2,added,NA,heparin,NA
+NA,3004105048,2026_rev_1,2026_rev_2,added,NA,containing piperacillin and tazobactam or its salts,NA
+NA,3004200070,2026_rev_1,2026_rev_2,added,NA,containing cefdinir or its salts,NA
+NA,3004200071,2026_rev_1,2026_rev_2,added,NA,containing cefepime or its salts,NA
+NA,3004200072,2026_rev_1,2026_rev_2,added,NA,containing ceftazidime or its salts,NA
+NA,3004200076,2026_rev_1,2026_rev_2,added,NA,containing meropenem or its salts,NA
+NA,3004200080,2026_rev_1,2026_rev_2,added,NA,containing vancomycin or its salts,NA
+NA,3004320010,2026_rev_1,2026_rev_2,added,NA,containing dexamethasone or its salts,NA
+NA,3004320040,2026_rev_1,2026_rev_2,added,NA,containing methylprednisolone or its salts,NA
+NA,3004390020,2026_rev_1,2026_rev_2,added,NA,containing epinephrine,NA
+NA,3004390030,2026_rev_1,2026_rev_2,added,NA,containing levothyroxine or its salts,NA
+NA,3004390040,2026_rev_1,2026_rev_2,added,NA,containing norepinephrine,NA
+NA,3004390045,2026_rev_1,2026_rev_2,added,NA,containing vasopressin,NA
+NA,3004909203,2026_rev_1,2026_rev_2,added,NA,containing acyclovir or its salts,NA
+NA,3004909205,2026_rev_1,2026_rev_2,added,NA,"containing valganciclovir, peramivir or their salts",NA
+NA,3004909207,2026_rev_1,2026_rev_2,added,NA,containing fluconazole or its salts,NA
+NA,3004909209,2026_rev_1,2026_rev_2,added,NA,containing metronidazole or its salts,NA
+NA,3004909211,2026_rev_1,2026_rev_2,added,NA,sulfonamides,NA
+NA,3004909220,2026_rev_1,2026_rev_2,added,NA,containing hydralazine or its salts,NA
+NA,3004909224,2026_rev_1,2026_rev_2,added,NA,"containing argatroban, adenosine, amlodipine, esmolol, dobutamine, phenoxybenzamine or their salts",NA
+NA,3004909226,2026_rev_1,2026_rev_2,added,NA,tolmetin,NA
+NA,3004909228,2026_rev_1,2026_rev_2,added,NA,tolmetin sodium (anhydrous),NA
+NA,3004909235,2026_rev_1,2026_rev_2,added,NA,containing tramadol,NA
+NA,3004909241,2026_rev_1,2026_rev_2,added,NA,"containing levetiracetam, phenytoin or their salts",NA
+NA,3004909245,2026_rev_1,2026_rev_2,added,NA,containing olanzapine or its salts,NA
+NA,3004909247,2026_rev_1,2026_rev_2,added,NA,containing rocuronium or its salts,NA
+NA,3004909248,2026_rev_1,2026_rev_2,added,NA,containing succinylcholine or its salts,NA
+NA,3004909252,2026_rev_1,2026_rev_2,added,NA,laxatives,NA
+NA,3004909253,2026_rev_1,2026_rev_2,added,NA,antacids,NA
+NA,3004909254,2026_rev_1,2026_rev_2,added,NA,containing famotidine or its salts,NA
+NA,3004909258,2026_rev_1,2026_rev_2,added,NA,containing loperamide or its salts,NA
+NA,3004909261,2026_rev_1,2026_rev_2,added,NA,containing furosemide and its salts,NA
+NA,3004909262,2026_rev_1,2026_rev_2,added,NA,containing hydrochlorothiazide or its salts,NA
+NA,3004909264,2026_rev_1,2026_rev_2,added,NA,containing calcium gluconate,NA
+NA,3004909265,2026_rev_1,2026_rev_2,added,NA,containing potassium chloride,NA
+NA,3004909269,2026_rev_1,2026_rev_2,added,NA,containing diphenhydramine or its salts,NA
+NA,3004909272,2026_rev_1,2026_rev_2,added,NA,containing timolol maleate,NA
+NA,3004909274,2026_rev_1,2026_rev_2,added,NA,containing heparin sodium or its salts,NA
+NA,3004909275,2026_rev_1,2026_rev_2,added,NA,containing zoledronic acid or its salts,NA
+NA,3504005010,2026_rev_1,2026_rev_2,added,NA,certified organic,NA
+NA,3801900010,2026_rev_1,2026_rev_2,added,NA,active anode material containing silicon,NA
+NA,3815120010,2026_rev_1,2026_rev_2,added,NA,with platinum group metals as the active substance,NA
+NA,3815120090,2026_rev_1,2026_rev_2,added,NA,other,NA
+NA,7306301010,2026_rev_1,2026_rev_2,added,NA,"internally coated or lined with a non-electrically insulating material, suitable for use as electrical conduit",NA
+NA,7306301090,2026_rev_1,2026_rev_2,added,NA,other,NA
+NA,7602000045,2026_rev_1,2026_rev_2,added,NA,recyclable aluminum auto and truck wheels,NA
+NA,8301600010,2026_rev_1,2026_rev_2,added,NA,of copper or copper alloys,NA
+NA,8301600060,2026_rev_1,2026_rev_2,added,NA,other,NA
+NA,8301700010,2026_rev_1,2026_rev_2,added,NA,of copper or copper alloys,NA
+NA,8301700060,2026_rev_1,2026_rev_2,added,NA,other,NA
+NA,8415908010,2026_rev_1,2026_rev_2,added,NA,of copper or copper alloys,NA
+NA,8415908020,2026_rev_1,2026_rev_2,added,NA,other,NA
+NA,8415908050,2026_rev_1,2026_rev_2,added,NA,of copper or copper alloys,NA
+NA,8415908070,2026_rev_1,2026_rev_2,added,NA,other,NA
+NA,8431491070,2026_rev_1,2026_rev_2,added,NA,of copper or copper alloys,NA
+NA,8431499032,2026_rev_1,2026_rev_2,added,NA,of copper or copper alloys,NA
+NA,8431499039,2026_rev_1,2026_rev_2,added,NA,of copper or copper alloys,NA
+NA,8431499092,2026_rev_1,2026_rev_2,added,NA,of copper or copper alloys,NA
+NA,8482910015,2026_rev_1,2026_rev_2,added,NA,of copper or copper alloys as described in statistical note 6 to this chapter,NA
+NA,8507600030,2026_rev_1,2026_rev_2,added,NA,"battery energy storage systems fully encased within a housing, as described in statistical note 2 to this chapter",NA
+NA,8541290065,2026_rev_1,2026_rev_2,added,NA,"with an operating frequency 30 mhz or greater but less than 30,000 mhz",NA
+NA,8541290085,2026_rev_1,2026_rev_2,added,NA,"with an operating frequency 30,000 mhz or greater",NA
+NA,8541900010,2026_rev_1,2026_rev_2,added,NA,frames for photovoltaic cells assembled in modules or made up into panels (as covered by subheading 8541.43.00),NA
+NA,9401999040,2026_rev_1,2026_rev_2,added,NA,of seats of a kind used for aircraft,NA
+NA,7602000035,2026_rev_2,2026_rev_3,added,NA,recyclable used beverage containers,NA
