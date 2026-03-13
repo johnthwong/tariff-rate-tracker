@@ -358,8 +358,8 @@ calculate_rates_for_revision <- function(
   rates <- calculate_rates_fast(products, ch99_data, countries, stacking_method = stacking_method)
 
   if (nrow(rates) == 0) {
-    message('  No rates calculated for ', revision_id)
-    return(enforce_rate_schema(tibble()))
+    message('  No footnote-linked rates for ', revision_id, ' — blanket authorities will seed rows')
+    rates <- enforce_rate_schema(tibble())
   }
 
   # 1b. Check IEEPA invalidation (SCOTUS ruling in Learning Resources v. Trump)

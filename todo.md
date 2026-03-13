@@ -1,33 +1,8 @@
 # Tracker Logic TODO
 
-## 1. Empty revisions can collapse to zero rows
+## 1. ~~Empty revisions can collapse to zero rows~~ (DONE 2026-03-13)
 
-### Issue
-
-In [src/06_calculate_rates.R](/C:/Users/ji252/Documents/GitHub/tariff-rate-tracker/src/06_calculate_rates.R), `calculate_rates_for_revision()` returns immediately when the initial footnote-based pass is empty. That happens before the blanket-authority logic for IEEPA, Section 232, Section 301, Section 122, and post-IEEPA grid expansion runs.
-
-### Why it matters
-
-A footnote parse miss, or a revision that relies mainly on blanket authorities, can produce a fully empty revision even though the repo has enough information to build most of the rates.
-
-### Proposed solution
-
-- Remove the early return on `nrow(rates) == 0`.
-- Initialize `rates` as an empty schema-conforming tibble instead.
-- Let the blanket-authority steps populate rows even when the footnote seed is empty.
-- At the end of the function, decide explicitly whether a truly empty revision means:
-  - no tariffed pairs, or
-  - a zero-duty base grid should be emitted.
-
-### Files to update
-
-- [src/06_calculate_rates.R](/C:/Users/ji252/Documents/GitHub/tariff-rate-tracker/src/06_calculate_rates.R)
-- possibly [src/helpers.R](/C:/Users/ji252/Documents/GitHub/tariff-rate-tracker/src/helpers.R) for a small helper like `empty_rates_schema()`
-
-### Tests to add
-
-- A revision fixture with no footnote-linked pairs but active blanket Section 122 or IEEPA
-- A revision fixture with no active authorities at all
+Fixed: removed the early return on `nrow(rates) == 0` in `calculate_rates_for_revision()`. Empty footnote results now initialize as a schema-conforming tibble via `enforce_rate_schema(tibble())`, allowing all blanket-authority steps (IEEPA, 232, 301, S122) to seed rows independently. All blanket steps use `expand_grid` or `add_blanket_pairs()` patterns that create rows from the full product/country lists, not from existing `rates` — so they work correctly on an empty seed.
 
 ---
 
@@ -141,7 +116,7 @@ The unweighted means move with panel coverage as well as policy. That makes them
 ## Suggested order
 
 1. ~~Fix fail-open country applicability.~~ (DONE)
-2. Remove the empty-revision early return.
+2. ~~Remove the empty-revision early return.~~ (DONE)
 3. Harmonize Section 301 scope across stacking and decomposition.
 4. Fix country-specific auto deals versus blanket auto rates. (low priority, mitigated by config)
 5. Redefine and document the unweighted daily mean denominator.
