@@ -7,7 +7,12 @@ library(here)
 source(here('src', 'helpers.R'))
 
 # ---- Tariff-ETRs benchmark data (from 2-21_temp scenario) ----
-etrs_path <- 'C:/Users/ji252/Documents/GitHub/Tariff-ETRs/output/2-21_temp/levels_by_census_country.csv'
+# Load path from config/local_paths.yaml; fall back to relative path
+local_cfg <- tryCatch(yaml::read_yaml(here('config', 'local_paths.yaml')), error = function(e) list())
+etrs_repo <- local_cfg$tariff_etrs_repo %||% file.path('..', 'Tariff-ETRs')
+etrs_path <- file.path(etrs_repo, 'output', '2-21_temp', 'levels_by_census_country.csv')
+if (!file.exists(etrs_path)) stop('Tariff-ETRs benchmark not found: ', etrs_path,
+  '\nSet tariff_etrs_repo in config/local_paths.yaml')
 etrs <- read_csv(etrs_path, col_types = cols(
   date = col_date(),
   cty_code = col_character(),
@@ -20,7 +25,7 @@ cat('Dates:', paste(unique(etrs$date), collapse = ', '), '\n')
 
 # ---- Load our imports for weighting ----
 # Uses same Census import data as 08_weighted_etr.R (from Tariff-ETRs cache)
-imports_raw <- readRDS(file.path('..', 'Tariff-ETRs', 'cache', 'hs10_by_country_gtap_2024_con.rds'))
+imports_raw <- readRDS(file.path(etrs_repo, 'cache', 'hs10_by_country_gtap_2024_con.rds'))
 imports <- imports_raw %>%
   group_by(hs10, cty_code) %>%
   summarise(value = sum(imports), .groups = 'drop') %>%

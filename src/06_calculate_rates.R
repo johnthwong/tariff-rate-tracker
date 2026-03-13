@@ -301,6 +301,10 @@ apply_232_derivatives <- function(rates, products, ch99_data, s232_rates, countr
   rates <- rates %>%
     left_join(metal_shares, by = 'hts10') %>%
     mutate(metal_share = coalesce(metal_share, 1.0))
+  n_missing_share <- sum(is.na(metal_shares$metal_share[metal_shares$hts10 %in% deriv_matched]))
+  if (n_missing_share > 0) {
+    warning(n_missing_share, ' derivative products have no metal_share data — defaulting to 1.0 (no scaling)')
+  }
 
   if (length(deriv_matched) > 0) {
     rates <- rates %>%
@@ -395,6 +399,7 @@ calculate_rates_for_revision <- function(
   ieepa_exempt_products <- if (file.exists(ieepa_exempt_path)) {
     read_csv(ieepa_exempt_path, col_types = cols(hts10 = col_character()))$hts10
   } else {
+    warning('ieepa_exempt_products.csv not found — all products subject to IEEPA')
     character(0)
   }
   if (length(ieepa_exempt_products) > 0) {
@@ -1268,6 +1273,10 @@ calculate_rates_for_revision <- function(
   #     aircraft dispute with the EU/UK and is assumed suspended from 2021 onward
   #     for the current series horizon.
   s301_products_path <- here('resources', 's301_product_lists.csv')
+  if (!file.exists(s301_products_path)) {
+    stop('s301_product_lists.csv not found at ', s301_products_path,
+         '\nSection 301 is a major tariff authority — cannot build without product lists.')
+  }
   if (file.exists(s301_products_path)) {
     s301_products <- read_csv(s301_products_path, col_types = cols(
       hts8 = col_character(), list = col_character(), ch99_code = col_character()

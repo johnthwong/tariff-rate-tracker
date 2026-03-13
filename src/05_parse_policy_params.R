@@ -285,13 +285,21 @@ extract_ieepa_rates <- function(hts_raw, country_lookup) {
       }
     }
 
-    # Check if terminated/suspended
-    terminated <- grepl('provision terminated|provision suspended', description, ignore.case = TRUE)
+    # Check if terminated/suspended.
+    # Normalize whitespace and encoding artifacts before matching to handle
+    # non-breaking spaces, smart quotes, and other USITC PDF rendering issues.
+    desc_normalized <- gsub('[\\s\\x{00A0}]+', ' ', description, perl = TRUE)
+    terminated <- grepl('provision terminated|provision suspended|temporarily suspended',
+                        desc_normalized, ignore.case = TRUE)
 
-    # Robust secondary check: handle encoding/format variations
-    # (e.g., non-breaking spaces, smart quotes in "[Compiler's note: provision suspended.]")
+    # Secondary check: compiler's note format (various punctuation/encoding)
     if (!terminated) {
-      terminated <- grepl('\\[Compiler.*suspended', description, ignore.case = TRUE)
+      terminated <- grepl('\\[Compiler.*suspend', desc_normalized, ignore.case = TRUE)
+    }
+
+    # Tertiary check: rate set to "Free" or "$0" (indicates effective suspension)
+    if (!terminated && !is.na(rate) && rate == 0) {
+      terminated <- grepl('free|\\$0', general, ignore.case = TRUE)
     }
 
     # Determine phase
@@ -307,10 +315,18 @@ extract_ieepa_rates <- function(hts_raw, country_lookup) {
       'phase1_apr9'
     }
 
-    # Diagnostic: log China entry's suspension status
+    # Diagnostic: log China entry's suspension status.
+    # 9903.01.63 was suspended starting at rev_17 (Geneva de-escalation).
+    # If the entry exists but is not detected as suspended, warn loudly —
+    # this likely means the text matching needs updating for a new format.
     if (ch99_code == '9903.01.63') {
       message('  [Diagnostic] 9903.01.63 (China): terminated=', terminated,
               ', description tail: "...', substr(description, max(1, nchar(description) - 60), nchar(description)), '"')
+      if (!terminated && !is.na(rate) && rate > 0) {
+        warning('9903.01.63 (China +34% reciprocal) has rate=', rate,
+                ' but suspension NOT detected — check footnote text for new suspension language.',
+                '\nDescription: ', substr(description, 1, 200))
+      }
     }
 
     # Extract countries

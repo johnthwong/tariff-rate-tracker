@@ -86,13 +86,27 @@ fetch_usitc_releases <- function(
     return(NULL)
   }
 
+  # Validate expected API schema before parsing
+  required_fields <- c('name', 'releaseStartDate', 'status')
+  if (is.data.frame(raw)) {
+    missing_fields <- setdiff(required_fields, names(raw))
+  } else if (is.list(raw) && length(raw) > 0) {
+    missing_fields <- setdiff(required_fields, names(raw[[1]]))
+  } else {
+    missing_fields <- required_fields
+  }
+  if (length(missing_fields) > 0) {
+    stop('USITC API response missing expected fields: ',
+         paste(missing_fields, collapse = ', '),
+         '\nAPI schema may have changed — update fetch_usitc_releases().')
+  }
+
   # Parse releases — errors here are code bugs, not API issues, so let them propagate
   releases <- as_tibble(raw) %>%
     filter(!is.na(name), !is.na(releaseStartDate)) %>%
     mutate(
       revision = map_chr(name, api_name_to_revision),
       effective_date = as.Date(releaseStartDate, format = '%m/%d/%Y'),
-      release_end = as.Date(releaseEndDate, format = '%m/%d/%Y'),
       api_status = status
     ) %>%
     filter(

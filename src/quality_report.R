@@ -294,7 +294,8 @@ run_quality_report <- function(
   message('\n--- Section 301 Scope Check ---')
   non_china_301 <- tibble()
   if ('rate_301' %in% names(ts) && 'country' %in% names(ts)) {
-    cty_china <- '5700'
+    pp <- tryCatch(load_policy_params(), error = function(e) NULL)
+    cty_china <- if (!is.null(pp)) pp$CTY_CHINA %||% '5700' else '5700'
     non_china_301 <- ts %>% filter(country != cty_china & rate_301 > 0)
     if (nrow(non_china_301) > 0) {
       message('WARNING: ', nrow(non_china_301),

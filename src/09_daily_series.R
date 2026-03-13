@@ -434,8 +434,9 @@ export_daily_slice <- function(ts, date_range, countries = NULL, products = NULL
         }
       }
     }
-    # Recompute totals
-    expanded <- apply_stacking_rules(expanded)
+    # Recompute totals (pass cty_china from policy_params for correct stacking)
+    cty_china <- if (!is.null(policy_params)) policy_params$CTY_CHINA %||% '5700' else '5700'
+    expanded <- apply_stacking_rules(expanded, cty_china = cty_china)
   }
 
   # Select output columns
