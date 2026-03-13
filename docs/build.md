@@ -83,8 +83,9 @@ Expected runtime: ~15–30 minutes for a full rebuild (depending on hardware).
 | `--start-from REV` | Incremental build from a specific revision |
 | `--build-only` | Build timeseries only, skip downstream scripts (daily, ETR, quality) |
 | `--core-only` | Build + unweighted daily series + quality report, skip weighted ETR |
+| `--with-alternatives` | Also run rebuild alternatives (USMCA 2024, flat metal content, nonzero duty-free) |
 
-Flags can be combined: `--full --core-only` rebuilds everything but skips weighted outputs.
+Flags can be combined: `--full --core-only` rebuilds everything but skips weighted outputs. Post-build alternative series (scenario-based: `no_ieepa`, `no_301`, etc.) always run in the normal downstream phase; `--with-alternatives` adds the slower rebuild variants that require re-processing all revisions with modified policy parameters.
 
 ---
 
@@ -108,6 +109,23 @@ Flags can be combined: `--full --core-only` rebuilds everything but skips weight
 | `daily_by_country.csv` | Per-day ETR by Census country code |
 | `daily_by_authority.csv` | Per-day ETR decomposed by tariff authority |
 | `daily_aggregates.rds` | All daily outputs as R list |
+
+### Alternative daily series (`output/alternative/`)
+
+| File | Description |
+|------|-------------|
+| `daily_overall_no_ieepa.csv` | Zero IEEPA reciprocal + fentanyl |
+| `daily_overall_no_ieepa_recip.csv` | Zero IEEPA reciprocal only |
+| `daily_overall_no_301.csv` | Zero Section 301 |
+| `daily_overall_no_232.csv` | Zero Section 232 |
+| `daily_overall_no_s122.csv` | Zero Section 122 |
+| `daily_overall_pre_2025.csv` | Only pre-2025 tariffs (232 + legacy 301) |
+| `daily_overall_tpc_stacking.csv` | TPC additive stacking (no mutual exclusion) |
+| `daily_overall_usmca_2024.csv` | Rebuild with 2024 USMCA shares (`--with-alternatives` only) |
+| `daily_overall_metal_flat.csv` | Rebuild with flat 50% metal content (`--with-alternatives` only) |
+| `daily_overall_dutyfree_nonzero.csv` | Rebuild with nonzero duty-free treatment (`--with-alternatives` only) |
+
+Same schema as `daily_overall.csv` plus a `variant` column.
 
 ### Weighted ETR (`output/etr/`) — requires import weights
 

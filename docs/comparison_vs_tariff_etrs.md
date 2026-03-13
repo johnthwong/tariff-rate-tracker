@@ -55,7 +55,9 @@ ETRs applies USMCA exemption rates from a 47-row GTAP sector file (~85-90% share
 
 ### Divergence source 2: Section 301 rate treatment (+4-6pp China)
 
-ETRs applies a flat 301 rate per product. The tracker applies per-list rates (MAX across ch99 codes; Biden supersedes Trump on 8 overlapping products). TPC confirms multi-list rates — 85%+ rates require it:
+ETRs partitions products into exclusive rate buckets (one rate per HS-10 × country). The tracker takes MAX across all active Ch99 entries per HTS-8. Both approaches give the same result: Biden supersedes Trump on the 8 overlapping products (Biden rates ≥ Trump rates for all 8).
+
+TPC's rate clusters suggest they may additionally stack Trump + Biden rates on overlapping products:
 
 | TPC rate cluster | Count | Decomposition |
 |-----------------|-------|---------------|
@@ -64,7 +66,9 @@ ETRs applies a flat 301 rate per product. The tracker applies per-list rates (MA
 | ~85% | 421 (3%) | fentanyl(10%) + 301_Trump(25%) + 301_Biden(50%) |
 | ~95% | 528 (4%) | recip(10%) + fentanyl(10%) + 301_Trump(25%) + 301_Biden(50%) |
 
-**Assessment:** Tracker is correct. Proposed ETRs fix: E2.
+The ~85% and ~95% clusters imply TPC sums Trump + Biden rates rather than taking the max. Both the tracker and ETRs treat Biden as superseding Trump on overlaps.
+
+**Assessment:** Tracker and ETRs agree (MAX/supersession). TPC may use additive stacking across 301 generations for the 8 overlapping products. Proposed ETRs fix E2 (per-list rates) is no longer applicable — the divergence is between the supersession approach (tracker + ETRs) and the additive approach (TPC).
 
 ### Divergence source 3: 232 product coverage (offsetting, ±1-4pp per country)
 
@@ -183,12 +187,12 @@ The tracker is within ~1pp of TPC at the three non-Liberation-Day dates. The rev
 | # | Source | Direction | Magnitude | Who's right | Fix | Status |
 |---|--------|-----------|-----------|-------------|-----|--------|
 | 1 | USMCA share granularity | Tracker high (CA/MX) | +9.7pp CA, +1.6pp MX | **Tracker** (TPC validates) | ETRs E1 | Open |
-| 2 | 301 rate treatment | Tracker high (China) | +4-6pp China | **Tracker** (Biden supersedes Trump via MAX) | ETRs E2 | Open |
+| 2 | 301 rate treatment | Tracker+ETRs agree (supersession) | +4-6pp China vs TPC | **Tracker = ETRs** (both MAX); TPC may sum | Reclassified | Methodological |
 | 3 | 232 product coverage (steel) | Offsetting | Ch72 ±40pp | ETRs missing ch72 | E3 | Open |
 | 4 | Copper 232 product coverage | Was tracker high | ~1pp at Feb 24 | **Resolved** (80/80 match) | D1 | **Done** |
 | 5 | Auto USMCA content scaling | Was tracker low (ch87) | ~4.7pp ch87 | **Aligned** (both use 0.4 content share) | T4 | **Done** |
 
-Divergences #1 and #2 are ETRs-side issues confirmed by TPC. Divergence #3: ETRs missing ch72 base steel. Divergence #5 resolved: tracker now applies `us_auto_content_share = 0.4` to scale USMCA exemptions for 232 auto/MHD products, matching ETRs methodology.
+Divergence #1 is ETRs-side (confirmed by TPC). Divergence #2 reclassified: tracker and ETRs agree on 301 supersession; TPC may additionally stack across generations. Divergence #3: ETRs missing ch72 base steel.
 
 ---
 
@@ -199,7 +203,7 @@ Divergences #1 and #2 are ETRs-side issues confirmed by TPC. Divergence #3: ETRs
 | # | Change | Status | Est. impact |
 |---|--------|--------|-------------|
 | E1 | Replace GTAP-level USMCA shares with product-level Census SPI data | Open | +4-8pp Canada, +2-3pp Mexico |
-| E2 | Implement per-list 301 rates (Biden supersedes Trump on overlap) | Open | +4-6pp China |
+| E2 | ~~Implement per-list 301 rates~~ — Reclassified: ETRs already uses exclusive rate partitioning (equivalent to tracker's MAX). TPC divergence is methodological (additive vs supersession). | N/A | — |
 | E3 | Add chapter 72 base steel products to s232.yaml | Open | +40pp ch72 (partially offsets E1/E2) |
 | D1 | Copper product list reconciled: parsed US Note 36(b), 80 HTS10 codes match ETRs exactly. Tracker now uses authoritative list via `s232_copper_products.csv` | **Done** | ~1pp at Feb 24 |
 
@@ -212,7 +216,7 @@ Divergences #1 and #2 are ETRs-side issues confirmed by TPC. Divergence #3: ETRs
 | T3 | Fix `parse_ch99_rate()` regex for "a duty of X%" pattern | **Done** | Enables automatic copper rate extraction |
 | T4 | Add `us_auto_content_share` (0.4) to scale 232 auto USMCA exemptions | **Done** | ~4.7pp ch87 |
 
-No remaining open tracker-side items. All known divergences are either resolved or confirmed ETRs-side.
+No remaining open tracker-side items. All known divergences are either resolved, confirmed ETRs-side, or reclassified as methodological differences.
 
 ---
 

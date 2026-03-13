@@ -81,9 +81,9 @@ Total rate = base_rate + total_additional
 
 For base Section 232 products (steel, aluminum, autos, copper), `metal_share = 1.0` and `nonmetal_share = 0`, so IEEPA is fully excluded. For derivative 232 products (aluminum-containing articles outside ch76), `metal_share = 0.50` (default), so IEEPA applies to the remaining 50%.
 
-Note: `rate_301` uses generation-based stacking — MAX within each generation (original Trump 9903.88.xx / Biden 9903.91-92.xx), SUM across generations. Products on both Trump and Biden lists receive both duties (e.g., 25% + 25% = 50%).
+Note: `rate_301` is the MAX across all active Ch99 entries for a given HTS-8 code. For the 8 products that appear on both Trump-era and Biden-era lists, Biden rates are always ≥ the corresponding Trump rate, so MAX achieves the correct supersession. This matches Tariff-ETRs, which partitions products into exclusive rate buckets.
 
-USMCA exemption: For Canadian and Mexican products, tariff rates are multiplied by `(1 - usmca_share)`, where `usmca_share` is the fraction of 2024 import value that entered under USMCA preference (Census RATE_PROV = 18). Shares are computed per-HTS10 x country from Census IMP_DETL.TXT fixed-width files by `src/compute_usmca_shares.R` and stored in `resources/usmca_product_shares.csv` (22,449 product-country pairs). Products not imported from CA/MX in 2024 retain full tariff (share = 0). Falls back to binary eligibility (S/S+ in HTS `special` field → zero rate) if Census SPI shares are unavailable. Applied to IEEPA reciprocal, IEEPA fentanyl, Section 122, and Section 232 auto/MHD programs.
+USMCA exemption: For Canadian and Mexican products, tariff rates are multiplied by `(1 - usmca_share)`, where `usmca_share` is the product-level USMCA utilization rate from USITC DataWeb SPI data (programs "S"/"S+"). Year-specific shares are available for 2024 and 2025 (~40K product-country pairs each), selectable via `usmca_shares.year` in `policy_params.yaml` (default: 2025). Products not imported from CA/MX retain full tariff (share = 0). For Section 232 auto/MHD products, the USMCA share is further scaled by `us_auto_content_share` (0.40). Falls back to binary eligibility (S/S+ in HTS `special` field) if DataWeb shares are unavailable. Applied to IEEPA reciprocal, IEEPA fentanyl, Section 122, and Section 232 auto/MHD programs.
 
 ### Calculation Pipeline
 
@@ -142,51 +142,25 @@ The within-2pp match rate improved significantly after the March 2026 base rate 
 
 ## Known Gaps and Limitations
 
-### ~~1. USMCA Utilization Rate~~ (Resolved — Census SPI data)
+### Remaining gaps
 
-**Impact**: CA 79.4% exact match (was 44.3%), MX 83.9% (was 44.5%)
+**Section 301 exclusions (9903.89.xx).** Some 9903.89.xx entries define product exclusions from Lists 1–4A that are not parsed. Excluded products may incorrectly receive the base 301 rate. Low impact (~61 products).
 
-Resolved by extracting per-product USMCA utilization shares from Census Bureau IMP_DETL.TXT RATE_PROV field (code 18 = USMCA preferential entry). For each HTS10 x country, `usmca_share = sum(value where RATE_PROV=18) / sum(total value)`. Applied to all CA/MX products as `rate * (1 - usmca_share)`. The Census data provides true product-level variation (CA median 0%, mean 41%; MX median 43%, mean 47%) rather than sector averages. Earlier attempts using Tariff-ETRs sector-level shares failed because sector averages don't capture within-sector bimodal distribution.
+**EU/Japan/Korea floor rate residual (~4pp vs TPC).** Two components: (1) *Duty-free treatment* (~38% of gap rows) — the tracker defaults to applying IEEPA to all products including those with 0% MFN base rate; TPC excludes duty-free products. The `dutyfree_nonzero` alternative series quantifies this effect. (2) *Continuous rate residual* (~62% of gap rows) — TPC assigns rates spanning 1–14% for products where the tracker applies a flat 15% floor, suggesting product-level methodology beyond the simple floor formula.
 
-### 2. Floor Country Residual (EU/Japan/Korea/Swiss)
+### Methodological differences vs TPC (not bugs)
 
-**Impact**: Germany 46.8% exact match (up from 41.5% after floor exemption fix), ~4pp mean excess
+**China+232 reciprocal stacking (~920 products, ~25pp gap).** TPC stacks IEEPA reciprocal on top of Section 232. We apply mutual exclusion per Tariff-ETRs: 232 takes precedence, so reciprocal contributes 0pp on base 232 products. The `tpc_stacking` alternative series reproduces TPC's additive behavior for comparison.
 
-This residual has two identified components:
+**China IEEPA reciprocal rate (34% vs ~25%).** The statutory rate from 9903.01.63 is 34%. TPC shows ~25%, likely reflecting timing of the US-China bilateral agreement encoding. The tracker correctly reads the HTS JSON suspension markers.
 
-**Duty-free treatment (configurable).** The tracker defaults to `ieepa_duty_free_treatment: 'all'`, applying IEEPA reciprocal to all products including those with 0% MFN base rate. TPC excludes duty-free products. At rev_32, ~38% of EU comparison rows (31,824 of 84,054) are flagged as duty-free-gap — products where the tracker assigns a floor rate and TPC assigns zero. Setting `nonzero_base_only` in `policy_params.yaml` eliminates this component. The legal text supports either interpretation; the default follows the stricter reading.
+### Resolved
 
-**Continuous rate residual.** For the remaining products where we apply the full 15% floor, TPC assigns rates spanning 1–14% — a continuous distribution suggesting TPC uses trade-weighted or product-level methodology beyond a simple floor formula. Floor country product exemptions (PTAAP, civil aircraft, pharma) addressed ~1,600 previously misclassified products per EU country, but this continuous-rate pattern remains unexplained.
-
-### 3. Floor Country Residual — 232 Interaction (~1,200 EU products)
-
-**Impact**: EU 232 products at 3.2% exact match with -12pp mean diff
-
-EU products subject to Section 232 have poor TPC match rates, suggesting EU-specific 232 exemption or exclusion patterns not captured in our methodology. Separate from the floor rate issue.
-
-### 4. Pre-Phase 2 Revision Mismatch (rev_6)
-
-**Impact**: 47.3% exact match
-
-The March 2025 TPC snapshot predates IEEPA reciprocal tariffs (Liberation Day was April 2, 2025). The lower match rate reflects different baseline assumptions and limited product overlap at that date.
-
----
-
-## Methodological Differences vs TPC
-
-These are deliberate modeling choices, not implementation gaps.
-
-### China+232 Reciprocal Stacking (~920 products, ~25pp gap)
-
-**Impact**: China metal chapters (72-76) at 1.2% exact match, -24pp mean diff
-
-TPC stacks IEEPA reciprocal on top of Section 232 for China products (e.g., 232(25%) + recip(25%) + fent(10%) + 301(25%) = 85%). Our model applies mutual exclusion per Tariff-ETRs methodology: Section 232 takes precedence over IEEPA reciprocal for base 232 products (`nonmetal_share = 0`), so reciprocal contributes 0pp. This follows the legal authority structure — Section 232 and IEEPA are separate statutory authorities. Confirmed via statistical analysis: adding 25pp reciprocal to our China+232 rates produces near-zero residual vs TPC. The `stacking_method = 'tpc_additive'` option reproduces TPC's additive behavior for diagnostic comparison.
-
-### China IEEPA Reciprocal Rate (34% vs ~25%)
-
-**Impact**: China 72.4% exact match at rev_32
-
-The statutory IEEPA reciprocal rate for China is 34% (from 9903.01.63). TPC shows ~25%, likely reflecting the May 2025 US-China bilateral agreement. Our system correctly tracks the suspension marker in the HTS JSON; the remaining discrepancy reflects timing differences in how the bilateral agreement is encoded.
+- **USMCA utilization rates:** Product-level USITC DataWeb SPI data (S/S+) replaces binary eligibility. Year-specific shares for 2024 and 2025, selectable via `usmca_shares.year`.
+- **Copper 232 product coverage:** Parsed US Note 36(b) — 80 HTS10 codes match ETRs exactly.
+- **Ch87 auto USMCA content scaling:** Added `us_auto_content_share = 0.4` to scale 232 auto USMCA exemptions.
+- **Base rate inheritance:** Statistical suffixes inherit MFN from parent indent (11,558 products fixed).
+- **301 Biden supersession:** Biden rates supersede Trump on 8 overlapping products via MAX aggregation.
 
 ---
 

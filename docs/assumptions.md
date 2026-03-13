@@ -110,17 +110,15 @@ For Section 232 auto/MHD products, the USMCA share is further scaled by `us_auto
 
 ---
 
-## 8. Section 301 Product Lists and Generation-Based Stacking
+## 8. Section 301 Product Lists and Rate Aggregation
 
-**Assumption:** ~12,200 product entries (covering ~11,000 unique HTS8 codes) are subject to Section 301 tariffs on China. Rate aggregation uses generation-based stacking: MAX within a generation (Trump 9903.88.xx / Biden 9903.91-92.xx), SUM across generations. Products on both Trump List 3 (25%) and Biden (25%) get 50% total.
+**Assumption:** ~12,200 product entries (covering ~11,000 unique HTS8 codes) are subject to Section 301 tariffs on China. Rate aggregation takes MAX across all active Ch99 entries per HTS-8 code. For the 8 products that appear on both Trump-era and Biden-era lists, Biden rates are always ≥ the corresponding Trump rate, so MAX achieves the correct supersession. This matches Tariff-ETRs, which partitions products into exclusive rate buckets (one rate per HS-10 × country).
 
 **Source:** Two non-HTS-JSON sources:
 1. USITC "China Tariffs" reference document (~10,400 codes)
 2. Chapter 99 PDF US Notes 20/31, scraped via `src/scrape_us_notes.R`
 
-Generation-based stacking logic comes from Tariff-ETRs methodology, not explicit Federal Register language.
-
-**Known gap:** 9903.89.xx US Note exclusions not captured (excluded products may incorrectly receive 301 rate).
+**Known gap:** 9903.89.xx US Note exclusions not captured (excluded products may incorrectly receive 301 rate, ~61 products).
 
 **Implementation:** `resources/s301_product_lists.csv`, `config/policy_params.yaml` (SECTION_301_RATES), `src/06_calculate_rates.R`.
 

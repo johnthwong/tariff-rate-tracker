@@ -121,7 +121,9 @@ Section 232 and Section 301 tariffs are unaffected by the SCOTUS ruling (separat
 | `delta_*.rds` | Changes between consecutive revisions |
 | `validation_*.rds` | TPC comparison at matched dates |
 
-**Daily aggregates** (`output/daily/`): per-day overall, by-country, and by-authority ETRs.
+**Daily aggregates** (`output/daily/`): per-day overall, by-country (with country names), and by-authority ETRs.
+
+**Alternative daily series** (`output/alternative/`): sensitivity variants of the daily overall ETR. Post-build variants (always produced): `no_ieepa`, `no_ieepa_recip`, `no_301`, `no_232`, `no_s122`, `pre_2025`, `tpc_stacking`. Rebuild variants (with `--with-alternatives`): `usmca_2024`, `metal_flat`, `dutyfree_nonzero`. Same schema as `daily_overall.csv` plus a `variant` column.
 
 **Weighted ETRs** (`output/etr/`): import-weighted effective tariff rates by partner, authority, and GTAP sector, with TPC overlay plots.
 
@@ -205,7 +207,7 @@ This reduces the import-weighted average base rate from ~4% (statutory) to ~2% (
 
 | File | Purpose |
 |------|---------|
-| `00_build_timeseries.R` | Main entry point. Iterates over all HTS revisions, builds per-revision rate snapshots, computes deltas, runs TPC validation, and combines into a long-format time series. Supports `--full` (clean rebuild), `--start-from` (incremental), `--build-only` (skip downstream), `--core-only` (skip weighted outputs), and auto-update (default). |
+| `00_build_timeseries.R` | Main entry point. Iterates over all HTS revisions, builds per-revision rate snapshots, computes deltas, runs TPC validation, and combines into a long-format time series. Supports `--full` (clean rebuild), `--start-from` (incremental), `--build-only` (skip downstream), `--core-only` (skip weighted outputs), `--with-alternatives` (rebuild sensitivity variants), and auto-update (default). |
 
 ### Build Pipeline (sourced by `00_build`)
 
@@ -224,7 +226,7 @@ This reduces the import-weighted average base rate from ~4% (statutory) to ~2% (
 | File | Purpose |
 |------|---------|
 | `08_weighted_etr.R` | Import-weighted ETR analysis by authority/partner/sector with TPC overlay plots. Callable via `run_weighted_etr()`. |
-| `09_daily_series.R` | Daily rate series with Section 122 expiry interval splitting. Callable via `run_daily_series()`. |
+| `09_daily_series.R` | Daily rate series with Section 122 expiry interval splitting. Also builds alternative daily series (scenario-based and rebuild variants). Callable via `run_daily_series()` and `run_alternative_series()`. |
 | `quality_report.R` | Schema checks, per-revision quality metrics, anomaly detection. Callable via `run_quality_report()`. |
 
 ### Shared Infrastructure
@@ -292,6 +294,9 @@ Rscript src/00_build_timeseries.R --start-from rev_25
 
 # Build only (skip downstream: daily series, ETR, quality report)
 Rscript src/00_build_timeseries.R --build-only
+
+# Include rebuild alternatives (USMCA 2024, flat metal, nonzero duty-free)
+Rscript src/00_build_timeseries.R --with-alternatives
 
 # Standalone downstream scripts (also run automatically by 00_build)
 Rscript src/09_daily_series.R
@@ -431,7 +436,7 @@ Where `nonmetal_share = 1 - metal_share` when `rate_232 > 0` and `metal_share < 
 | 9903.91.xx | US Note 31 | Footnotes + blanket list (Biden acceleration) | ~390 via `s301_product_lists.csv` |
 | 9903.92.xx | US Note 31 | Footnotes + blanket list (crane duties) | ~20 via `s301_product_lists.csv` |
 
-**Generation-based rate stacking:** MAX within each generation (original Trump 9903.88.xx / Biden 9903.91–92.xx), SUM across generations. This correctly handles products on both Trump and Biden lists (e.g., Trump List 3 at 25% + Biden at 25% = 50% total).
+**Rate aggregation:** Products may appear on multiple Ch99 lists. The applied rate is the MAX across all active Ch99 entries for that HTS-8 code. For the 8 products that appear on both Trump-era and Biden-era lists, Biden rates are always ≥ the corresponding Trump rate, so MAX achieves the correct supersession. This matches Tariff-ETRs, which partitions products into exclusive rate buckets (one rate per HS-10 × country).
 
 **Biden-only 301 steel products** (ch72/73/76) are genuinely not on Trump lists; their 301 rate is 25%, not 50%.
 
@@ -554,37 +559,31 @@ Import-weighted effective tariff rates compared against [Tariff-ETRs](https://gi
 | 2026-02-24 | 12.01% | 10.49% | +1.53 | S122 + 232 + 301 (IEEPA zeroed) |
 | 2026-07-24 | 7.62% | 7.29% | +0.33 | 232 + 301 + MFN only |
 
-**Key divergence sources:** (1) USMCA share granularity — tracker uses product-level USITC DataWeb SPI data vs ETRs' GTAP sector-level shares (tracker confirmed correct by TPC); (2) 301 rate treatment (tracker correct — Biden supersedes Trump on 8 overlap products); (3) 232 product coverage gaps (bilateral — ETRs missing ch72 base steel; ch87 autos needs investigation); (4) Copper 232 product coverage (resolved — parsed US Note 36(b), 80/80 match with ETRs). Full details in `docs/comparison_vs_tariff_etrs.md`.
+**Key divergence sources:** (1) USMCA share granularity — tracker uses product-level USITC DataWeb SPI data vs ETRs' GTAP sector-level shares (tracker confirmed correct by TPC); (2) 301 rate treatment — tracker and ETRs agree (MAX/supersession), TPC may additionally stack across generations; (3) 232 product coverage gaps (ETRs missing ch72 base steel); (4) Copper and auto gaps resolved. Full details in `docs/comparison_vs_tariff_etrs.md`.
 
 ---
 
 ## Current Issues
 
-### Open implementation gaps
+### Remaining gaps
 
-**1. Section 301 exclusions (9903.89.xx).** Some 9903.89.xx exclusion entries reference US Note product lists that are not parsed. Excluded products may incorrectly receive the base 301 rate. Low impact (~61 products).
+**Section 301 exclusions (9903.89.xx).** Some 9903.89.xx entries define product exclusions from Lists 1–4A that are not parsed. Excluded products may incorrectly receive the base 301 rate. Low impact (~61 products).
 
-**2. EU floor rate residual (~4pp systematic).** EU/Japan/Korea/Swiss countries show ~35–42% exact match with TPC, with ~4pp mean excess. This residual has two components:
+**EU/Japan/Korea floor rate residual (~4pp vs TPC).** Two components: (1) *Duty-free treatment* (~38% of gap rows) — the tracker defaults to applying IEEPA reciprocal to all products including those with 0% MFN base rate; TPC excludes duty-free products. The `dutyfree_nonzero` alternative series quantifies this. (2) *Continuous rate residual* (~62% of gap rows) — TPC assigns rates spanning 1–14% for products where the tracker applies a flat 15% floor, suggesting product-level methodology beyond the simple floor formula.
 
-- **Duty-free treatment (configurable, ~38% of gap rows):** The tracker defaults to `ieepa_duty_free_treatment: 'all'` — applying IEEPA reciprocal to all products including those with 0% MFN base rate. TPC excludes duty-free products. Setting `nonzero_base_only` in `policy_params.yaml` eliminates this component and improves match rates materially. The legal text supports either interpretation; the current default follows the stricter reading.
-- **Continuous rate residual (~62% of gap rows):** For products where the tracker applies the full 15% floor, TPC assigns rates spanning 1–14% — a continuous distribution suggesting product-level methodology beyond the simple floor formula. This portion remains unexplained.
+### Methodological differences vs TPC (not bugs)
 
-**3. Ch87 (autos) gap vs Tariff-ETRs (was ~12pp, now reduced).** Previously driven by the tracker applying full USMCA shares to 232 auto products, while ETRs scaled by `us_auto_content_share = 0.4`. The tracker now applies the same scaling (added March 2026), which should substantially close the gap. Any remaining difference reflects product-level USMCA share granularity (Census SPI vs GTAP sectors).
+**China+232 reciprocal stacking (~920 products, ~25pp gap).** TPC stacks IEEPA reciprocal on top of Section 232. We apply mutual exclusion per Tariff-ETRs: 232 takes precedence, so reciprocal contributes 0pp on base 232 products. The `tpc_stacking` alternative series reproduces TPC's additive behavior.
 
-**4. Section 122 expiry uncertainty.** The 150-day statutory limit expires approximately July 23, 2026. Whether Congress extends the authority or the administration shifts to an alternative legal basis is unknown. The `finalized` flag in `policy_params.yaml` controls behavior; the projection horizon extends to 2026-12-31 with S122 zeroed after expiry.
-
-### Methodological differences (not bugs)
-
-**China+232 reciprocal stacking (~920 products, ~25pp gap vs TPC).** For Chinese products subject to Section 232, TPC stacks IEEPA reciprocal on top of 232 (e.g., 232(25%) + recip(25%) + fent(10%) + 301(25%) = 85%). We apply mutual exclusion per Tariff-ETRs methodology: 232 takes precedence over IEEPA reciprocal, so reciprocal contributes 0pp on base 232 products. This is a deliberate methodological choice — our approach follows the legal authority structure (Section 232 and IEEPA are separate authorities with different statutory bases). The `stacking_method = 'tpc_additive'` option in `apply_stacking_rules()` reproduces TPC's additive behavior for diagnostic comparison.
-
-**China IEEPA reciprocal rate (34% vs ~25%).** The statutory IEEPA reciprocal rate for China is 34% (from 9903.01.63). TPC shows ~25%, likely reflecting the May 2025 US-China bilateral agreement. Our system correctly tracks the suspension marker in the HTS JSON; the remaining discrepancy reflects timing differences in how the bilateral agreement is encoded. Not actionable without new evidence of a parser error.
+**China IEEPA reciprocal rate (34% vs ~25%).** The statutory rate from 9903.01.63 is 34%. TPC shows ~25%, likely reflecting timing of the US-China bilateral agreement encoding. The tracker correctly reads the HTS JSON suspension markers.
 
 ### Resolved
 
-- **Copper 232 product coverage:** Parsed US Note 36(b) via `scrape_us_notes.R --copper`. 80 HTS10 codes match ETRs exactly. Now uses `resources/s232_copper_products.csv`.
-- **USMCA utilization rates:** Product-level USITC DataWeb SPI data (S/S+) replaces binary S/S+ eligibility. Year-specific shares for 2024 and 2025 (~40K product-country pairs each), selectable via `usmca_shares.year` in `policy_params.yaml`.
+- **Copper 232 product coverage:** Parsed US Note 36(b) — 80 HTS10 codes match ETRs exactly (`s232_copper_products.csv`).
+- **Ch87 auto USMCA content scaling:** Added `us_auto_content_share = 0.4` to scale 232 auto USMCA exemptions, matching ETRs.
+- **USMCA utilization rates:** Product-level USITC DataWeb SPI data (S/S+) replaces binary eligibility. Year-specific shares for 2024 and 2025 (~40K pairs each).
 - **Base rate inheritance:** Statistical suffixes inherit MFN from parent indent (11,558 products fixed).
-- **301 Biden supersession:** Biden rates supersede Trump on 8 overlapping products via `max()` aggregation.
+- **301 Biden supersession:** Biden rates supersede Trump on 8 overlapping products via MAX aggregation. Matches ETRs (exclusive rate partitioning).
 
 ---
 

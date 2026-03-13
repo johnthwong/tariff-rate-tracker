@@ -1288,10 +1288,11 @@ calculate_rates_for_revision <- function(
 
     if (length(active_301_codes) > 0) {
       # Build HTS8 -> 301 rate lookup:
-      # Take MAX(s301_rate) across all ch99 codes per HTS8. This works because
-      # Biden rates (9903.91.xx) are always >= the corresponding Trump rate
-      # (9903.88.xx) for the 8 overlapping products, so MAX achieves the correct
-      # supersession behavior without needing explicit generation tracking.
+      # Take MAX(s301_rate) across all ch99 codes per HTS8. For the 8 products
+      # that appear on both Trump-era (9903.88.xx) and Biden-era (9903.91.xx)
+      # lists, Biden rates are always >= the corresponding Trump rate, so MAX
+      # achieves the correct supersession. This matches Tariff-ETRs, which
+      # partitions products into exclusive rate buckets (one rate per HS10).
       s301_lookup <- s301_products %>%
         filter(ch99_code %in% active_301_codes) %>%
         inner_join(
