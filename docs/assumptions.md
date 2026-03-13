@@ -211,7 +211,7 @@ Phase classification determines stacking behavior — country_eo rates stack add
 
 **Source:** Tariff-ETRs order-of-operations confirmed via comparison analysis. No explicit Federal Register guidance on whether floor deduction should use statutory or effective base rate.
 
-**Implementation:** `src/06_calculate_rates.R` step 6d — after MFN exemption shares are applied to `base_rate` (step 6c), floor-country rows with `rate_ieepa_recip > 0` are recomputed as `pmax(0, floor_rate - base_rate)`.
+**Implementation:** `src/06_calculate_rates.R` step 6d — after MFN exemption shares are applied to `base_rate` (step 6c), rows with `ieepa_type == 'floor'` and `rate_ieepa_recip > 0` are recomputed as `pmax(0, floor_rate - base_rate)`. The `ieepa_type` flag is preserved from Step 2 to distinguish genuine floor rows from surcharge rows for the same countries (e.g., Swiss/Liechtenstein outside the framework window).
 
 ---
 

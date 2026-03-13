@@ -39,8 +39,17 @@ library(tidyverse)
 # NOTE: classify_authority(), apply_stacking_rules(), enforce_rate_schema(),
 # and RATE_SCHEMA are defined in helpers.R.
 
+# Policy params — needed throughout for IEEPA, 232, floor, MFN, etc.
+.pp <- tryCatch(
+  load_policy_params(),
+  error = function(e) {
+    # Graceful fallback when sourced before helpers.R sets working dir
+    NULL
+  }
+)
+
 # Country code constants — centralized in helpers.R, loaded from YAML with fallback
-.cc <- get_country_constants()
+.cc <- get_country_constants(.pp)
 CTY_CHINA  <- .cc$CTY_CHINA
 CTY_CANADA <- .cc$CTY_CANADA
 CTY_MEXICO <- .cc$CTY_MEXICO
@@ -591,7 +600,7 @@ calculate_rates_for_revision <- function(
             TRUE ~ 0
           )
         ) %>%
-        select(-ieepa_country_rate, -ieepa_type, -floor_exempt)
+        select(-ieepa_country_rate, -floor_exempt)
 
       # Also add IEEPA rows for products NOT currently in rates
       # (products with no other Ch99 duties but still subject to IEEPA)
@@ -641,7 +650,7 @@ calculate_rates_for_revision <- function(
           )
         ) %>%
         filter(rate_ieepa_recip > 0) %>%
-        select(-ieepa_country_rate, -ieepa_type, -floor_exempt)
+        select(-ieepa_country_rate, -floor_exempt)
 
       if (nrow(new_pairs) > 0) {
         message('  Adding ', nrow(new_pairs), ' product-country pairs for IEEPA-only duties')
@@ -1450,15 +1459,16 @@ calculate_rates_for_revision <- function(
             ' product-country pairs')
 
     # 6d. Recompute IEEPA floor deduction against post-MFN base_rate.
-    # Floor countries (EU/JP/KR/CH/LI) have rate_ieepa_recip = max(0, floor - base).
-    # Step 2 computed this against statutory MFN; now base_rate is lower (after FTA/GSP
-    # preference), so the floor gap is wider. ETRs computes floor against effective MFN,
-    # so we recompute here to align: rate_ieepa_recip = max(0, floor - effective_base).
-    floor_countries <- .pp$FLOOR_COUNTRIES
+    # Only for rows originally computed as floor-type (ieepa_type == 'floor').
+    # Step 2 computed floor as max(0, floor_rate - statutory_base); now base_rate is
+    # lower (after FTA/GSP preference in 6c), so the floor gap is wider.
+    # Surcharge rows for floor countries (e.g. Swiss/LI outside framework window)
+    # must NOT be recomputed — their rate is a flat surcharge, not a floor deduction.
     floor_rate_val <- .pp$FLOOR_RATE
-    if (!is.null(floor_countries) && !is.null(floor_rate_val) &&
-        'rate_ieepa_recip' %in% names(rates)) {
-      floor_mask <- rates$country %in% floor_countries &
+    if (!is.null(floor_rate_val) &&
+        'rate_ieepa_recip' %in% names(rates) &&
+        'ieepa_type' %in% names(rates)) {
+      floor_mask <- rates$ieepa_type == 'floor' &
                     rates$rate_ieepa_recip > 0 &
                     rates$base_rate < rates$statutory_base_rate
       if (any(floor_mask)) {
@@ -1466,9 +1476,12 @@ calculate_rates_for_revision <- function(
         rates$rate_ieepa_recip[floor_mask] <- pmax(0, floor_rate_val - rates$base_rate[floor_mask])
         n_floor_adjusted <- sum(rates$rate_ieepa_recip[floor_mask] != old_recip)
         message('  Floor recomputation: updated rate_ieepa_recip for ', n_floor_adjusted,
-                ' floor-country pairs (against post-MFN base_rate)')
+                ' floor-type pairs (against post-MFN base_rate)')
       }
     }
+
+    # Drop transient ieepa_type column — not part of production output
+    rates$ieepa_type <- NULL
   }
 
   # 7. Apply USMCA exemptions

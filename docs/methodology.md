@@ -4,7 +4,7 @@ This document is the canonical description of the tariff regime, the repo's mode
 
 ## Scope
 
-The tracker constructs statutory U.S. tariff rates at the `HTS-10 x country` level by processing USITC HTS revisions. The current repo covers 39 revisions from January 1, 2025 through February 25, 2026, and extends the final interval through December 31, 2026 using the configured series horizon.
+The tracker constructs statutory U.S. tariff rates at the `HTS-10 x country` level by processing USITC HTS revisions. The current repo covers 38 revisions from January 1, 2025 through February 24, 2026, and extends the final interval through December 31, 2026 using the configured series horizon.
 
 The production series is built from:
 
@@ -68,6 +68,12 @@ Daily outputs are derived from this interval representation rather than stored a
 New HTS revisions are discovered automatically via the USITC REST API (`hts.usitc.gov/reststop/releaseList`). The scraper (`src/01_scrape_revision_dates.R`) also checks whether the Chapter 99 PDF has changed by comparing SHA-256 hashes, which can detect amendments that have not yet been published as a separate API release.
 
 **Important:** The API returns *publication dates* (when USITC posted the revision), not *policy effective dates* (when the tariff took effect). These regularly differ by weeks. When the scraper adds a new revision, it uses the publication date as a placeholder and marks the `policy_event` column with `[REVIEW]`. The pipeline treats this date as the policy date for timeseries intervals until manually corrected. The correct policy effective date should be set in `config/revision_dates.csv` before running a production build.
+
+## HTS product concordance
+
+Product codes can change between HTS revisions — codes are renamed, split, merged, or dropped. The concordance builder (`src/build_hts_concordance.R`) tracks these changes by comparing consecutive revision JSONs using Jaccard word-overlap similarity within same 4-digit headings (inspired by Pierce & Schott 2012). The output is `resources/hts_concordance.csv`.
+
+The concordance is used in `compare_etrs.R` to remap Census import codes (which reflect the 2024 HTS edition) to match snapshot codes from later revisions. Without this remapping, products that were renumbered between the import data vintage and the snapshot revision would drop out of the import-weighted ETR numerator, artificially depressing the ETR for countries concentrated in affected products.
 
 ## Operational model
 
@@ -158,7 +164,17 @@ The repo currently defaults to:
 
 This is configurable through `ieepa_duty_free_treatment`. Benchmark comparisons show that changing to `nonzero_base_only` improves TPC agreement for some floor-country cases.
 
-For floor countries (EU-27, Japan, South Korea, Switzerland, Liechtenstein), the IEEPA reciprocal rate is computed as `max(0, floor_rate - base_rate)`. The floor deduction is computed against the effective (post-MFN-exemption) base rate, not the statutory MFN rate. This means FTA preferences (e.g., KORUS for South Korea) widen the floor gap — if the statutory MFN is 5% but KORUS reduces the effective base to 0.5%, the IEEPA floor component is `max(0, 0.15 - 0.005) = 14.5%`, not `max(0, 0.15 - 0.05) = 10%`. This aligns with the Tariff-ETRs methodology and reflects the policy intent that the floor rate represents the intended total tariff level. The recomputation is implemented as Step 6d in `06_calculate_rates.R`, after MFN exemption shares are applied in Step 6c.
+For floor countries (EU-27, Japan, South Korea, Switzerland, Liechtenstein), the IEEPA reciprocal rate is computed as `max(0, floor_rate - base_rate)`. The floor deduction is computed against the effective (post-MFN-exemption) base rate, not the statutory MFN rate. This means FTA preferences (e.g., KORUS for South Korea) widen the floor gap — if the statutory MFN is 5% but KORUS reduces the effective base to 0.5%, the IEEPA floor component is `max(0, 0.15 - 0.005) = 14.5%`, not `max(0, 0.15 - 0.05) = 10%`. This aligns with the Tariff-ETRs methodology and reflects the policy intent that the floor rate represents the intended total tariff level.
+
+The recomputation is implemented as Step 6d in `06_calculate_rates.R`, after MFN exemption shares are applied in Step 6c. Step 6d uses the `ieepa_type` flag (preserved from Step 2) to identify rows that were originally computed as floor-type deductions. This ensures that surcharge rows for floor countries — such as Switzerland and Liechtenstein outside their framework window — are not incorrectly converted into floor deductions.
+
+### IEEPA exempt products and ITA prefix expansion
+
+The repo identifies ~4,325 HTS10 products as exempt from IEEPA reciprocal tariffs, based on US Note 2 subdivision (v)(iii) (Annex A), Chapter 98 statutory exemptions, and country-specific carve-outs. The expansion pipeline (`src/expand_ieepa_exempt.R`) includes ITA (Information Technology Agreement) prefix entries for headings such as 8471, 8473.30, 8486, 8523, 8524, 8541, and 8542, adding ~125 more HTS8 codes than the Tariff-ETRs project lists.
+
+This difference primarily affects Taiwan and Malaysia in weighted ETR comparisons (−6.9pp and −5.9pp respectively versus Tariff-ETRs at January 1, 2026), because both are major electronics and semiconductor exporters concentrated in Chapters 84–85. The gap vanishes after IEEPA invalidation (February 24, 2026) since these products are no longer subject to IEEPA reciprocal tariffs under either methodology.
+
+The tracker's broader interpretation follows the legal text of the subdivision, which defines exempt products by ITA heading prefixes rather than enumerating individual HTS10 codes. This is a known methodological difference, not a data error on either side. See [assumptions.md, Assumption 15](assumptions.md) for details.
 
 ### USMCA utilization
 
@@ -189,6 +205,8 @@ The main non-official assumptions are cataloged in [assumptions.md](assumptions.
 - product-level USMCA utilization
 - resource-file-based exemption and product lists
 - duty-free treatment choices
+- floor deduction order-of-operations (post-FTA base rate)
+- IEEPA exempt product scope (ITA prefix expansion)
 
 ## Outputs and interpretation
 
@@ -239,11 +257,15 @@ Tariff-ETRs comparison is useful for cross-repo reconciliation, especially aroun
 - USMCA treatment
 - Section 232 coverage
 - denominator choices in ETR reporting
+- IEEPA exempt product scope
 
 The main current takeaways from the tracked comparison work are:
 
 - product-level USMCA shares are a meaningful tracker-side improvement
 - copper and several auto-related gaps were resolved
+- the floor deduction order-of-operations was aligned (Step 6d recomputes against post-FTA base rate, closing the South Korea gap)
+- Taiwan and Malaysia gaps are explained by broader ITA prefix expansion in the tracker's IEEPA exempt list (see [assumptions.md, Assumption 15](assumptions.md))
+- HTS product concordance remapping in `compare_etrs.R` addresses spurious ETR drops from code renumbering (e.g., Cayman Islands lithium battery codes)
 - some remaining differences appear methodological rather than parser bugs
 
 ## Open modeling questions
@@ -254,7 +276,7 @@ The repo's China Section 301 logic is intentionally built from the China product
 
 ### Floor-country residuals
 
-Even after accounting for duty-free treatment choices, some floor-country differences versus TPC remain unexplained. This may reflect a different product-level methodology on the benchmark side or an unmodeled exemption path on the tracker side.
+The Step 6d floor recomputation (against post-FTA base rates) closed the largest floor-country gap versus Tariff-ETRs (South Korea: −4.6pp → approximately closed). Some residual floor-country differences versus TPC remain, which may reflect a different product-level methodology on the benchmark side or an unmodeled exemption path on the tracker side.
 
 ### Liberation Day timing
 

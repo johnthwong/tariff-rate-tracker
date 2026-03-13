@@ -254,7 +254,10 @@ if (sys.nframe() == 0) {
     'core'               = !any_required_missing && has_json,
     'core_plus_weights'  = !any_required_missing && has_json && has_weights,
     'compare_tpc'        = !any_required_missing && has_json && has_tpc,
-    'compare_etrs'       = FALSE  # Would need tariff_etrs_repo configured
+    'compare_etrs'       = !any_required_missing && has_json && tryCatch({
+      lp2 <- yaml::read_yaml(local_paths_file)
+      !is.null(lp2$tariff_etrs_repo) && dir.exists(lp2$tariff_etrs_repo)
+    }, error = function(e) FALSE)
   )
 
   for (mode in names(modes)) {

@@ -11,7 +11,7 @@ The repo is designed to run in progressively richer modes depending on what loca
 | `core` | repo resources, config files, HTS JSON archives, required R packages | tariff timeseries, unweighted daily outputs, quality report |
 | `core_plus_weights` | core + import weights in `config/local_paths.yaml` | core outputs + weighted daily fields + weighted ETR outputs |
 | `compare_tpc` | core + TPC benchmark CSV | comparison outputs against TPC |
-| `compare_etrs` | core + Tariff-ETRs repo path | reserved comparison workflow; not fully implemented in `run_comparisons.R` |
+| `compare_etrs` | core + Tariff-ETRs repo path | standalone script (`src/compare_etrs.R`); wrapper in `run_comparisons.R` not yet complete |
 
 The core series is the production dataset. Comparison inputs are optional.
 
@@ -42,7 +42,7 @@ Required packages:
 Optional packages:
 
 - `pdftools`
-- `rvest`
+- `digest`
 - `arrow`
 - `httr`
 
@@ -92,7 +92,7 @@ Rscript src/00_build_timeseries.R --with-alternatives
 |---|---|---|---|---|
 | HTS JSON archives | `data/hts_archives/*.json` | auto-download | official tariff schedule by revision | `src/02_download_hts.R` |
 | Policy config | `config/policy_params.yaml` | committed | tariff logic, dates, and assumptions | manual update when policy changes |
-| Revision schedule | `config/revision_dates.csv` | committed | HTS effective dates and benchmark alignment | manual update when new revisions publish |
+| Revision schedule | `config/revision_dates.csv` | committed | HTS effective dates and benchmark alignment | `src/01_scrape_revision_dates.R` discovers new revisions via USITC API; placeholder dates require manual review |
 | Census country codes | `resources/census_codes.csv` | committed | country dimension | manual refresh |
 | Country-partner mapping | `resources/country_partner_mapping.csv` | committed | partner aggregates for reporting | manual refresh |
 | Section 301 product list | `resources/s301_product_lists.csv` | committed | blanket 301 coverage | `src/scrape_us_notes.R` (validates anchor coverage; refuses partial writes) |
@@ -114,7 +114,7 @@ Rscript src/00_build_timeseries.R --with-alternatives
 | Import weights | local path via `config/local_paths.yaml` | private/local | weighted daily outputs and weighted ETRs |
 | TPC benchmark | local path via `config/local_paths.yaml` | private/local | validation only |
 | Tariff-ETRs repo | local path via `config/local_paths.yaml` | optional/local | comparison only |
-| Chapter 99 PDFs | `data/us_notes/*.pdf` | manual-download | regenerate resource files from US Notes |
+| Chapter 99 PDFs | `data/us_notes/*.pdf` | auto-download via `scrape_us_notes.R`; hash-checked by `01_scrape_revision_dates.R` | regenerate resource files from US Notes |
 
 ## What runs without what
 
@@ -157,7 +157,7 @@ Rscript src/run_comparisons.R --tpc
 Rscript src/run_comparisons.R --etr
 ```
 
-`--etrs` is currently a placeholder for a future cross-repo comparison wrapper.
+`--etrs` is currently a placeholder in the wrapper. For Tariff-ETRs comparison, run `src/compare_etrs.R` directly (requires `tariff_etrs_repo` in `config/local_paths.yaml`).
 
 ## Updating when a new HTS revision is published
 

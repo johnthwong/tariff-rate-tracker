@@ -5,19 +5,24 @@
 # Builds an HTS10 product concordance mapping that tracks how product codes
 # change across HTS revisions. Inspired by Pierce & Schott (2012) algorithm.
 #
-# For each consecutive revision pair, identifies:
-#   - Unchanged: codes present in both with same/similar description
+# For each consecutive revision pair, identifies changes only:
 #   - Added: codes only in new revision
 #   - Dropped: codes only in old revision
 #   - Splits (1 old -> N new), Merges (N old -> 1 new), Renames
+#   - Many-to-many: multiple old <-> multiple new within same heading
 #
-# Matching uses Jaccard word-overlap similarity within same 4-digit heading.
+# NOTE: This is a heuristic concordance. Matching uses Jaccard word-overlap
+# similarity within same 4-digit heading. Because every above-threshold pair
+# within a heading is recorded (greedy matching without row/column exclusion),
+# splits and many-to-many counts may be overstated. The output is suitable
+# for import-code remapping in compare_etrs.R but should not be treated as
+# an authoritative concordance without manual review.
 #
 # Usage:
 #   Rscript src/build_hts_concordance.R            # full build
 #   Rscript src/build_hts_concordance.R --dry-run   # stats only, no CSV
 #
-# Output: resources/hts_concordance.csv
+# Output: resources/hts_concordance.csv (changes only)
 # =============================================================================
 
 suppressPackageStartupMessages({
@@ -172,8 +177,7 @@ classify_changes <- function(matches) {
 #' @param archive_dir Path to HTS archive directory
 #' @param sim_threshold Jaccard similarity threshold
 #' @return Tibble of concordance entries
-compare_revisions <- function(rev_from, rev_to, archive_dir, sim_threshold = 0.7,
-                              changes_only = TRUE) {
+compare_revisions <- function(rev_from, rev_to, archive_dir, sim_threshold = 0.7) {
   path_from <- resolve_json_path(rev_from, archive_dir)
   path_to   <- resolve_json_path(rev_to, archive_dir)
 
@@ -273,13 +277,11 @@ compare_revisions <- function(rev_from, rev_to, archive_dir, sim_threshold = 0.7
 #' @param output_path Path for output CSV
 #' @param sim_threshold Jaccard similarity threshold (default 0.7)
 #' @param dry_run If TRUE, print stats but don't write CSV
-#' @param changes_only If TRUE, exclude 'unchanged' rows from output
-#' @return Tibble of concordance entries (invisibly)
+#' @return Tibble of concordance entries (changes only, invisibly)
 build_concordance <- function(archive_dir = here('data', 'hts_archives'),
                               output_path = here('resources', 'hts_concordance.csv'),
                               sim_threshold = 0.7,
-                              dry_run = FALSE,
-                              changes_only = TRUE) {
+                              dry_run = FALSE) {
   # Load revision order
   rev_dates <- load_revision_dates()
   all_revisions <- rev_dates$revision
@@ -287,6 +289,12 @@ build_concordance <- function(archive_dir = here('data', 'hts_archives'),
   # Filter to revisions we actually have JSON for
   available <- get_available_revisions_all_years(all_revisions, archive_dir)
   revisions <- all_revisions[all_revisions %in% available]
+
+  if (length(revisions) < 2) {
+    message('Need at least 2 revisions with JSON files to build concordance (found ',
+            length(revisions), ')')
+    return(invisible(tibble()))
+  }
 
   message('\nFound ', length(revisions), ' revisions with JSON files')
   message('Processing ', length(revisions) - 1, ' consecutive pairs\n')
@@ -330,53 +338,18 @@ build_concordance <- function(archive_dir = here('data', 'hts_archives'),
               format(type_counts$n[i], big.mark = ','))
     }
 
-    # Count unique revision pairs with changes
-    changes <- concordance %>% filter(change_type != 'unchanged')
-    if (nrow(changes) > 0) {
-      message('\nCode changes (non-unchanged): ', format(nrow(changes), big.mark = ','))
-      pairs_with_changes <- changes %>%
-        distinct(revision_from, revision_to) %>% nrow()
-      message('Revision pairs with changes: ', pairs_with_changes)
-
-      # Check specific codes of interest
-      message('\nSpecific code tracking:')
-      lithium <- concordance %>%
-        filter(old_hts10 == '8507600020' | new_hts10 == '8507600020')
-      if (nrow(lithium) > 0) {
-        lithium_changes <- lithium %>% filter(change_type != 'unchanged')
-        message('  8507600020 (lithium batteries): ',
-                nrow(lithium), ' entries (',
-                nrow(lithium_changes), ' changes)')
-        if (nrow(lithium_changes) > 0) {
-          for (r in seq_len(nrow(lithium_changes))) {
-            message('    ', lithium_changes$revision_from[r], ' -> ',
-                    lithium_changes$revision_to[r], ': ',
-                    lithium_changes$change_type[r],
-                    ' (old=', lithium_changes$old_hts10[r],
-                    ', new=', lithium_changes$new_hts10[r], ')')
-          }
-        }
-      } else {
-        message('  8507600020 (lithium batteries): not found in any change')
-      }
-    }
-  }
-
-  # Filter to changes only if requested
-  if (changes_only) {
-    concordance_out <- concordance %>% filter(change_type != 'unchanged')
-    message('\nOutput (changes only): ', format(nrow(concordance_out), big.mark = ','), ' rows')
-  } else {
-    concordance_out <- concordance
+    pairs_with_changes <- concordance %>%
+      distinct(revision_from, revision_to) %>% nrow()
+    message('Revision pairs with changes: ', pairs_with_changes)
   }
 
   # Write output
 
-  if (!dry_run && nrow(concordance_out) > 0) {
-    write_csv(concordance_out, output_path)
+  if (!dry_run && nrow(concordance) > 0) {
+    write_csv(concordance, output_path)
     message('Wrote concordance to: ', output_path)
   } else if (dry_run) {
-    message('\n[DRY RUN] Would write ', format(nrow(concordance_out), big.mark = ','),
+    message('\n[DRY RUN] Would write ', format(nrow(concordance), big.mark = ','),
             ' rows to ', output_path)
   }
 

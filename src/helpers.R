@@ -612,6 +612,106 @@ get_available_revisions_all_years <- function(all_revisions, archive_dir = here(
 
 
 # =============================================================================
+# HTS Concordance
+# =============================================================================
+
+#' Load and chain HTS product concordance for import remapping
+#'
+#' Reads the concordance CSV and builds a cumulative old->new mapping between
+#' two revisions. Used to remap import product codes (which may reflect an
+#' older HTS edition) to match snapshot product codes.
+#'
+#' @param concordance_path Path to hts_concordance.csv
+#' @return Tibble with old_hts10, new_hts10, change_type columns
+load_hts_concordance <- function(concordance_path = here('resources', 'hts_concordance.csv')) {
+  if (!file.exists(concordance_path)) {
+    warning('Concordance file not found: ', concordance_path)
+    return(tibble(old_hts10 = character(), new_hts10 = character(), change_type = character()))
+  }
+  read_csv(concordance_path, col_types = cols(.default = col_character(),
+                                               similarity = col_double()))
+}
+
+
+#' Remap import product codes using HTS concordance
+#'
+#' For imports whose hts10 does not appear in the snapshot, looks up the
+#' concordance chain to find the successor code. Handles renames, splits,
+#' and many-to-many mappings. When a code splits into multiple successors,
+#' import value is divided equally among successors.
+#'
+#' @param imports Tibble with hts10, country (country_code), value columns
+#' @param snapshot_codes Character vector of hts10 codes in the active snapshot
+#' @param concordance Tibble from load_hts_concordance()
+#' @return imports tibble with remapped hts10 codes and a `remapped` flag
+remap_imports_via_concordance <- function(imports, snapshot_codes, concordance) {
+  if (nrow(concordance) == 0) return(imports %>% mutate(remapped = FALSE))
+
+  # Build old->new mapping (renames, splits, many_to_many — not 'added'/'dropped')
+  mapping <- concordance %>%
+    filter(!is.na(old_hts10), !is.na(new_hts10)) %>%
+    select(old_hts10, new_hts10) %>%
+    distinct()
+
+  # Chain through transitive mappings (old->intermediate->new)
+  # Iterate until stable — handles multi-step renames across revisions
+  for (iter in 1:10) {
+    chained <- mapping %>%
+      inner_join(mapping, by = c('new_hts10' = 'old_hts10'), suffix = c('', '.next')) %>%
+      filter(new_hts10.next != old_hts10)  # avoid cycles
+
+    if (nrow(chained) == 0) break
+
+    extended <- chained %>%
+      select(old_hts10, new_hts10 = new_hts10.next) %>%
+      distinct()
+
+    # Replace intermediate mappings with chained ones
+    mapping <- mapping %>%
+      anti_join(chained %>% select(old_hts10, new_hts10), by = c('old_hts10', 'new_hts10')) %>%
+      bind_rows(extended) %>%
+      distinct()
+  }
+
+  # Only remap codes that are (a) missing from snapshot and (b) have a successor in snapshot
+  missing_codes <- setdiff(unique(imports$hts10), snapshot_codes)
+  useful_mapping <- mapping %>%
+    filter(old_hts10 %in% missing_codes, new_hts10 %in% snapshot_codes)
+
+  if (nrow(useful_mapping) == 0) return(imports %>% mutate(remapped = FALSE))
+
+  # Count successors per old code (for splits, divide value equally)
+  successor_counts <- useful_mapping %>% count(old_hts10, name = 'n_successors')
+  useful_mapping <- useful_mapping %>% left_join(successor_counts, by = 'old_hts10')
+
+  # Split imports into remappable and not
+  imports_remap <- imports %>%
+    filter(hts10 %in% useful_mapping$old_hts10) %>%
+    inner_join(useful_mapping, by = c('hts10' = 'old_hts10')) %>%
+    mutate(
+      hts10 = new_hts10,
+      value = value / n_successors,
+      remapped = TRUE
+    ) %>%
+    select(-new_hts10, -n_successors)
+
+  imports_keep <- imports %>%
+    filter(!hts10 %in% useful_mapping$old_hts10) %>%
+    mutate(remapped = FALSE)
+
+  result <- bind_rows(imports_keep, imports_remap)
+
+  n_remapped <- sum(result$remapped)
+  if (n_remapped > 0) {
+    cat('  Concordance: remapped', n_remapped, 'import rows (',
+        length(unique(useful_mapping$old_hts10)), 'codes)\n')
+  }
+
+  return(result)
+}
+
+
+# =============================================================================
 # Rate Schema
 # =============================================================================
 
@@ -1342,7 +1442,8 @@ apply_post_interval_adjustments_point <- function(snapshot, query_date, policy_p
   }
 
   if (needs_restacking) {
-    snapshot <- apply_stacking_rules(snapshot)
+    cty_china <- policy_params$CTY_CHINA %||% '5700'
+    snapshot <- apply_stacking_rules(snapshot, cty_china = cty_china)
   }
 
   return(snapshot)

@@ -49,6 +49,10 @@ eu27 <- pp$EU27_CODES
 partner_labels <- c('China' = '5700', 'Canada' = '1220', 'Mexico' = '2010',
                      'Japan' = '5880', 'UK' = '4120')
 
+# ---- HTS concordance for import code remapping ----
+concordance <- load_hts_concordance()
+cat('HTS concordance:', nrow(concordance), 'entries\n')
+
 # ---- Process each date by loading the appropriate snapshot ----
 # Map dates to revisions
 rev_dates <- load_revision_dates(here('config', 'revision_dates.csv'))
@@ -131,9 +135,16 @@ for (d in comparison_dates) {
     cat('  Reconstructed total_rate via apply_stacking_rules()\n')
   }
 
+  # Remap import codes via concordance (handles renumbered products across revisions)
+  snapshot_codes <- unique(rates$hts10)
+  imports_remapped <- remap_imports_via_concordance(
+    imports %>% select(hts10, country_code, value),
+    snapshot_codes, concordance
+  )
+
   # Join with imports
   merged <- rates %>%
-    inner_join(imports %>% select(hts10, country = country_code, value),
+    inner_join(imports_remapped %>% select(hts10, country = country_code, value),
                by = c('hts10', 'country'))
 
   matched_imports <- sum(merged$value)
