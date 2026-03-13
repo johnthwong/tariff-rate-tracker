@@ -113,8 +113,9 @@ The default production rule is `mutual_exclusion`, implemented in `helpers.R::ap
 In words:
 
 - Section 232 takes precedence over IEEPA reciprocal on the metal-covered portion.
-- For derivative 232 products, IEEPA can still apply to the non-metal portion.
-- Fentanyl, Section 301, Section 122, Section 201, and other provisions then contribute according to the modeled authority rules.
+- For derivative 232 products, IEEPA reciprocal and Section 122 apply only to the non-metal portion (scaled by `1 - metal_share`).
+- Fentanyl always stacks in full on 232 products (not scaled by metal share), matching the China treatment.
+- Section 301, Section 201, and other provisions contribute at their full rates.
 
 An alternative `tpc_additive` mode exists for diagnostic comparison only.
 

@@ -306,4 +306,9 @@ No Chapter 99 changes. +153 product line additions.
 
 4. **"Other" authority**: The `classify_authority()` function classifies IEEPA Phase 1 (9903.01.xx) and Phase 2 (9903.02.xx) entries as "other" rather than "ieepa_reciprocal". The IEEPA reciprocal count reflects only 9903.90/93/95/96 entries, not the full IEEPA range. The extraction pipeline (`05_parse_policy_params.R`) correctly handles the full ranges.
 
-5. **TPC date gaps**: rev_18 (effective 2025-08-07) is validated against TPC date 2025-10-17 — a 2+ month gap. Policy changes between these dates (revisions 19-27) may cause discrepancies. See `config/revision_dates.csv` for the full date mapping.
+5. **TPC date gaps**: rev_18 (effective 2025-08-07) is validated against TPC date 2025-10-17 — a 2+ month gap. Policy changes between these dates (revisions 19-27) may cause discrepancies. See `config/revision_dates.csv` for the full date mapping. The `tpc_policy_revision` column maps each validation row to the correct policy snapshot (e.g., rev_10 validates against rev_7's rates).
+
+6. **Bug fixes (2026-03-13)**: Three high-priority fixes applied to the stacking and rate-assignment logic:
+   - **Fentanyl stacking on 232 products**: `apply_stacking_rules()` and `compute_net_authority_contributions()` in `helpers.R` were incorrectly scaling fentanyl by `nonmetal_share` for non-China 232 products (zeroing fentanyl on full-metal items). Fixed to stack fentanyl in full, matching the China path.
+   - **Country alias codes**: Myanmar (5560→5460), Macau (5850→5660), Cote d'Ivoire (7230→7480) were mapped to wrong Census codes in `05_parse_policy_params.R`.
+   - **232 light-truck gate**: `06_calculate_rates.R` used `autos_light` instead of `autos_light_trucks` in its heading gates, causing light-truck prefixes to bypass the Ch99-activation check.
