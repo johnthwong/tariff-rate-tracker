@@ -340,6 +340,20 @@ parse_us_note_products <- function(
     return(invisible(NULL))
   }
 
+  # ---- Validate anchor coverage ----
+  missing_301 <- setdiff(target_codes, s301_anchors$ch99_code)
+  if (length(missing_301) > 0) {
+    message('  Missing Section 301 anchors: ', paste(missing_301, collapse = ', '))
+    coverage_pct <- round(nrow(s301_anchors) / length(target_codes) * 100)
+    message('  Anchor coverage: ', coverage_pct, '% (',
+            nrow(s301_anchors), '/', length(target_codes), ')')
+    if (coverage_pct < 80) {
+      message('ERROR: Anchor coverage below 80%. Refusing to write — ',
+              'PDF format may have changed. Use --dry-run to inspect.')
+      return(invisible(NULL))
+    }
+  }
+
   # ---- Extract product lists between consecutive anchors ----
   message('\nExtracting product lists...')
   all_parsed <- tibble(hts_code = character(), ch99_code = character())
@@ -440,6 +454,13 @@ parse_us_note_products <- function(
       arrange(hts8, ch99_code)
 
   } else {
+    # First-time bootstrap: refuse to write if anchor coverage was partial
+    if (length(missing_301) > 0) {
+      message('ERROR: First-time bootstrap with partial anchor coverage (',
+              length(missing_301), ' missing). Refusing to write.')
+      message('  Fix the anchor patterns or supply a manually curated CSV first.')
+      return(invisible(NULL))
+    }
     message('  No existing CSV found. Writing all parsed entries.')
     combined <- all_parsed %>%
       arrange(hts8, ch99_code)
@@ -604,10 +625,18 @@ parse_floor_exempt_products <- function(
     return(invisible(NULL))
   }
 
-  # Report missing codes
+  # Report missing codes and validate coverage
   missing_codes <- setdiff(target_codes, matched_anchors$ch99_code)
   if (length(missing_codes) > 0) {
+    coverage_pct <- round(nrow(matched_anchors) / length(target_codes) * 100)
     message('  Missing anchors: ', paste(missing_codes, collapse = ', '))
+    message('  Anchor coverage: ', coverage_pct, '% (',
+            nrow(matched_anchors), '/', length(target_codes), ')')
+    if (coverage_pct < 80) {
+      message('ERROR: Floor exemption anchor coverage below 80%. Refusing to write — ',
+              'PDF format may have changed. Use --dry-run to inspect.')
+      return(invisible(NULL))
+    }
   }
 
   # ---- Extract product lists ----
@@ -702,6 +731,13 @@ parse_floor_exempt_products <- function(
 
   # ---- Write output ----
   if (!dry_run) {
+    # Refuse to overwrite existing CSV when anchors are missing
+    if (length(missing_codes) > 0 && file.exists(output_csv)) {
+      message('\nWARNING: Partial anchor coverage — not overwriting existing ', output_csv)
+      message('  Missing: ', paste(missing_codes, collapse = ', '))
+      message('  Use --dry-run to inspect parsed results, or fix anchor patterns.')
+      return(invisible(result))
+    }
     result <- result %>% arrange(hts8, country_group, ch99_code)
     write_csv(result, output_csv)
     message('\nWrote ', nrow(result), ' entries to ', output_csv)
@@ -847,12 +883,41 @@ parse_note36_copper_products <- function(
   # PDF format is XXXX.XX.XX (8 digits). Pad with '00' to get HTS10.
   hts10_codes <- str_pad(gsub('\\.', '', all_codes), 10, side = 'right', pad = '0')
 
-  # ---- Validate: check heading distribution ----
+  # ---- Validate: check heading distribution and expected coverage ----
   headings <- substr(hts10_codes, 1, 4)
   heading_counts <- table(headings)
   message('\n  Heading distribution:')
   for (h in sort(names(heading_counts))) {
     message('    ', h, ': ', heading_counts[h], ' codes')
+  }
+
+  # Check for unexpected headings beyond ch74/ch8544 on scanned pages.
+  # If Note 36 expands to other headings, these will appear here.
+  all_hts_on_pages <- character()
+  for (pg in scan_pages) {
+    all_hts_on_pages <- c(all_hts_on_pages,
+      str_extract_all(pages[pg], '[0-9]{4}\\.[0-9]{2}\\.[0-9]{2}')[[1]])
+  }
+  all_hts_on_pages <- unique(all_hts_on_pages)
+  non_copper <- all_hts_on_pages[!grepl('^(74|8544|9903)', all_hts_on_pages)]
+  if (length(non_copper) > 0) {
+    message('\n  NOTE: Non-copper/non-ch99 HTS codes found on scanned pages:')
+    message('    ', paste(head(non_copper, 20), collapse = ', '))
+    message('    If Note 36 has expanded to new headings, update the copper parser.')
+  }
+
+  # Sanity check: copper list has historically been ~80 codes. A dramatic drop
+  # suggests the parser missed content (e.g., the grid moved to a new page or
+  # the Note expanded beyond subdivision (b)).
+  EXPECTED_MIN_CODES <- 60
+  if (length(hts10_codes) < EXPECTED_MIN_CODES) {
+    message('\n  WARNING: Only ', length(hts10_codes), ' codes extracted (expected >= ',
+            EXPECTED_MIN_CODES, '). The PDF layout may have changed.')
+    if (file.exists(output_csv)) {
+      message('  Refusing to overwrite existing ', output_csv, ' with a reduced list.')
+      message('  Use --dry-run to inspect, or update the parser.')
+      return(invisible(NULL))
+    }
   }
 
   # ---- Build output ----

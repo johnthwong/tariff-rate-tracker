@@ -96,8 +96,11 @@ parse_countries <- function(description) {
     }
   }
 
-  # Default: applies to all countries
-  return(list(type = 'all', countries = character(0), exempt = character(0)))
+  # Default: unknown — downstream consumers must opt into 'all' explicitly.
+  # Returning 'unknown' instead of 'all' prevents a parser miss from silently
+
+  # promoting a country-specific or all_except entry to a global blanket tariff.
+  return(list(type = 'unknown', countries = character(0), exempt = character(0)))
 }
 
 
@@ -202,6 +205,20 @@ parse_chapter99 <- function(json_path) {
   cty_summary <- parsed %>%
     count(country_type, sort = TRUE)
   print(cty_summary)
+
+  # Flag unknown country types so parser misses are visible in build logs
+  unknown_entries <- parsed %>% filter(country_type == 'unknown')
+  if (nrow(unknown_entries) > 0) {
+    message('\n  WARNING: ', nrow(unknown_entries),
+            ' entries with unknown country scope (description not matched by parse_countries):')
+    for (i in seq_len(min(nrow(unknown_entries), 10))) {
+      message('    ', unknown_entries$ch99_code[i], ' [', unknown_entries$authority[i],
+              ']: "', substr(unknown_entries$description[i], 1, 80), '..."')
+    }
+    if (nrow(unknown_entries) > 10) {
+      message('    ... and ', nrow(unknown_entries) - 10, ' more')
+    }
+  }
 
   return(parsed)
 }

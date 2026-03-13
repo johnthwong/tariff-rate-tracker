@@ -40,9 +40,14 @@ parse_products <- function(json_path) {
   message('  Total items: ', length(hts_raw))
 
   # Build a rate inheritance stack: for statistical suffixes (empty general field),
-
   # inherit the MFN rate from the nearest parent in the indent hierarchy.
   # ~59% of HTS10 products are statistical suffixes with empty general fields.
+  #
+  # Known edge case (rare): this assumes the JSON preserves parent-before-child
+  # order and that indent levels increase monotonically within a heading. If
+  # USITC changes the JSON structure (e.g., reorders items or introduces
+  # non-standard indent jumps), inherited rates could be wrong. No validation
+  # pass currently checks for these anomalies.
   rate_stack <- list()  # indent level -> parsed rate (numeric or NA)
   n_inherited <- 0L
 
