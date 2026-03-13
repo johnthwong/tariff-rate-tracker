@@ -34,15 +34,17 @@ This document catalogs methodological assumptions derived from non-official sour
 
 ## 3. USMCA Utilization Shares
 
-**Assumption:** USMCA preference utilization is measured at the product-country level using Census Bureau RATE_PROV field code 18, computed from calendar year 2024 monthly import data. Tariff rates are scaled by `(1 - usmca_share)` for Canadian and Mexican products. Applied to IEEPA reciprocal, IEEPA fentanyl, Section 122, and Section 232 auto/MHD programs.
+**Assumption:** USMCA preference utilization is measured at the product-country level using USITC DataWeb Special Program Indicator (SPI) codes "S" and "S+". Year-specific shares are available for 2024 and 2025; default is 2025, configurable via `usmca_shares.year` in `policy_params.yaml`. Tariff rates are scaled by `(1 - usmca_share)` for Canadian and Mexican products. Applied to IEEPA reciprocal, IEEPA fentanyl, Section 122, and Section 232 auto/MHD programs.
 
 For Section 232 auto/MHD products, the USMCA share is further scaled by `us_auto_content_share` (0.40) to reflect that USMCA-eligible vehicles contain ~60% non-originating content under rules of origin. This means only 40% of a qualifying vehicle's value receives the USMCA exemption from 232 tariffs. This scaling matches Tariff-ETRs methodology and applies only to the 232 USMCA exemption — IEEPA/fentanyl/S122 exemptions use the full product-level USMCA share.
 
-**Source:** Census Bureau Import Detail (IMP_DETL.TXT) files. Methodology replicates TPC's approach ("multiplied by the complement of the USMCA share for each product"). The `us_auto_content_share` parameter matches Tariff-ETRs' `us_auto_content_share` in `other_params.yaml`.
+**Source:** USITC DataWeb API (`datawebws.usitc.gov`), querying imports for consumption by HTS10 × country with SPI program filter (S/S+). DataWeb captures ALL USMCA-claimed trade regardless of duty treatment, unlike Census API's RP=18 field which misses USMCA claims on already-duty-free products (~50% undercount). Validated against Brookings/USITC aggregate shares (CA: 38.4% vs 35.5%, MX: 49.9% vs 49.5%). The `us_auto_content_share` parameter matches Tariff-ETRs' `us_auto_content_share` in `other_params.yaml`.
 
-**Why non-official:** Census RATE_PROV coding is administrative, not statutory. Product-level utilization is an empirical estimate, not a legal determination. The auto content share (0.40) is an economic estimate of US/USMCA-origin content in qualifying vehicles, not a statutory rate. Falls back to binary HTS `special` field eligibility (S/S+) when shares are unavailable.
+**Year selection:** Two years are available. 2024 (CA: 38%, MX: 50%) represents pre-tariff steady-state utilization. 2025 (CA: 67%, MX: 68%) reflects tariff-induced behavioral changes — firms rushed to claim USMCA preferences to avoid new tariffs, nearly doubling utilization rates. Default is 2025.
 
-**Implementation:** `src/compute_usmca_shares.R`, `resources/usmca_product_shares.csv` (22,449 product-country pairs), applied in `src/06_calculate_rates.R` steps 2 (fentanyl), 4 (232 auto/MHD), and 7 (IEEPA/S122). Auto content share configured in `config/policy_params.yaml` under `auto_rebate.us_auto_content_share`.
+**Why non-official:** SPI coding is administrative, not statutory. Product-level utilization is an empirical estimate, not a legal determination. The auto content share (0.40) is an economic estimate of US/USMCA-origin content in qualifying vehicles, not a statutory rate. Falls back to binary HTS `special` field eligibility (S/S+) when shares are unavailable.
+
+**Implementation:** `src/download_usmca_dataweb.R` (optional, requires USITC DataWeb account and API token in `.env`). Year-specific files: `resources/usmca_product_shares_2024.csv` (40,088 pairs) and `resources/usmca_product_shares_2025.csv` (40,258 pairs). Year selected via `usmca_shares.year` in `config/policy_params.yaml` (default: 2025). Applied in `src/06_calculate_rates.R` steps 2 (fentanyl), 4 (232 auto/MHD), and 7 (IEEPA/S122). Auto content share configured in `config/policy_params.yaml` under `auto_rebate.us_auto_content_share`.
 
 ---
 

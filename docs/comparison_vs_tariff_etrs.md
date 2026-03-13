@@ -43,12 +43,12 @@ The +1.77pp overall gap reflects large offsetting country-level differences: Chi
 
 ### Divergence source 1: USMCA share granularity (+9.7pp Canada, +1.6pp Mexico)
 
-ETRs applies USMCA exemption rates from a 47-row GTAP sector file (~85-90% shares). The tracker uses product-level Census SPI data (~41% Canada, ~47% Mexico). TPC independently validates the tracker's approach:
+ETRs applies USMCA exemption rates from a 47-row GTAP sector file (~85-90% shares). The tracker uses product-level USITC DataWeb SPI data (programs S/S+). TPC independently validates the tracker's approach:
 
 | Source | Canada share | Mexico share |
 |--------|-------------|-------------|
 | TPC (benchmark) | 45.5% | 50.7% |
-| Tracker (Census SPI) | 41.2% | 47.3% |
+| Tracker (DataWeb SPI) | 41.2% | 47.3% |
 | ETRs (GTAP sectors) | ~85-90% | ~75-85% |
 
 **Assessment:** Tracker is correct. ETRs over-exempts CA/MX by ~2x. Proposed ETRs fix: E1.

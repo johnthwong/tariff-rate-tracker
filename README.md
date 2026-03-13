@@ -94,6 +94,7 @@ Section 232 and Section 301 tariffs are unaffected by the SCOTUS ruling (separat
 | 301 product lists | `resources/s301_product_lists.csv` | ~12,200 entries (~11,000 unique HTS-8 codes) | [USITC](https://hts.usitc.gov/) |
 | 232 derivative products | `resources/s232_derivative_products.csv` | ~129 aluminum-containing article prefixes | [Tariff-ETRs](https://github.com/Budget-Lab-Yale/Tariff-ETRs) |
 | 232 copper products | `resources/s232_copper_products.csv` | 80 HTS-10 codes from US Note 36(b) (ch74 + ch8544) | [USITC](https://hts.usitc.gov/) Ch99 PDF |
+| USMCA utilization shares | `resources/usmca_product_shares_{year}.csv` | ~40K HTS-10 × country USMCA utilization rates (DataWeb SPI S/S+); 2024 and 2025 included | [USITC DataWeb](https://dataweb.usitc.gov/) |
 | MFN exemption shares | `resources/mfn_exemption_shares.csv` | 4,695 HS2 × country FTA/GSP preference shares | [Tariff-ETRs](https://github.com/Budget-Lab-Yale/Tariff-ETRs) |
 | Fentanyl carve-outs | `resources/fentanyl_carveout_products.csv` | 308 HTS-8 prefixes (energy/minerals/potash) | [Tariff-ETRs](https://github.com/Budget-Lab-Yale/Tariff-ETRs) |
 | Floor exemptions | `data/us_notes/floor_exempt_{revision}.csv` (fallback: `resources/floor_exempt_products.csv`) | Per-revision country-product floor exemptions | [USITC](https://hts.usitc.gov/) |
@@ -248,6 +249,8 @@ This reduces the import-weighted average base rate from ~4% (statutory) to ~2% (
 | `scrape_us_notes.R` | Parses US Note 20/21/31 product lists, floor exemptions, and Note 36 copper product list from Chapter 99 PDF. Generates static resource files. Run manually when USITC updates PDFs. Flags: `--copper`, `--floor-exemptions`, `--all`. |
 | `apply_scenarios.R` | Counterfactual scenario system: zeros out selected authority columns, recomputes totals. Config in `config/scenarios.yaml`. |
 | `diagnostics.R` | Validation utilities: 301 coverage gaps, China IEEPA tracking, per-revision summary, `decompose_tpc_discrepancies()` |
+| `download_usmca_dataweb.R` | Downloads USMCA utilization shares from USITC DataWeb API. Requires DataWeb account token in `.env`. Output: `resources/usmca_product_shares_{year}.csv`. Flags: `--year`. |
+| `compute_usmca_shares.R` | Alternative USMCA share computation from Census RP=18 data (local files or API). Superseded by DataWeb approach. |
 | `revision_changelog.R` | Diffs Ch99 entries across all revisions, builds policy timeline |
 | `tests/test_tpc_comparison.R` | Standalone TPC comparison across all 5 validation dates with detailed diagnostics |
 
@@ -401,7 +404,7 @@ total = rate_ieepa_recip + rate_ieepa_fent + rate_s122 + rate_301 + rate_section
 
 Where `nonmetal_share = 1 - metal_share` when `rate_232 > 0` and `metal_share < 1.0`, else `0`. For base 232 products (steel, aluminum, autos, copper), `metal_share = 1.0` so `nonmetal_share = 0`, preserving the mutual exclusion. For derivative products (~130 aluminum-containing articles), `metal_share < 1.0` (default 0.50) so IEEPA/fentanyl apply to the remaining portion.
 
-**USMCA exemption:** Products with "S"/"S+" in `special` field get IEEPA reciprocal and fentanyl zeroed out. For 232 auto/MHD products, the USMCA share is scaled by `us_auto_content_share` (0.40) — reflecting that only ~40% of a USMCA-eligible vehicle's value is US/USMCA-origin content. Non-auto 232 products (steel, aluminum) are NOT USMCA-exempt.
+**USMCA exemption:** Canadian and Mexican products are scaled by product-level USMCA utilization shares from USITC DataWeb (SPI S/S+). IEEPA reciprocal, fentanyl, and Section 122 rates are multiplied by `(1 - usmca_share)`. For 232 auto/MHD products, the USMCA share is further scaled by `us_auto_content_share` (0.40) — reflecting that only ~40% of a USMCA-eligible vehicle's value is US/USMCA-origin content. Non-auto 232 products (steel, aluminum) are NOT USMCA-exempt.
 
 **China fentanyl exclusion:** China/Hong Kong are excluded from blanket fentanyl application because their 9903.90.xx footnote rates already incorporate fentanyl — adding it would double-count ~10pp.
 
@@ -462,11 +465,15 @@ The Trade Act §122 limits blanket tariffs to 150 days. Enforcement at three lev
 
 Controlled by `section_122` config in `policy_params.yaml` with `effective`, `expiry`, and `finalized` fields.
 
-### USMCA Eligibility
+### USMCA Utilization Shares
 
-USMCA eligibility is determined from the HTS `special` field: products with "S" or "S+" in any parenthesized group are flagged as eligible. `extract_usmca_eligibility()` checks all parenthesized groups (fixed: S+ in secondary groups is now detected). ~24% of products are USMCA-eligible.
+USMCA utilization is measured at the product-country level using USITC DataWeb SPI codes "S"/"S+" for a given calendar year. For each HTS-10 × country (Canada/Mexico), the USMCA share is `usmca_claimed_value / total_value`. Tariff rates for IEEPA reciprocal, fentanyl, and Section 122 are scaled by `(1 - usmca_share)`. For 232 auto/MHD products, the share is further scaled by `us_auto_content_share` (0.40).
 
-USMCA-eligible products for Canada/Mexico get IEEPA reciprocal and fentanyl zeroed out. Section 232 still applies. This is a binary classification — no utilization-rate adjustment (see [Current Issues](#current-issues)).
+Two years of shares are committed: 2024 (CA: 38%, MX: 50%) and 2025 (CA: 67%, MX: 68%). The year is selected via `usmca_shares.year` in `config/policy_params.yaml` (default: 2025). The 2025 data reflects tariff-induced behavioral changes — firms rushed to claim USMCA preferences to avoid new tariffs, nearly doubling utilization rates. The 2024 data represents pre-tariff steady-state.
+
+DataWeb SPI captures all USMCA claims regardless of duty treatment, unlike Census RP=18 which misses claims on already-duty-free products.
+
+**Updating USMCA shares** requires a free USITC DataWeb account. Save your API token in `.env` as `DATAWEB_API_TOKEN=<token>` and run `Rscript src/download_usmca_dataweb.R --year <year>`. The committed year-specific files can be used without a DataWeb account.
 
 ### Fentanyl Carve-Outs
 
@@ -533,7 +540,7 @@ To handle this, `revision_dates.csv` supports an optional `tpc_policy_revision` 
 
 The `etr_aligned` column in `output/etr/etr_overall.csv` contains the policy-aligned tracker ETR where overrides are active. For Liberation Day, the override narrows the gap only slightly (-8.28pp → -7.77pp) because rev_7 also lacks the country-specific rates — the 10% universal baseline was all that was ever encoded in the HTS.
 
-**Key gap sources:** (1) China+232 reciprocal stacking (methodological difference, see below); (2) EU/Japan/Korea floor residual (partially explained by duty-free treatment setting, see below); (3) USMCA binary vs. utilization-adjusted.
+**Key gap sources:** (1) China+232 reciprocal stacking (methodological difference, see below); (2) EU/Japan/Korea floor residual (partially explained by duty-free treatment setting, see below).
 
 ---
 
@@ -547,7 +554,7 @@ Import-weighted effective tariff rates compared against [Tariff-ETRs](https://gi
 | 2026-02-24 | 12.01% | 10.49% | +1.53 | S122 + 232 + 301 (IEEPA zeroed) |
 | 2026-07-24 | 7.62% | 7.29% | +0.33 | 232 + 301 + MFN only |
 
-**Key divergence sources:** (1) USMCA share granularity — tracker uses product-level Census SPI data vs ETRs' GTAP sector-level shares (tracker confirmed correct by TPC); (2) 301 rate treatment (tracker correct — Biden supersedes Trump on 8 overlap products); (3) 232 product coverage gaps (bilateral — ETRs missing ch72 base steel; ch87 autos needs investigation); (4) Copper 232 product coverage (resolved — parsed US Note 36(b), 80/80 match with ETRs). Full details in `docs/comparison_vs_tariff_etrs.md`.
+**Key divergence sources:** (1) USMCA share granularity — tracker uses product-level USITC DataWeb SPI data vs ETRs' GTAP sector-level shares (tracker confirmed correct by TPC); (2) 301 rate treatment (tracker correct — Biden supersedes Trump on 8 overlap products); (3) 232 product coverage gaps (bilateral — ETRs missing ch72 base steel; ch87 autos needs investigation); (4) Copper 232 product coverage (resolved — parsed US Note 36(b), 80/80 match with ETRs). Full details in `docs/comparison_vs_tariff_etrs.md`.
 
 ---
 
@@ -575,7 +582,7 @@ Import-weighted effective tariff rates compared against [Tariff-ETRs](https://gi
 ### Resolved
 
 - **Copper 232 product coverage:** Parsed US Note 36(b) via `scrape_us_notes.R --copper`. 80 HTS10 codes match ETRs exactly. Now uses `resources/s232_copper_products.csv`.
-- **USMCA utilization rates:** Product-level Census SPI data replaces binary S/S+ eligibility.
+- **USMCA utilization rates:** Product-level USITC DataWeb SPI data (S/S+) replaces binary S/S+ eligibility. Year-specific shares for 2024 and 2025 (~40K product-country pairs each), selectable via `usmca_shares.year` in `policy_params.yaml`.
 - **Base rate inheritance:** Statistical suffixes inherit MFN from parent indent (11,558 products fixed).
 - **301 Biden supersession:** Biden rates supersede Trump on 8 overlapping products via `max()` aggregation.
 

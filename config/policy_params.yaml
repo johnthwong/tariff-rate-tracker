@@ -415,6 +415,14 @@ tpc_excluded_countries:
   - '3720'   # Falkland Islands
   - '7660'   # DR Congo
 
+# --- USMCA utilization shares ---
+# Product-level USMCA utilization rates from USITC DataWeb (SPI S/S+).
+# Year-specific files: resources/usmca_product_shares_{year}.csv
+# 2024: pre-tariff steady-state (CA ~38%, MX ~50%)
+# 2025: tariff-induced jump (CA ~67%, MX ~68%) — firms rushed to claim preferences
+usmca_shares:
+  year: 2025
+
 # --- MFN exemption shares (FTA/GSP preference utilization) ---
 # Adjusts statutory MFN base_rate down using Census calculated duty data.
 # effective_mfn = mfn_rate * (1 - exemption_share) at HS2 x country level.
