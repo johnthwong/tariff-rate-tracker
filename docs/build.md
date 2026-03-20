@@ -28,23 +28,10 @@ This checks packages, config files, committed resources, HTS JSON availability, 
 ### 2. Install packages
 
 ```bash
-Rscript src/install_dependencies.R
-Rscript src/install_dependencies.R --all
+Rscript -e "renv::restore()"
 ```
 
-Required packages:
-
-- `tidyverse`
-- `jsonlite`
-- `yaml`
-- `here`
-
-Optional packages:
-
-- `pdftools`
-- `digest`
-- `arrow`
-- `httr`
+This installs all packages at the versions recorded in `renv.lock`. Required: `tidyverse`, `jsonlite`, `yaml`, `here`. Optional: `pdftools`, `digest`, `arrow`, `openxlsx`, `httr`.
 
 ### 3. Download HTS JSON archives
 
@@ -168,7 +155,7 @@ Rscript src/run_comparisons.R --etr
 
 ## Troubleshooting
 
-- If `preflight.R` reports missing packages, run `src/install_dependencies.R --all`.
+- If `preflight.R` reports missing packages, run `Rscript -e "renv::restore()"` or `src/install_dependencies.R --all`.
 - If weighted outputs are skipped, check `config/local_paths.yaml`.
 - If benchmark comparisons are skipped, confirm the configured TPC path exists.
 - If no HTS JSON archives are found, run `src/02_download_hts.R`.

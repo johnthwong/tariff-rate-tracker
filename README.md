@@ -24,8 +24,8 @@ The repository's core product is an interval-encoded tariff panel for the 2025-2
 ## Quick start
 
 ```bash
+Rscript -e "renv::restore()"
 Rscript src/preflight.R
-Rscript src/install_dependencies.R --all
 Rscript src/02_download_hts.R
 Rscript src/00_build_timeseries.R --full --core-only
 ```
