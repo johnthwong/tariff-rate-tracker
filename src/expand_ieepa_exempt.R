@@ -2,10 +2,12 @@
 # =============================================================================
 # Expand IEEPA Exempt Products
 # =============================================================================
-# Three fixes:
+# Five fixes:
 #   1. Expand all existing HTS8 prefixes to full HTS10 codes using HTS JSON
 #   2. Add Ch98 exempt codes (US Notes (v)(i) exempts Ch98 except 9802.00.40/50/60/80)
 #   3. Expand ITA prefix entries (8471, 8473.30, 8486, 8523, 8524, 8541, 8542)
+#   4. Add Ch97 (artworks/antiques) — Berman Amendment (19 USC 2505)
+#   5. Add Ch49 (printed matter) — Berman Amendment (19 USC 2505, "informational materials")
 # =============================================================================
 
 library(tidyverse)
@@ -68,8 +70,30 @@ ita_matches <- unique(ita_matches)
 new_ita <- setdiff(ita_matches, c(current$hts10, expanded_from_existing, ch98_exempt))
 cat("Fix 3 - ITA prefix expansion: +", length(new_ita), "codes\n")
 
+# --- Fix 4: Add Ch97 (Berman Amendment) ---
+# Berman Amendment (19 USC 2505) exempts "informational materials" from trade
+# restrictions. Ch97 (works of art, collectors' pieces, antiques) is covered
+# by its own Ch99 code. TPC confirms these are exempt.
+ch97_all <- all_hts10[substr(all_hts10, 1, 2) == "97"]
+new_ch97 <- setdiff(ch97_all, c(current$hts10, expanded_from_existing))
+cat("Fix 4 - Ch97 Berman Amendment: +", length(new_ch97), "codes",
+    "(of", length(ch97_all), "total Ch97)\n")
+
+# --- Fix 5: Add Ch49 (Berman Amendment) ---
+# Berman Amendment also covers "printed matter" (informational materials).
+# 19 USC 2505(c) defines informational materials broadly: publications, films,
+# artworks, etc. Ch49 headings 4901-4911 are informational materials.
+# Calendars (4910) and stamps (4907) may be borderline, but TPC confirms
+# broad Berman coverage for ch49. Include all ch49 products.
+ch49_all <- all_hts10[substr(all_hts10, 1, 2) == "49"]
+ch49_already <- ch49_all[ch49_all %in% c(current$hts10, expanded_from_existing, ita_matches)]
+new_ch49 <- setdiff(ch49_all, c(current$hts10, expanded_from_existing, ita_matches))
+cat("Fix 5 - Ch49 Berman Amendment: +", length(new_ch49), "codes",
+    "(of", length(ch49_all), "total Ch49,", length(ch49_already), "already exempt)\n")
+
 # --- Combine all ---
-all_exempt <- sort(unique(c(current$hts10, new_from_expansion, new_ch98, new_ita)))
+all_exempt <- sort(unique(c(current$hts10, new_from_expansion, new_ch98, new_ita,
+                            new_ch97, new_ch49)))
 cat("\nTotal after all fixes:", length(all_exempt),
     "(was", nrow(current), ", +", length(all_exempt) - nrow(current), ")\n")
 

@@ -1,39 +1,34 @@
-# ETRs Comparison TODO
+# Tariff Rate Tracker — TODO
 
-## 1. Slovakia Feb 24 spike (+7.8pp) — FIXED
+## Pipeline bugs
 
-**Root cause:** Bug in `compare_etrs.R` reconstruction logic. When IEEPA invalidation triggered `needs_reconstruct`, naive `rowSums()` added `rate_s122` at full value to 232 products instead of scaling by `nonmetal_share`. Replaced with `apply_stacking_rules()`. Pipeline rates were always correct.
+### MHD vehicle/bus 232 rates not applied (9903.74)
 
-**Result:** Feb 24 overall gap went from +0.45pp to -0.43pp.
+MHD 232 entries (`9903.74.xx`) first appear in the HTS JSON at rev_26 (Oct 6, 2025). Two issues:
 
-## 2. South Korea / Taiwan / Malaysia negative gaps — INVESTIGATED
+1. **No HTS entries before rev_26.** Jul 23 – Oct 5 has zero MHD coverage. By design (tracker follows HTS, not announcements).
+2. **Rates may still be zero after rev_26** if built from stale ch99 data. Current full rebuild (2026-03-23) should resolve. Verify after rebuild.
 
-**South Korea (-4.6pp):** Floor formula order-of-operations. Step 2 computed `rate_ieepa_recip = max(0, 0.15 - statutory_base)` before Step 6c applied KORUS FTA exemption. ETRs computes floor against effective (post-FTA) base. Fix: added Step 6d to recompute floor deduction after MFN exemption. KR has 79.5% mean KORUS exemption share — simulated delta = +3.2pp, closing most of the gap. Also affects Japan (+0.32pp), EU (+0.01 to +0.22pp).
+Also: `docs/revision_changelog.md` mislabels rev_26's `9903.74.xx` entries as "Copper 232" — should be "MHD vehicles/buses 232 + copper 232".
 
-**Taiwan (-6.9pp) and Malaysia (-5.9pp):** Extra IEEPA-exempt products in tracker. The `expand_ieepa_exempt.R` ITA prefix expansion added ~125 more HTS8 codes (Ch84/85 electronics/semiconductors) than ETRs. These dominate TW (TSMC) and MY (electronics assembly) exports. **Tracker is correct per US Note 2 subdivision (v)(iii).** No code change needed.
+**Files:** `src/06_calculate_rates.R` (heading gates ~line 836), `config/policy_params.yaml` (MHD config ~line 120-138), `docs/revision_changelog.md` (rev_26 label)
 
-## 3. Cayman Islands post-invalidation drop — INVESTIGATED
+## Pipeline rebuild
 
-**Root cause:** Product concordance mismatch, not a rate bug. Product `8507600020` (lithium-ion battery cells, 47% of Cayman Islands' $36.5M imports) was renumbered to `8507600030`/`8507600090` in `2026_rev_4`. The `inner_join` in `compare_etrs.R` drops unmatched imports from the numerator while the denominator stays fixed, collapsing the ETR.
+- [ ] Verify MHD 232 rates appear after rebuild (check rev_26+ for `rate_232 > 0` on MHD products)
+- [ ] Fix `revision_changelog.md` rev_26 label
+- [ ] Re-run `compare_etrs.R` after rebuild to confirm gap closure
+- [ ] Add generic pharma country-specific exemption shares (per TPC feedback; low priority)
 
-**Fix needed:** HTS product concordance mapping for renumbered codes. Building `src/build_hts_concordance.R` to diff consecutive revision JSONs and track splits/merges/renames. 65 products ($36.5B) affected between `2026_basic` and `2026_rev_4`.
+## Blog publication (`blog_april2/`)
 
-## 4. Systematic small-country outliers
+- [ ] Regenerate all figures after pipeline rebuild completes
+- [ ] Regenerate docx from final `.md` before publication
 
-Persistent large gaps on low-import countries suggest systematic differences in preference/FTA handling:
-- Azerbaijan: -26pp
-- Bahrain: -22pp (has BFTA)
-- UAE: -8pp (0.19% share — largest of this group)
-- Uzbekistan: -12pp
-- Georgia: +14pp
-- Albania: +12pp
-- New Caledonia: +22pp (French territory — classification mismatch?)
+## Concordance builder
 
-Doesn't affect aggregates but indicates the tracker may be missing some preference utilization data.
+Matching in `src/build_hts_concordance.R` may overstate splits/merges. Suitable for `compare_etrs.R` but not authoritative. Tighten with reciprocal-best or capped matching if needed.
 
-## Remaining actions
+## Small-country outliers
 
-- [ ] Full pipeline rebuild to propagate floor fix (Step 6d) to snapshots
-- [ ] Re-run `compare_etrs.R` after rebuild to confirm KR/JP/EU gap closure
-- [ ] Complete HTS concordance builder and integrate into `compare_etrs.R`
-- [ ] Document TW/MY exempt product difference as known methodological choice
+Persistent large gaps on low-import countries (Azerbaijan -26pp, Bahrain -22pp, UAE -8pp, Georgia +14pp, New Caledonia +22pp). Not material to aggregates. Investigate after rebuild.

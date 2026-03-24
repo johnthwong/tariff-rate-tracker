@@ -319,13 +319,13 @@ run_all_diagnostics <- function(
 #'
 #' Takes the combined TPC comparison CSV (from test_tpc_comparison.R) and
 #' classifies each mismatch into one of:
-#'   1. duty_free_ieepa: base=0, our recip>0, TPC=0 (we apply IEEPA to duty-free)
-#'   2. s232_mutual_exclusion: 232>0, our recip=0, TPC higher (~25pp gap)
+#'   1. duty_free_ieepa: base=0, our recip>0, TPC=0
+#'   2. s232_me_* sub-categories (pure_steel, pure_aluminum, copper, derivative,
+#'      auto, other): 232 products where TPC is higher
 #'   3. floor_gap: floor country, we higher, non-duty-free
 #'   4. usmca_diff: CA/MX, rate difference
 #'   5. s301_gap: China, TPC higher, likely missing 301
-#'   6. base_rate_parsing: compound rate shows as 0
-#'   7. unclassified: everything else
+#'   6. unclassified: everything else
 #'
 #' @param comparison_path Path to tpc_comparison_all.csv
 #' @param revision_filter Optional revision to filter to (default: latest)
@@ -374,6 +374,50 @@ decompose_tpc_discrepancies <- function(comparison_path, revision_filter = NULL)
       is_match = abs(diff) < 0.005
     )
 
+  # Load 232 product lists for sub-category classification
+  derivative_products <- tryCatch(
+    read_csv(here('resources', 's232_derivative_products.csv'),
+             col_types = cols(.default = col_character()))$hts8,
+    error = function(e) character(0)
+  )
+  auto_parts <- tryCatch(
+    readLines(here('resources', 's232_auto_parts.txt')),
+    error = function(e) character(0)
+  )
+  mhd_parts <- tryCatch(
+    readLines(here('resources', 's232_mhd_parts.txt')),
+    error = function(e) character(0)
+  )
+  auto_all <- unique(c(auto_parts, mhd_parts))
+  copper_prefixes <- tryCatch({
+    cp <- pp$section_232_headings$copper$prefixes
+    if (is.null(cp)) character(0) else cp
+  }, error = function(e) character(0))
+  # Also load copper products file if available
+  copper_products <- tryCatch(
+    read_csv(here('resources', 's232_copper_products.csv'),
+             col_types = cols(.default = col_character()))$hts10,
+    error = function(e) character(0)
+  )
+  steel_chapters <- c('72', '73')
+  aluminum_chapters <- c('76')
+
+  # Classify 232 sub-type for each product
+  comp <- comp %>%
+    mutate(
+      hts8 = substr(hts10, 1, 8),
+      s232_subtype = case_when(
+        rate_232 == 0 ~ NA_character_,
+        chapter %in% steel_chapters ~ 's232_pure_steel',
+        chapter %in% aluminum_chapters ~ 's232_pure_aluminum',
+        hts10 %in% copper_products |
+          substr(hts10, 1, 4) %in% copper_prefixes ~ 's232_copper',
+        hts8 %in% derivative_products ~ 's232_derivative',
+        hts8 %in% auto_all ~ 's232_auto',
+        TRUE ~ 's232_other'
+      )
+    )
+
   # Classify mismatches into categories
   comp <- comp %>%
     mutate(
@@ -381,9 +425,9 @@ decompose_tpc_discrepancies <- function(comparison_path, revision_filter = NULL)
         is_match ~ 'match',
         # 1. Duty-free IEEPA: base=0, we charge IEEPA recip, TPC doesn't
         base_rate < 0.001 & rate_ieepa_recip > 0 & we_higher ~ 'duty_free_ieepa',
-        # 2. 232 mutual exclusion: we have 232, TPC adds recip on top
+        # 2. 232 mutual exclusion: sub-categorized by product type
         rate_232 > 0 & rate_ieepa_recip == 0 & tpc_higher &
-          abs(diff + 0.25) < 0.06 ~ 's232_mutual_exclusion',
+          !is.na(s232_subtype) ~ paste0('s232_me_', s232_subtype),
         rate_232 > 0 & rate_ieepa_recip == 0 & tpc_higher ~ 's232_mutual_exclusion_other',
         # 3. Floor gaps: floor country, non-duty-free, we higher
         is_floor_country & we_higher & base_rate >= 0.001 ~ 'floor_gap',
@@ -442,13 +486,27 @@ decompose_tpc_discrepancies <- function(comparison_path, revision_filter = NULL)
     print(df_by_group)
   }
 
-  # 232 mutual exclusion breakdown
-  s232_me <- comp %>% filter(grepl('s232_mutual_exclusion', category))
+  # 232 mutual exclusion breakdown (enhanced sub-categories)
+  s232_me <- comp %>% filter(grepl('s232_me_|s232_mutual_exclusion', category))
   if (nrow(s232_me) > 0) {
-    cat('\n--- 232 Mutual Exclusion ---\n')
-    cat('  Product-country pairs: ', nrow(s232_me), '\n')
+    cat('\n--- 232 Mutual Exclusion (Enhanced Breakdown) ---\n')
+    cat('  Total product-country pairs: ', nrow(s232_me), '\n')
     cat('  Mean gap: ', round(mean(s232_me$diff) * 100, 1), 'pp\n')
     cat('  Unique products: ', n_distinct(s232_me$hts10), '\n')
+
+    s232_sub <- s232_me %>%
+      group_by(category) %>%
+      summarise(
+        n_pairs = n(),
+        n_products = n_distinct(hts10),
+        mean_gap_pp = round(mean(diff) * 100, 2),
+        mean_tpc_rate = round(mean(tpc_rate) * 100, 2),
+        pct_base_zero = round(mean(base_rate < 0.001) * 100, 1),
+        .groups = 'drop'
+      ) %>%
+      arrange(desc(n_pairs))
+    cat('\n  Sub-category breakdown:\n')
+    print(s232_sub, n = 20)
   }
 
   # Impact simulation
