@@ -244,6 +244,10 @@ ensure_dir <- function(path) {
 #' Returns a list with convenience fields unpacked for direct use.
 #'
 #' @param yaml_path Path to policy_params.yaml
+#' @param use_policy_dates If TRUE (default), swap date-sensitive config fields
+#'   (IEEPA invalidation, S122 effective/expiry) to their policy_effective_date
+#'   equivalents. Set FALSE when using --use-hts-dates or for utilities that
+#'   need raw HTS timing. See docs/policy_timing.md.
 #' @return List with raw params plus convenience fields
 load_policy_params <- function(yaml_path = here('config', 'policy_params.yaml'),
                                use_policy_dates = TRUE) {
@@ -1560,6 +1564,13 @@ apply_expiry_zeroing <- function(rev_data, sub_start, policy_params) {
 #' @return Tibble — one snapshot for the active revision at query_date
 get_rates_at_date <- function(ts, query_date, policy_params = NULL) {
   query_date <- as.Date(query_date)
+
+  # Load default policy params if not provided — ensures post-interval
+
+  # adjustments (S122 expiry, Swiss framework) are applied consistently
+  if (is.null(policy_params)) {
+    policy_params <- tryCatch(load_policy_params(), error = function(e) NULL)
+  }
 
   stopifnot(
     'valid_from' %in% names(ts),

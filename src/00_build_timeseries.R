@@ -424,7 +424,8 @@ print_timeseries_summary <- function(timeseries_path = 'data/timeseries/rate_tim
 detect_incremental_start <- function(
   output_dir = 'data/timeseries',
   archive_dir = 'data/hts_archives',
-  revision_dates_path = 'config/revision_dates.csv'
+  revision_dates_path = 'config/revision_dates.csv',
+  use_policy_dates = TRUE
 ) {
   metadata_path <- file.path(output_dir, 'metadata.rds')
   if (!file.exists(metadata_path)) {
@@ -437,7 +438,8 @@ detect_incremental_start <- function(
   message('Last build: ', metadata$last_build_time, ' (', last_rev, ')')
 
   # Check for new revisions after last_rev
-  rev_dates <- load_revision_dates(revision_dates_path)
+  rev_dates <- load_revision_dates(revision_dates_path,
+                                    use_policy_dates = use_policy_dates)
   all_revisions <- rev_dates$revision
 
   available <- get_available_revisions_all_years(all_revisions, archive_dir)
@@ -487,7 +489,7 @@ if (sys.nframe() == 0) {
   } else if (!is.null(start_from)) {
     message('Mode: Incremental from ', start_from)
   } else {
-    start_from <- detect_incremental_start()  # NULL = full backfill
+    start_from <- detect_incremental_start(use_policy_dates = use_policy_dates)
   }
 
   # --- Step B: Download missing JSON ---
@@ -517,7 +519,7 @@ if (sys.nframe() == 0) {
     source(here('src', 'quality_report.R'))
 
     ts <- readRDS(result$timeseries_path)
-    pp <- load_policy_params()
+    pp <- load_policy_params(use_policy_dates = use_policy_dates)
 
     if (core_only) {
       message('\n', strrep('=', 70))
