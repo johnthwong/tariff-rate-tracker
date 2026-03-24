@@ -559,12 +559,11 @@ if (sys.nframe() == 0) {
 
       # --- Step F: Alternative daily series ---
       # Post-build alternatives always run; rebuild alternatives only with --with-alternatives
-      source(here('src', 'apply_scenarios.R'))
-      tryCatch(
+      tryCatch({
+        source(here('src', 'apply_scenarios.R'))
         run_alternative_series(ts, imports = imports, policy_params = pp,
-                                rebuild = with_alternatives),
-        error = function(e) message('Alternative series failed: ', conditionMessage(e))
-      )
+                                rebuild = with_alternatives)
+      }, error = function(e) message('Alternative series failed: ', conditionMessage(e)))
     }
   }
 }
