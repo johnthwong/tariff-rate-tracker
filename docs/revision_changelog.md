@@ -52,7 +52,7 @@ Semiconductor tariff entries are handled through the normal Chapter 99 parsing p
 | rev_23 | 2025-09-12 | 632 | 7 | 0 | 0 | **Japan floor** (9903.02.72-73, 15%); 232 auto Japan entries |
 | rev_24 | 2025-09-19 | 640 | 8 | 0 | 0 | EU exemption entries (9903.02.74-77); 232 auto EU entries |
 | rev_25 | 2025-09-26 | 647 | 7 | 0 | 0 | **Section 122** entries (9903.76.xx) |
-| rev_26 | 2025-10-06 | 663 | 16 | 0 | 0 | Copper 232 entries (9903.74.xx); 232 auto additional entries |
+| rev_26 | 2025-10-06 | 663 | 16 | 0 | 0 | MHD vehicles/buses 232 (9903.74.xx); copper 232; 232 auto additional entries |
 | rev_27 | 2025-10-15 | 668 | 5 | 1 | 0 | **301 cranes** (9903.91.12-16, 100%); China fentanyl: 20% → 10% (post-Geneva) |
 | rev_28 | 2025-10-22 | 668 | 0 | 0 | 0 | (no Ch99 changes) |
 | rev_29 | 2025-10-31 | 669 | 1 | 0 | 0 | Phase 2 exemption entry (9903.02.78) |
@@ -194,8 +194,8 @@ No Chapter 99 changes.
 - Added: 9903.76.01-04 (Section 122 entries, 10%-25%)
 - Added: 9903.76.20-22 (Section 122 entries, 10%-15%)
 
-### `rev_26` — 2025-10-06: Copper 232, More Autos
-- Added: 9903.74.01-11 (copper Section 232 entries)
+### `rev_26` — 2025-10-06: MHD Vehicles/Buses 232, Copper 232, More Autos
+- Added: 9903.74.01-11 (MHD vehicles/buses and copper Section 232 entries)
 - Added: 9903.94.07 (auto 232), 9903.94.33 (auto 10%)
 - Added: 9903.94.44-45, 9903.94.54-55 (232 auto floor entries)
 
@@ -273,7 +273,7 @@ No Chapter 99 changes. +153 product line additions.
 | 2025-08-20 | India EO (+25%) | rev_20 |
 | 2025-09-12 | Japan floor (15%) + 232 auto deal | rev_23 |
 | 2025-09-19 | EU floor entries + 232 auto deal | rev_24 |
-| 2025-10-06 | Copper 232 | rev_26 |
+| 2025-10-06 | MHD vehicles/buses 232 + copper 232 | rev_26 |
 | 2025-10-15 | 301 cranes (100%); China fentanyl reduced to 10% | rev_27 |
 | 2025-11-15 | S. Korea floor (15%) | rev_32 |
 | 2026-01-01 | Switzerland/Liechtenstein floor (15%) | 2026_basic |
