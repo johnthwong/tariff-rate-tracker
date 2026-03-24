@@ -70,7 +70,7 @@ build_full_timeseries <- function(
   scenario = 'baseline',
   start_from = NULL,
   stacking_method = 'mutual_exclusion',
-  use_policy_dates = FALSE
+  use_policy_dates = TRUE
 ) {
   start_time <- Sys.time()
 

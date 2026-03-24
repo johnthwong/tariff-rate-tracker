@@ -70,17 +70,22 @@ These are not tracker errors — the tracker correctly follows legal effective d
 
 The `config/revision_dates.csv` includes a `policy_effective_date` column alongside the existing `effective_date` (HTS publication date). This column is populated for the 7 revisions where the legal effective date differs from the HTS date.
 
-### Default: policy dates
+### Default: policy dates (where HTS was late)
 
-The pipeline defaults to using legal policy effective dates where they differ from HTS revision dates. This is implemented in `load_revision_dates()` in `src/helpers.R`, which swaps `policy_effective_date` into `effective_date` for the revisions where it's populated.
+The pipeline defaults to using legal policy effective dates for revisions where the HTS was published **after** the legal effective date. Only two revisions qualify:
 
-To use raw HTS dates instead:
+- **rev_16** (232 steel/aluminum 50%): HTS Jun 6 → policy Jun 4 (2 days late)
+- **2026_rev_4** (SCOTUS + S122): HTS Feb 24 → policy Feb 20 (4 days late)
+
+Revisions where HTS was published **before** the legal effective date (rev_6, rev_7, rev_11, rev_26) are NOT overridden, because shifting them later creates timeline collisions and reorderings (e.g., Liberation Day appearing after China's retaliatory escalation). For these cases, the tracker follows the HTS publication date — the date when the rates were legally in the tariff schedule — even if CBP collection began later.
+
+For the SCOTUS ruling (2026_rev_4), both IEEPA removal and Section 122 imposition are assigned to the ruling date (Feb 20, 2026), since the S122 EO was signed the same day even though CBP implementation was Feb 24. The `ieepa_invalidation_date` and `section_122.effective_date` in `policy_params.yaml` are also coordinated to Feb 20.
+
+To use raw HTS dates for all revisions instead:
 
 ```bash
 Rscript src/00_build_timeseries.R --full --use-hts-dates
 ```
-
-For the SCOTUS ruling (2026_rev_4), both IEEPA removal and Section 122 imposition are assigned to the ruling date (Feb 20, 2026), since the S122 EO was signed the same day even though CBP implementation was Feb 24.
 
 **Bundling analysis:** We decomposed each timing-gap revision to determine what share of its ETR impact belongs to the policy-date component vs. the HTS-date component (import-weighted):
 
