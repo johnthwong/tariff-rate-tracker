@@ -809,11 +809,10 @@ extract_section232_rates <- function(ch99_data) {
 
   mhd_rate <- 0
   if (nrow(s232_mhd) > 0) {
-    mhd_all <- s232_mhd %>% filter(country_type == 'all')
-    if (nrow(mhd_all) > 0) {
-      mhd_rate <- max(mhd_all$rate)
-      message('  MHD vehicles 232: ', round(mhd_rate * 100), '%')
-    }
+    # 9903.74.xx descriptions reference US Note 38, not countries,
+    # so parse_countries() returns 'unknown'. Take max rate directly.
+    mhd_rate <- max(s232_mhd$rate)
+    message('  MHD vehicles 232: ', round(mhd_rate * 100), '%')
   }
 
   # --- Copper (9903.78) ---
@@ -822,11 +821,11 @@ extract_section232_rates <- function(ch99_data) {
 
   copper_rate <- 0
   if (nrow(s232_copper) > 0) {
-    copper_all <- s232_copper %>% filter(country_type == 'all')
-    if (nrow(copper_all) > 0) {
-      copper_rate <- max(copper_all$rate)
-      message('  Copper 232: ', round(copper_rate * 100), '%')
-    }
+    # 9903.78.01 is a blanket rate; description references US Note 36
+    # subdivision, not countries, so parse_countries() returns 'unknown'.
+    # Don't filter by country_type — take the max rate from any entry.
+    copper_rate <- max(s232_copper$rate)
+    message('  Copper 232: ', round(copper_rate * 100), '%')
   }
 
   has_232 <- (steel_rate > 0 || aluminum_rate > 0 || auto_rate > 0 || auto_has_deals ||
