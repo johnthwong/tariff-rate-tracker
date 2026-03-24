@@ -6,11 +6,13 @@ This document is an appendix to [methodology.md](methodology.md). It catalogs me
 
 ## 1. Tariff Stacking: Mutual Exclusion vs. Additive
 
-**Assumption:** Section 232 and IEEPA reciprocal tariffs are mutually exclusive — 232 takes precedence, and IEEPA reciprocal applies only to the non-metal portion of derivative 232 products. TPC instead stacks all authorities additively (no mutual exclusion), which accounts for a ~25pp gap on ~25,800 products.
+**Assumption:** Section 232 and IEEPA reciprocal tariffs are mutually exclusive — 232 takes precedence, and IEEPA reciprocal applies only to the non-metal portion of derivative 232 products.
 
-**Source:** Tariff-ETRs legal interpretation. Confirmed by reverse-engineering TPC methodology through rate comparison.
+**TPC feedback (March 2026):** TPC confirmed they largely agree with mutual exclusion between 232 and IEEPA. Two exceptions: (1) copper products can stack 232 + CA/MX IEEPA (fentanyl), and (2) 232 derivatives face IEEPA on the non-metal portion (which our methodology already handles). The previously attributed ~25pp gap on ~25,800 products needs re-investigation — it may be driven by duty-free treatment differences or other factors rather than a fundamental stacking disagreement.
 
-**Evidence:** Running `tests/test_tpc_comparison.R --tpc-stacking` (additive mode) isolates data discrepancies from this methodological difference.
+**Source:** Tariff-ETRs legal interpretation, confirmed by TPC correspondence. The `tpc_additive` stacking mode is retained for sensitivity analysis.
+
+**Evidence:** Running `tests/test_tpc_comparison.R --tpc-stacking` (additive mode) is a sensitivity analysis toggle, not a TPC-matching switch. Enhanced 232 sub-category diagnostics in `src/diagnostics.R` decompose the gap by product type (pure metal, copper, derivative, auto, other).
 
 **Implementation:** `src/helpers.R:apply_stacking_rules()`, `stacking_method` parameter (default `'mutual_exclusion'`).
 
@@ -86,13 +88,15 @@ For Section 232 auto/MHD products, the USMCA share is further scaled by `us_auto
 
 ## 6. IEEPA Product Exemptions (Annex A)
 
-**Assumption:** ~4,325 HTS10 products are exempt from IEEPA reciprocal tariffs. Three sources:
+**Assumption:** IEEPA reciprocal tariff exemptions cover products from five sources:
 
 1. **Annex A / US Note 2 subdivision (v)(iii)**: ~2,172 HTS8 codes expanded to ~4,106 HTS10 (including ITA prefix entries for headings 8471, 8473.30, 8486, 8523, 8524, 8541, 8542)
 2. **Chapter 98 statutory exemption**: US Note 2 subdivision (v)(i) explicitly exempts Chapter 98 articles from IEEPA reciprocal, except 9802.00.40/.50/.60/.80. Adds ~101 HTS10 codes.
 3. **Country-specific carve-outs**: Merged from Tariff-ETRs `ieepa_reciprocal.yaml` product_rates (rate=0).
+4. **Chapter 97 (Berman Amendment)**: Artworks, collectors' pieces, antiques — exempt via 19 USC 2505 ("informational materials"). TPC confirms these have their own Ch99 code.
+5. **Chapter 49 (Berman Amendment)**: Printed matter — also exempt as "informational materials" under 19 USC 2505.
 
-**Source:** Executive orders (official policy), but the product list is maintained as an external resource file because the HTS JSON API does not provide US Notes text. List history: initial 1,087 codes → +1,085 from ETRs merge (March 2026) → +1,993 from HTS8→HTS10 expansion + 101 Ch98 + 59 ITA prefix expansion (March 9, 2026).
+**Source:** Executive orders (official policy), but the product list is maintained as an external resource file because the HTS JSON API does not provide US Notes text. List history: initial 1,087 codes → +1,085 from ETRs merge (March 2026) → +1,993 from HTS8→HTS10 expansion + 101 Ch98 + 59 ITA prefix expansion (March 9, 2026) → ch97 + ch49 Berman Amendment expansion (March 20, 2026).
 
 **Why non-official:** While the exemptions themselves are statutory (defined in US Notes), the compiled product list requires manual extraction from Chapter 99 PDF text since the HTS JSON API does not provide US Notes subdivisions. The HTS8→HTS10 expansion uses the HTS JSON product hierarchy to enumerate all statistical suffixes.
 
@@ -191,13 +195,19 @@ Phase classification determines stacking behavior — country_eo rates stack add
 
 ## 13. IEEPA Duty-Free Product Treatment
 
-**Assumption:** TPC does not apply IEEPA reciprocal tariffs to products with 0% MFN base rate. Our default (`'all'`) applies IEEPA to all products regardless of MFN rate, which is the legally strict interpretation (EO text does not carve out duty-free products). Setting `ieepa_duty_free_treatment: 'nonzero_base_only'` matches TPC methodology.
+**Assumption:** Our default (`'all'`) applies IEEPA reciprocal tariffs to all products regardless of MFN base rate, which is the legally strict interpretation (EO text does not carve out duty-free products). Setting `ieepa_duty_free_treatment: 'nonzero_base_only'` excludes 0% MFN products as a sensitivity analysis.
 
-**Impact:** ~26K product-country pairs at rev_32 (14,930 in floor countries + 11,288 in non-floor). Top affected chapters: 61-62 (apparel, ~7K), 84-85 (ITA machinery/electronics, ~1.7K), 98 (special provisions, ~3.5K), 97 (artworks), 29-30 (pharma), 49 (printed matter). Toggling to `'nonzero_base_only'` improves TPC match rate by ~8.5pp (65.9% → ~74.4% at rev_32).
+**TPC feedback (March 2026):** TPC does **not** use a blanket duty-free exclusion. Instead, specific product categories are exempt for specific legal reasons:
+- **Berman Amendment** (19 USC 2505): Ch49 (printed matter) and Ch97 (artworks/antiques) — "informational materials"
+- **Annex II**: Electronics (ITA products in Ch84/85)
+- **Country-specific generic pharma shares**: Partial exemption based on generic drug import shares
+- **Ch98 statutory**: Special classification provisions
 
-**Source:** Reverse-engineered from TPC validation data. The executive order text applies reciprocal tariffs to "articles imported into the United States" with no explicit carve-out for duty-free products, supporting the `'all'` interpretation. However, TPC's exclusion of duty-free products is a reasonable economic interpretation since the tariff base is zero.
+The `nonzero_base_only` toggle partially overlaps with these product-specific exemptions but is not equivalent. It remains useful as a sensitivity analysis variant but should not be characterized as "matching TPC methodology."
 
-**Implementation:** `config/policy_params.yaml` (`ieepa_duty_free_treatment`), applied in `src/06_calculate_rates.R` step 2 (existing products and new IEEPA-only pair expansion).
+**Impact:** ~26K product-country pairs at rev_32 (14,930 in floor countries + 11,288 in non-floor). Top affected chapters: 61-62 (apparel, ~7K), 84-85 (ITA machinery/electronics, ~1.7K), 98 (special provisions, ~3.5K), 97 (artworks), 29-30 (pharma), 49 (printed matter).
+
+**Implementation:** `config/policy_params.yaml` (`ieepa_duty_free_treatment`), applied in `src/06_calculate_rates.R` step 2. Berman Amendment products (ch49, ch97) added to IEEPA exempt list via `src/expand_ieepa_exempt.R` Fixes 4-5.
 
 ---
 

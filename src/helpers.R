@@ -820,9 +820,10 @@ apply_stacking_rules <- function(df, cty_china = '5700', stacking_method = 'mutu
   }
 
   # TPC additive: all authorities stack with no mutual exclusion.
-  # TPC stacks IEEPA reciprocal on top of 232 — confirmed empirically by comparing
-  # our mutual-exclusion rates against TPC data (the ~25pp systematic gap on 232
-  # products matches the IEEPA reciprocal rate and disappears in additive mode).
+  # TPC confirmed (March 2026) they mostly agree with mutual exclusion between
+  # 232 and IEEPA, with exceptions for copper (232 + CA/MX fentanyl) and
+  # derivatives (IEEPA on non-metal portion). This mode is retained for
+  # sensitivity analysis, not as a TPC-matching switch.
   if (stacking_method == 'tpc_additive') {
     return(
       df %>%

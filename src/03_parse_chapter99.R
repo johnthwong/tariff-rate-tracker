@@ -64,6 +64,16 @@ parse_countries <- function(description) {
     return(list(type = 'specific', countries = countries, exempt = character(0)))
   }
 
+  # Check for "except" clauses that reference HTS headings, not countries.
+  # e.g., "Except for derivative iron or steel products described in headings 9903.81.89..."
+  # These are blanket rates — the "except" carves out other HTS codes, not countries.
+  if (str_detect(desc_lower, 'except.*(?:heading|subheading|9903)')) {
+    if (!any(str_detect(desc_lower, c('canada', 'mexico', 'japan', 'korea',
+                                       'kingdom', 'european', 'russia')))) {
+      return(list(type = 'all', countries = character(0), exempt = character(0)))
+    }
+  }
+
   # Check for "except products of..." pattern (Section 232 style)
   except_match <- str_match(desc_lower, 'except[^,]*(products? of|of)\\s+([^,]+(?:,\\s*(?:of\\s+)?[^,]+)*)')
   if (!is.na(except_match[1, 1])) {

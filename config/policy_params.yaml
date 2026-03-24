@@ -434,9 +434,13 @@ mfn_exemption:
 
 # --- IEEPA reciprocal: duty-free product treatment ---
 # Whether to apply IEEPA reciprocal tariffs to products with 0% MFN base rate.
-# TPC excludes these; legal text supports either interpretation.
+# Legal text supports either interpretation. Sensitivity toggle, not a TPC match:
+# TPC uses product-specific legal exemptions (Berman Amendment for ch49/ch97,
+# Annex II for electronics, country-specific generic pharma shares, Ch98 statutory),
+# not a blanket duty-free exclusion. This toggle partially overlaps with those
+# but is not equivalent.
 #   'all' = apply to all products (current default, legally strict)
-#   'nonzero_base_only' = skip duty-free products (matches TPC methodology)
+#   'nonzero_base_only' = skip duty-free products (sensitivity analysis)
 ieepa_duty_free_treatment: 'all'
 
 # --- IEEPA invalidation (SCOTUS ruling) ---
