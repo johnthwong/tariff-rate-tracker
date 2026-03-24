@@ -80,4 +80,16 @@ Rscript src/00_build_timeseries.R --full --use-policy-dates
 
 This swaps `policy_effective_date` into `effective_date` for the 7 revisions where it's populated. All downstream logic (rate calculation, interval construction, daily series) uses the swapped dates. The flag is implemented in `load_revision_dates()` in `src/helpers.R`.
 
-**Limitation:** Some revisions bundle multiple policy changes with different timing gaps. For example, rev_17 includes both the CA fentanyl increase (no timing gap) and copper 232 (31-day gap). The flag shifts the entire revision date, which is an approximation. For finer-grained control, copy `config/revision_dates.csv` and edit individual `effective_date` values directly.
+**Bundling analysis:** We decomposed each timing-gap revision to determine what share of its ETR impact belongs to the policy-date component vs. the HTS-date component (import-weighted):
+
+| Revision | Total ETR Change | Policy-date share | HTS-date share | Assessment |
+|---|---|---|---|---|
+| rev_6 (232 Autos) | +2.25pp | 100% (232) | 0% | Clean — all early by 22 days |
+| rev_7 (Liberation Day) | +5.29pp | 100% (IEEPA) | 0% | Clean — all early by 3 days |
+| rev_11 (Auto parts) | +1.65pp | 100% (232) | 0% | Clean — all early by 22 days |
+| rev_16 (232 50%) | -0.06pp | 100% (232) | 0% | Clean — all late by 2 days (small impact) |
+| rev_17 (CA fent + copper) | +0.41pp | 0% | 100% (fentanyl) | **No gap:** copper 232 shows zero ETR impact; fentanyl is correctly dated at Jul 1. `policy_effective_date` left blank. |
+| rev_26 (MHD + copper + auto) | +0.00pp | — | — | **No gap:** zero net ETR change despite new ch99 entries. `policy_effective_date` has no effect. |
+| 2026_rev_4 (SCOTUS + S122) | -4.18pp | 67.7% (IEEPA+fent removal, Feb 20) | 32.3% (S122 addition, Feb 24) | **Bundled:** flag shifts dominant component correctly but applies S122 4 days early |
+
+For finer-grained control, copy `config/revision_dates.csv` and edit individual `effective_date` values directly.
