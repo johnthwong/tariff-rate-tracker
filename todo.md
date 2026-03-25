@@ -4,11 +4,11 @@
 
 - [x] Full rebuild with copper + MHD fixes — completed 2026-03-24
 - [x] Regenerate blog figures — completed 2026-03-24
-- [x] Re-run `compare_etrs.R` after rebuild — completed 2026-03-24
-  - timing-sensitive comparison rerun completed against the rebuilt artifacts
-  - `src/compare_etrs.R` now uses the canonical timing fields (`pp$SECTION_122`, `pp$IEEPA_INVALIDATION_DATE`) for post-snapshot adjustments
-  - residual tracker-vs-ETRs overall gaps remain: `+2.12pp` (`2026-01-01`), `+1.32pp` (`2026-02-24`), `+1.35pp` (`2026-07-24`)
-  - large China residuals persist (`+6.24pp`, `+6.48pp`, `+6.53pp` respectively), so this rerun did not "close" the comparison gap
+- [x] Re-run `compare_etrs.R` after rebuild — completed 2026-03-25
+  - **Section 301 List 4B (9903.88.16) suspension fix**: the HTS JSON retains suspended entries with original rates; the calculator now filters them out via description grep
+  - root cause diagnosed via `src/diagnose_china_gap.R`: 590 List 4B HTS8 codes ($116B China imports) were incorrectly assigned 15% rate
+  - post-fix tracker-vs-ETRs overall gaps: `+1.51pp` (`2026-01-01`), `+0.71pp` (`2026-02-24`), `+0.74pp` (`2026-07-24`)
+  - China gap reduced from `~6.5pp` to `~2pp`; remaining residual is Lists 1-3 coverage differences + prefix over-expansion + non-301 methodology
 - [ ] Add generic pharma country-specific exemption shares (per TPC feedback; low priority)
   - planning note saved at `docs/analysis/generic_pharma_exemption_share_plan_2026-03-24.md`
 
@@ -26,18 +26,17 @@
 
 ## Open investigations
 
-### China gap vs Tariff-ETRs
+### ~~China gap vs Tariff-ETRs~~ — RESOLVED (9c4c316, 2026-03-25)
 
-Follow-up note saved at `docs/analysis/compare_etrs_china_gap_followup_2026-03-24.md`.
+Root cause: Section 301 List 4B (9903.88.16) has been suspended since rev_4 (2025-03-04), but the calculator treated the entry as active because it still appears in the HTS JSON with its original 15% rate. The description field contains "[Compiler's note: provision suspended.]" which was not being checked.
 
-Current read:
+Fix: added `grepl('provision suspended', description)` filter to the active_301_codes determination in `06_calculate_rates.R`.
 
-- the residual China gap is stable across `2026-01-01`, `2026-02-24`, and `2026-07-24` (`~6.2-6.5pp`)
-- the gap persists before and after both IEEPA invalidation and Section 122 activation/expiry
-- the biggest positive chapter-level contributors are large China import chapters `84`, `85`, and `95`
-- those chapters are strongly Section 301-driven in the tracker
-
-So the next China-specific comparison task should focus on Section 301 scope / coverage differences, not on broad timing logic.
+Diagnosis saved at `src/diagnose_china_gap.R`. Gap decomposition:
+- 301 List 4B-only products removed: -4.18pp
+- 301 List 4B+4A revert to 7.5%: -0.39pp
+- remaining 301 residual: +1.06pp (Lists 1-3 absent HTS8, prefix over-expansion)
+- non-301 residual: +0.91pp
 
 ### rev_16 shows -0.06pp 232 change (expected ~+1pp for 50% increase)
 
@@ -105,6 +104,8 @@ Validation:
 - [x] Regenerate docx from final `.md` before publication — completed 2026-03-24
   - rendered `blog_april2/Daily Tariff Rate Blog - April 2 2026.md`
   - output: `blog_april2/Daily-Tariff-Rate-Blog---April-2-2026.docx`
+- [x] Regenerate blog figures after 301 List 4B fix — completed 2026-03-25
+  - figures, Excel workbook (`tariff_rate_tracker_blog_20260325.xlsx`), and docx all regenerated from rebuilt daily series
 
 ## Low priority
 
