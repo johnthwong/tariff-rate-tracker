@@ -226,7 +226,8 @@ check_country_applies <- function(country, country_type, countries, exempt) {
 #' @param s232_rates Section 232 rates from extract_section232_rates()
 #' @param countries Vector of Census country codes
 #' @return List with 'rates' (updated tibble) and 'deriv_matched' (character vector)
-apply_232_derivatives <- function(rates, products, ch99_data, s232_rates, countries) {
+apply_232_derivatives <- function(rates, products, ch99_data, s232_rates, countries,
+                                  policy_params = NULL) {
   deriv_products <- load_232_derivative_products()
   deriv_matched <- character(0)
 
@@ -288,7 +289,8 @@ apply_232_derivatives <- function(rates, products, ch99_data, s232_rates, countr
   # Join metal content shares and scale derivative 232 rates.
   # For derivative products, rate_232 was set to the full rate above;
   # now scale by metal_share so that the rate reflects metal-content-only.
-  metal_cfg <- if (!is.null(.pp)) .pp$metal_content else NULL
+  pp_local <- policy_params %||% .pp
+  metal_cfg <- if (!is.null(pp_local)) pp_local$metal_content else NULL
   metal_shares <- load_metal_content(metal_cfg, unique(rates$hts10), deriv_matched)
   if ('metal_share' %in% names(rates)) {
     rates <- rates %>% select(-metal_share)
@@ -347,9 +349,19 @@ calculate_rates_for_revision <- function(
   countries, revision_id, effective_date,
   s232_rates = NULL,
   fentanyl_rates = NULL,
-  stacking_method = 'mutual_exclusion'
+  stacking_method = 'mutual_exclusion',
+  policy_params = NULL
 ) {
   message('Calculating rates for revision: ', revision_id, ' (', effective_date, ')')
+
+  pp <- policy_params %||% load_policy_params()
+  cc <- get_country_constants(pp)
+  CTY_CHINA  <- cc$CTY_CHINA
+  CTY_CANADA <- cc$CTY_CANADA
+  CTY_MEXICO <- cc$CTY_MEXICO
+  STEEL_CHAPTERS <- cc$STEEL_CHAPTERS
+  ALUM_CHAPTERS  <- cc$ALUM_CHAPTERS
+  ISO_TO_CENSUS  <- cc$ISO_TO_CENSUS
 
   # 1. Get footnote-based rates from calculate_rates_fast()
   #    This captures 232, 301, fentanyl, other — but NOT IEEPA reciprocal,
@@ -364,7 +376,7 @@ calculate_rates_for_revision <- function(
   # 1b. Check IEEPA invalidation (SCOTUS ruling in Learning Resources v. Trump)
   #     If this revision's effective_date is on or after the invalidation date,
   #     IEEPA tariff authority is void — zero out reciprocal and fentanyl.
-  ieepa_invalidation <- .pp$IEEPA_INVALIDATION_DATE
+  ieepa_invalidation <- pp$IEEPA_INVALIDATION_DATE
   if (!is.null(ieepa_invalidation) && as.Date(effective_date) >= ieepa_invalidation) {
     message('  IEEPA invalidated as of ', ieepa_invalidation,
             ' — zeroing reciprocal and fentanyl for ', revision_id)
@@ -384,7 +396,7 @@ calculate_rates_for_revision <- function(
 
   # Duty-free treatment: 'all' (default) applies IEEPA to all products;
   # 'nonzero_base_only' skips products with 0% MFN base rate (matches TPC).
-  duty_free_treatment <- .pp$ieepa_duty_free_treatment %||% 'all'
+  duty_free_treatment <- pp$ieepa_duty_free_treatment %||% 'all'
   if (duty_free_treatment != 'all') {
     message('  IEEPA duty-free treatment: ', duty_free_treatment)
   }
@@ -410,11 +422,11 @@ calculate_rates_for_revision <- function(
 
   # Load product-level USMCA utilization shares from DataWeb SPI data (S/S+).
   # Year configured in policy_params.yaml (usmca_shares.year). Falls back to binary eligibility.
-  usmca_product_shares <- load_usmca_product_shares(policy_params = .pp)
+  usmca_product_shares <- load_usmca_product_shares(policy_params = pp)
 
   # Load MFN exemption shares (FTA/GSP preference utilization at HS2 x country level).
   # Adjusts statutory base_rate down before stacking. Sourced from Tariff-ETRs.
-  mfn_exemption_shares <- if (.pp$MFN_EXEMPTION$method == 'hs2') {
+  mfn_exemption_shares <- if (pp$MFN_EXEMPTION$method == 'hs2') {
     load_mfn_exemption_shares()
   } else {
     NULL
@@ -468,8 +480,6 @@ calculate_rates_for_revision <- function(
       # Exclude CA/MX: they have a separate fentanyl-only IEEPA regime and
       # are explicitly excluded from reciprocal tariffs by executive order.
       universal_baseline <- attr(ieepa_rates, 'universal_baseline')
-      pp <- load_policy_params()
-
       # Build country -> country_group mapping for floor exemption lookup
       has_floor_exempts <- nrow(floor_exempt_products) > 0
       if (has_floor_exempts) {
@@ -801,7 +811,7 @@ calculate_rates_for_revision <- function(
   }
 
   # Load heading-level 232 config from policy params
-  s232_headings <- if (!is.null(.pp)) .pp$section_232_headings else NULL
+  s232_headings <- if (!is.null(pp)) pp$section_232_headings else NULL
 
   if (s232_rates$has_232) {
     # --- Identify covered products by prefix matching ---
@@ -974,7 +984,7 @@ calculate_rates_for_revision <- function(
     # Date-bounded: only apply if this revision's effective_date is before the expiry.
     rev_date <- as.Date(effective_date)
     n_config_overrides <- 0L
-    for (exemption in .pp$S232_COUNTRY_EXEMPTIONS) {
+    for (exemption in pp$S232_COUNTRY_EXEMPTIONS) {
       # Check if exemption is active for this revision date
       is_active <- is.null(exemption$expiry_date) || rev_date < exemption$expiry_date
       if (!is_active) next
@@ -1100,7 +1110,7 @@ calculate_rates_for_revision <- function(
   #     Reduces effective 232 rate on auto/vehicle products by a credit reflecting
   #     US assembly content: effective_rate -= rebate_rate * us_assembly_share.
   #     Applied before metal content scaling (step 5) and before USMCA (step 7).
-  auto_rebate_cfg <- if (!is.null(.pp)) .pp$auto_rebate else NULL
+  auto_rebate_cfg <- if (!is.null(pp)) pp$auto_rebate else NULL
   rebate_rate <- if (!is.null(auto_rebate_cfg)) auto_rebate_cfg$rebate_rate %||% 0 else 0
   assembly_share <- if (!is.null(auto_rebate_cfg)) auto_rebate_cfg$us_assembly_share %||% 0 else 0
   us_auto_content_share <- if (!is.null(auto_rebate_cfg)) auto_rebate_cfg$us_auto_content_share %||% 1 else 1
@@ -1133,7 +1143,7 @@ calculate_rates_for_revision <- function(
   # Helper: convert ISO country code to Census code(s), expanding EU to 27 members
   iso_to_census_vec <- function(iso_code) {
     if (iso_code == 'EU') {
-      return(if (!is.null(.pp)) names(.pp$eu27_codes) else EU27_CODES)
+      return(if (!is.null(pp)) names(pp$eu27_codes) else EU27_CODES)
     }
     census <- ISO_TO_CENSUS[iso_code]
     if (is.na(census)) return(character(0))
@@ -1253,7 +1263,10 @@ calculate_rates_for_revision <- function(
   # 5. Apply Section 232 derivative tariff + metal content scaling
   #    Derivative products (9903.85.04/.07/.08) are aluminum-containing articles
   #    outside chapter 76. The tariff applies only to the metal content portion.
-  result <- apply_232_derivatives(rates, products, ch99_data, s232_rates, countries)
+  result <- apply_232_derivatives(
+    rates, products, ch99_data, s232_rates, countries,
+    policy_params = pp
+  )
   rates <- result$rates
   deriv_matched <- result$deriv_matched
 
@@ -1279,8 +1292,8 @@ calculate_rates_for_revision <- function(
 
     # Get active 301 ch99 codes from this revision's Ch99 data
     # Use SECTION_301_RATES config for reliable rate values
-    s301_rate_lookup <- if (!is.null(.pp)) {
-      .pp$SECTION_301_RATES
+    s301_rate_lookup <- if (!is.null(pp)) {
+      pp$SECTION_301_RATES
     } else {
       tibble(ch99_pattern = character(), s301_rate = numeric())
     }
@@ -1375,13 +1388,13 @@ calculate_rates_for_revision <- function(
   s122_rates <- extract_section122_rates(ch99_data)
 
   s122_in_force <- TRUE
-  if (!is.null(.pp$SECTION_122) && !.pp$SECTION_122$finalized) {
-    s122_in_force <- (as.Date(effective_date) >= .pp$SECTION_122$effective_date &&
-                      as.Date(effective_date) <= .pp$SECTION_122$expiry_date)
+  if (!is.null(pp$SECTION_122) && !pp$SECTION_122$finalized) {
+    s122_in_force <- (as.Date(effective_date) >= pp$SECTION_122$effective_date &&
+                      as.Date(effective_date) <= pp$SECTION_122$expiry_date)
   }
 
   if (s122_rates$has_s122 && !s122_in_force) {
-    message('  Section 122 expired (', .pp$SECTION_122$expiry_date, ') — not applied')
+    message('  Section 122 expired (', pp$SECTION_122$expiry_date, ') — not applied')
   }
 
   if (s122_rates$has_s122 && s122_in_force) {
@@ -1434,7 +1447,7 @@ calculate_rates_for_revision <- function(
     mutate(statutory_base_rate = base_rate)
 
   if (!is.null(mfn_exemption_shares) && nrow(mfn_exemption_shares) > 0) {
-    exclude_usmca <- .pp$MFN_EXEMPTION$exclude_usmca_countries
+    exclude_usmca <- pp$MFN_EXEMPTION$exclude_usmca_countries
     usmca_countries <- c(CTY_CANADA, CTY_MEXICO)
 
     rates <- rates %>%
@@ -1464,7 +1477,7 @@ calculate_rates_for_revision <- function(
     # lower (after FTA/GSP preference in 6c), so the floor gap is wider.
     # Surcharge rows for floor countries (e.g. Swiss/LI outside framework window)
     # must NOT be recomputed — their rate is a flat surcharge, not a floor deduction.
-    floor_rate_val <- .pp$FLOOR_RATE
+    floor_rate_val <- pp$FLOOR_RATE
     if (!is.null(floor_rate_val) &&
         'rate_ieepa_recip' %in% names(rates) &&
         'ieepa_type' %in% names(rates)) {

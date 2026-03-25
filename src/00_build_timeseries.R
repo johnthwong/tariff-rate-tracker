@@ -100,6 +100,10 @@ build_full_timeseries <- function(
   rev_dates <- load_revision_dates(revision_dates_path,
                                     use_policy_dates = use_policy_dates)
 
+  # Load one canonical policy object for this build so revision ordering,
+  # rate construction, interval creation, and downstream steps share a regime.
+  pp_build <- load_policy_params(use_policy_dates = use_policy_dates)
+
   # Load country codes
   census_codes <- read_csv(census_codes_path, col_types = cols(.default = col_character()))
   countries <- census_codes$Code
@@ -223,7 +227,8 @@ build_full_timeseries <- function(
         countries, rev_id, eff_date,
         s232_rates = s232_rates,
         fentanyl_rates = fentanyl_rates,
-        stacking_method = stacking_method
+        stacking_method = stacking_method,
+        policy_params = pp_build
       )
 
       # h. Save snapshot
@@ -312,8 +317,7 @@ build_full_timeseries <- function(
 
   # Add temporal intervals (valid_from / valid_until) from revision ordering
   # Final revision extends to configurable horizon (default: 2026-12-31), not Sys.Date()
-  policy_params <- load_policy_params(use_policy_dates = use_policy_dates)
-  horizon_end <- policy_params$SERIES_HORIZON_END %||% Sys.Date()
+  horizon_end <- pp_build$SERIES_HORIZON_END %||% Sys.Date()
   # Guard: horizon cannot be earlier than the final revision's effective_date
   last_eff <- max(rev_dates$effective_date[rev_dates$revision %in% unique(timeseries$revision)])
   if (horizon_end < last_eff) {

@@ -1,10 +1,22 @@
 # Policy Timing: Announcement vs. HTS Effective Dates
 
-The tracker uses USITC Harmonized Tariff Schedule (HTS) revision dates as the effective date for each tariff change. In most cases this aligns with the legal effective date of the policy. However, several policies have gaps between announcement, legal effective date, and HTS publication. This document catalogs those gaps for transparency and to support users who want to adjust dates.
+The tracker does **not** simply use raw USITC HTS release dates for every revision. The default build uses a hybrid timing rule:
+
+- for most revisions, it follows the tracker’s curated `effective_date` chronology in [config/revision_dates.csv](/C:/Users/ji252/Documents/GitHub/tariff-rate-tracker/config/revision_dates.csv), which is designed to reflect the tariff-policy sequence rather than the literal archive publication calendar;
+- for the two revisions where the HTS lagged the policy materially and shifting them does not create timeline collisions (`rev_16` and `2026_rev_4`), the default build uses `policy_effective_date`;
+- users who want raw HTS timing can opt out with `--use-hts-dates`.
+
+This document explains where legal effective dates, HTS archive dates, and the tracker’s chosen modeling dates differ.
 
 ## How to use this document
 
-The `config/revision_dates.csv` file maps each HTS revision to its `effective_date` (HTS publication) and `policy_effective_date` (legal effective date of the underlying proclamation/EO, when different). To model a policy as effective on its legal date rather than its HTS date, users can swap these columns or use the `policy_effective_date` column in the daily series builder.
+The checked-in [config/revision_dates.csv](/C:/Users/ji252/Documents/GitHub/tariff-rate-tracker/config/revision_dates.csv) is the tracker’s timing control table. In the default build:
+
+- `effective_date` is the main tracker chronology;
+- `policy_effective_date` is used only for the small set of HTS-late revisions where the repo intentionally overrides the main date;
+- raw HTS archive timing is available by running the pipeline with `--use-hts-dates`.
+
+So this file should be read as a modeling schedule, not as a verbatim copy of the USITC archive calendar.
 
 ## Legal sources
 
