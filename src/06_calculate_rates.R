@@ -1298,10 +1298,24 @@ calculate_rates_for_revision <- function(
       tibble(ch99_pattern = character(), s301_rate = numeric())
     }
 
+    # Filter to 301 codes present in this revision's Ch99 data, excluding any
+    # that are marked as suspended (e.g. 9903.88.16 List 4B since rev_4).
+    # The HTS JSON retains suspended entries with their original rate but adds
+    # "[Compiler's note: provision suspended.]" to the description.
     active_301_codes <- ch99_data %>%
       filter(ch99_code %in% s301_rate_lookup$ch99_pattern) %>%
+      filter(!grepl('provision suspended', description, ignore.case = TRUE)) %>%
       pull(ch99_code) %>%
       unique()
+
+    suspended_301 <- setdiff(
+      ch99_data$ch99_code[ch99_data$ch99_code %in% s301_rate_lookup$ch99_pattern],
+      active_301_codes
+    )
+    if (length(suspended_301) > 0) {
+      message('  Section 301: excluding suspended codes: ',
+              paste(suspended_301, collapse = ', '))
+    }
 
     if (length(active_301_codes) > 0) {
       # Build HTS8 -> 301 rate lookup:
