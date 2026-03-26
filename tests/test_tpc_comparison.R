@@ -1,4 +1,12 @@
 ## TPC Validation: Full comparison across all 5 TPC dates
+##
+## Usage:
+##   Rscript tests/test_tpc_comparison.R              # default: mutual exclusion
+##   Rscript tests/test_tpc_comparison.R --tpc-stacking  # sensitivity: additive stacking
+##
+## Note: --tpc-stacking is a sensitivity analysis toggle that stacks all
+## authorities additively. TPC confirmed (March 2026) they mostly agree with
+## mutual exclusion; this flag is NOT a TPC-matching switch.
 library(tidyverse)
 library(jsonlite)
 library(here)

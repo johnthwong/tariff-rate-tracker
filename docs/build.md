@@ -2,6 +2,13 @@
 
 This guide covers first-run setup, required and optional inputs, build modes, and expected outputs.
 
+## System requirements
+
+- **R 4.3+** with packages listed in `src/install_dependencies.R`
+- **RAM**: The full pipeline (`--full`) expands a product × country matrix of roughly 19,000 products × 240 countries during rate calculation. **32 GB RAM is recommended.** Machines with 16 GB may run out of memory during the IEEPA broadcasting step in `06_calculate_rates.R`. If you are memory-constrained, you can build individual revisions rather than running `--full`, since each revision is processed independently.
+- **Disk**: The `data/` directory (HTS JSON archives + processed snapshots) requires approximately 2 GB.
+- **OS**: Tested on Windows 10/11, macOS, and Linux. No platform-specific dependencies.
+
 ## Build modes
 
 The repo is designed to run in progressively richer modes depending on what local data you have.
@@ -69,7 +76,10 @@ Rscript src/00_build_timeseries.R
 Rscript src/00_build_timeseries.R --full
 Rscript src/00_build_timeseries.R --build-only
 Rscript src/00_build_timeseries.R --with-alternatives
+Rscript src/00_build_timeseries.R --full --use-hts-dates
 ```
+
+By default, the pipeline uses **legal policy effective dates** where they differ from HTS revision dates (e.g., SCOTUS ruling effective Feb 20 vs. HTS revision Feb 24). Pass `--use-hts-dates` to use raw HTS revision dates instead. See [docs/policy_timing.md](policy_timing.md) for the full list of affected revisions and legal sources.
 
 ## Input inventory
 

@@ -53,5 +53,17 @@ Thumbs.db
 .vscode/
 .idea/
 
+# Internal working files
+todo.md
+blog*/
+
+# Rendered HTML in docs (only source .md/.Rmd tracked)
+docs/analysis/*.html
+docs/analysis/*.pdf
+
+# Additional data directories
+data/federal_register/
+data/us_notes/*.csv
+
 # Claude
 .claude/

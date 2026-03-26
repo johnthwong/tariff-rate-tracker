@@ -882,6 +882,210 @@ run_test('deal-only auto does not set auto_rate for non-deal countries', {
 
 
 # =============================================================================
+# Test 16: Policy-date vs HTS-date propagation
+# =============================================================================
+
+message('\n--- Test 16: Policy-date propagation ---')
+
+make_mode_test_products <- function() {
+  tibble(
+    hts10 = '1234567890',
+    base_rate = 0.05,
+    n_ch99_refs = 0L,
+    ch99_refs = list(character(0))
+  )
+}
+
+make_mode_test_ch99 <- function() {
+  tibble(
+    ch99_code = c('9903.03.01', '9903.80.01'),
+    rate = c(0.10, 0.25),
+    country_type = c('all', 'all'),
+    countries = list('all', 'all'),
+    exempt_countries = list(character(0), character(0)),
+    description = c('Section 122 test entry', 'Steel article test entry'),
+    general_raw = c('10%', '25%')
+  )
+}
+
+make_mode_test_ieepa <- function() {
+  ieepa <- tibble(
+    ch99_code = '9903.02.09',
+    rate = 0.50,
+    rate_type = 'surcharge',
+    phase = 'phase2_aug7',
+    terminated = FALSE,
+    country_name = 'China',
+    census_code = '5700'
+  )
+  attr(ieepa, 'universal_baseline') <- 0.10
+  ieepa
+}
+
+run_test('calculator honors policy-date mode on 2026-02-20', {
+  products <- make_mode_test_products()
+  ch99_data <- make_mode_test_ch99()
+  ieepa_rates <- make_mode_test_ieepa()
+  s232_rates <- extract_section232_rates(ch99_data)
+
+  pp_policy <- load_policy_params(use_policy_dates = TRUE)
+  pp_hts <- load_policy_params(use_policy_dates = FALSE)
+
+  rates_policy <- calculate_rates_for_revision(
+    products = products,
+    ch99_data = ch99_data,
+    ieepa_rates = ieepa_rates,
+    usmca = NULL,
+    countries = '5700',
+    revision_id = '2026_rev_4',
+    effective_date = as.Date('2026-02-20'),
+    s232_rates = s232_rates,
+    fentanyl_rates = NULL,
+    policy_params = pp_policy
+  )
+
+  rates_hts <- calculate_rates_for_revision(
+    products = products,
+    ch99_data = ch99_data,
+    ieepa_rates = ieepa_rates,
+    usmca = NULL,
+    countries = '5700',
+    revision_id = '2026_rev_4',
+    effective_date = as.Date('2026-02-20'),
+    s232_rates = s232_rates,
+    fentanyl_rates = NULL,
+    policy_params = pp_hts
+  )
+
+  stopifnot(all(rates_policy$rate_ieepa_recip == 0))
+  stopifnot(all(rates_policy$rate_s122 > 0))
+
+  stopifnot(any(rates_hts$rate_ieepa_recip > 0))
+  stopifnot(all(rates_hts$rate_s122 == 0))
+})
+
+run_test('policy params differ for HTS-late 2026_rev_4 timing', {
+  pp_policy <- load_policy_params(use_policy_dates = TRUE)
+  pp_hts <- load_policy_params(use_policy_dates = FALSE)
+
+  stopifnot(pp_policy$IEEPA_INVALIDATION_DATE == as.Date('2026-02-20'))
+  stopifnot(pp_hts$IEEPA_INVALIDATION_DATE == as.Date('2026-02-24'))
+  stopifnot(pp_policy$SECTION_122$effective_date == as.Date('2026-02-20'))
+  stopifnot(pp_hts$SECTION_122$effective_date == as.Date('2026-02-24'))
+})
+
+
+# =============================================================================
+# Test 17: Run-mode consistency on built artifacts
+# =============================================================================
+
+message('\n--- Test 17: Run-mode consistency ---')
+
+snapshot_signature <- function(df) {
+  tibble(
+    rows = nrow(df),
+    n_products = n_distinct(df$hts10),
+    n_countries = n_distinct(df$country),
+    sum_total_rate = round(sum(df$total_rate), 8),
+    sum_total_additional = round(sum(df$total_additional), 8),
+    n_s122_positive = sum(df$rate_s122 > 0, na.rm = TRUE),
+    n_ieepa_positive = sum(df$rate_ieepa_recip > 0, na.rm = TRUE)
+  )
+}
+
+run_test('snapshot_rev_16 matches point query on effective date', {
+  ts_path <- here('data', 'timeseries', 'rate_timeseries.rds')
+  snap_path <- here('data', 'timeseries', 'snapshot_rev_16.rds')
+  if (!file.exists(ts_path) || !file.exists(snap_path)) {
+    skip_test('timeseries or snapshot_rev_16 missing')
+  }
+
+  ts <- readRDS(ts_path)
+  snap <- readRDS(snap_path)
+  pp <- load_policy_params()
+  point <- get_rates_at_date(ts, as.Date('2025-06-04'), policy_params = pp)
+
+  stopifnot(unique(point$revision) == 'rev_16')
+  stopifnot(identical(snapshot_signature(point), snapshot_signature(snap)))
+})
+
+run_test('snapshot_2026_rev_4 matches point query on effective date', {
+  ts_path <- here('data', 'timeseries', 'rate_timeseries.rds')
+  snap_path <- here('data', 'timeseries', 'snapshot_2026_rev_4.rds')
+  if (!file.exists(ts_path) || !file.exists(snap_path)) {
+    skip_test('timeseries or snapshot_2026_rev_4 missing')
+  }
+
+  ts <- readRDS(ts_path)
+  snap <- readRDS(snap_path)
+  pp <- load_policy_params()
+  point <- get_rates_at_date(ts, as.Date('2026-02-20'), policy_params = pp)
+
+  stopifnot(unique(point$revision) == '2026_rev_4')
+  stopifnot(identical(snapshot_signature(point), snapshot_signature(snap)))
+})
+
+run_test('daily_overall matches direct aggregation on timing-sensitive dates', {
+  ts_path <- here('data', 'timeseries', 'rate_timeseries.rds')
+  daily_path <- here('output', 'daily', 'daily_overall.csv')
+  if (!file.exists(ts_path) || !file.exists(daily_path)) {
+    skip_test('timeseries or daily_overall.csv missing')
+  }
+
+  ts <- readRDS(ts_path)
+  daily <- read_csv(daily_path, show_col_types = FALSE)
+  pp <- load_policy_params()
+
+  for (d in as.Date(c('2026-02-24', '2026-07-24'))) {
+    built_row <- daily %>% filter(date == d)
+    stopifnot(nrow(built_row) == 1)
+
+    point <- get_rates_at_date(ts, d, policy_params = pp)
+    n_products <- n_distinct(point$hts10)
+    n_countries <- n_distinct(point$country)
+    n_all_pairs <- n_products * n_countries
+
+    direct_mean_additional_all <- sum(point$total_additional) / n_all_pairs
+    direct_mean_total_all <- sum(point$total_rate) / n_all_pairs
+
+    stopifnot(abs(built_row$mean_additional_all_pairs - direct_mean_additional_all) < 1e-10)
+    stopifnot(abs(built_row$mean_total_all_pairs - direct_mean_total_all) < 1e-10)
+    stopifnot(built_row$n_products == n_products)
+    stopifnot(built_row$n_countries == n_countries)
+  }
+})
+
+run_test('daily_by_country matches direct aggregation for China on timing-sensitive dates', {
+  ts_path <- here('data', 'timeseries', 'rate_timeseries.rds')
+  daily_path <- here('output', 'daily', 'daily_by_country.csv')
+  if (!file.exists(ts_path) || !file.exists(daily_path)) {
+    skip_test('timeseries or daily_by_country.csv missing')
+  }
+
+  ts <- readRDS(ts_path)
+  daily <- read_csv(daily_path, show_col_types = FALSE)
+  pp <- load_policy_params()
+
+  for (d in as.Date(c('2026-02-24', '2026-07-24'))) {
+    built_row <- daily %>% filter(date == d, country == '5700')
+    stopifnot(nrow(built_row) == 1)
+
+    point <- get_rates_at_date(ts, d, policy_params = pp) %>%
+      filter(country == '5700')
+    n_products_total <- n_distinct(get_rates_at_date(ts, d, policy_params = pp)$hts10)
+
+    direct_mean_additional_all <- sum(point$total_additional) / n_products_total
+    direct_mean_total_all <- sum(point$total_rate) / n_products_total
+
+    stopifnot(abs(built_row$mean_additional_all_pairs - direct_mean_additional_all) < 1e-10)
+    stopifnot(abs(built_row$mean_total_all_pairs - direct_mean_total_all) < 1e-10)
+    stopifnot(built_row$n_products_total == n_products_total)
+    stopifnot(built_row$n_products_present == nrow(point))
+  }
+})
+
+
+# =============================================================================
 # Summary
 # =============================================================================
 

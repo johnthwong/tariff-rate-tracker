@@ -579,8 +579,11 @@ extract_section232_rates <- function(ch99_data) {
   # fall back to original entries (9903.80.xx). The June 2025 proclamation
   # doubled steel from 25% to 50% via new 9903.81.87-93 entries.
   # UK gets 25% via 9903.81.94-99.
+  # 9903.81.87 is a statutory blanket rate (all countries); its description
+  # references HTS headings in the "except" clause, not countries, so
+  # parse_countries() may return country_type='unknown'. Don't filter by type.
   steel_increase <- steel_entries %>%
-    filter(ch99_code == '9903.81.87', country_type %in% c('all', 'all_except'))
+    filter(ch99_code == '9903.81.87', !is.na(rate))
   steel_parent <- steel_entries %>% filter(grepl('^9903\\.80\\.', ch99_code))
   steel_all <- steel_parent %>% filter(country_type == 'all')
   steel_except <- steel_parent %>% filter(country_type == 'all_except')
@@ -619,8 +622,9 @@ extract_section232_rates <- function(ch99_data) {
 
   # Aluminum: check for June 2025 increase entry (9903.85.02) first, then
   # fall back to original entries (9903.85.01/.03). UK gets 25% via 9903.85.12-15.
+  # 9903.85.02 is a statutory blanket rate (all countries); same issue as steel.
   alum_increase <- aluminum_entries %>%
-    filter(ch99_code == '9903.85.02', country_type %in% c('all', 'all_except'))
+    filter(ch99_code == '9903.85.02', !is.na(rate))
   alum_parent <- aluminum_entries %>%
     filter(ch99_code %in% c('9903.85.01', '9903.85.03'))
   # Original "increase to 25%" entry (pre-June 2025, Proclamation 10896)
@@ -805,11 +809,10 @@ extract_section232_rates <- function(ch99_data) {
 
   mhd_rate <- 0
   if (nrow(s232_mhd) > 0) {
-    mhd_all <- s232_mhd %>% filter(country_type == 'all')
-    if (nrow(mhd_all) > 0) {
-      mhd_rate <- max(mhd_all$rate)
-      message('  MHD vehicles 232: ', round(mhd_rate * 100), '%')
-    }
+    # 9903.74.xx descriptions reference US Note 38, not countries,
+    # so parse_countries() returns 'unknown'. Take max rate directly.
+    mhd_rate <- max(s232_mhd$rate)
+    message('  MHD vehicles 232: ', round(mhd_rate * 100), '%')
   }
 
   # --- Copper (9903.78) ---
@@ -818,11 +821,11 @@ extract_section232_rates <- function(ch99_data) {
 
   copper_rate <- 0
   if (nrow(s232_copper) > 0) {
-    copper_all <- s232_copper %>% filter(country_type == 'all')
-    if (nrow(copper_all) > 0) {
-      copper_rate <- max(copper_all$rate)
-      message('  Copper 232: ', round(copper_rate * 100), '%')
-    }
+    # 9903.78.01 is a blanket rate; description references US Note 36
+    # subdivision, not countries, so parse_countries() returns 'unknown'.
+    # Don't filter by country_type — take the max rate from any entry.
+    copper_rate <- max(s232_copper$rate)
+    message('  Copper 232: ', round(copper_rate * 100), '%')
   }
 
   has_232 <- (steel_rate > 0 || aluminum_rate > 0 || auto_rate > 0 || auto_has_deals ||

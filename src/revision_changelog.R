@@ -86,7 +86,7 @@ run_changelog <- function() {
   source(here('src', '03_parse_chapter99.R'))
 
   # ---- Load revision dates ----
-  rev_dates <- load_revision_dates(here('config', 'revision_dates.csv'))
+  rev_dates <- load_revision_dates(here('config', 'revision_dates.csv'), use_policy_dates = FALSE)
   revisions <- rev_dates$revision
 
   cat('Processing', length(revisions), 'revisions\n')

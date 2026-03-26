@@ -20,6 +20,14 @@ The repository's core product is an interval-encoded tariff panel for the 2025-2
 - Methodology and tariff-regime history: [docs/methodology.md](docs/methodology.md)
 - Non-official assumptions: [docs/assumptions.md](docs/assumptions.md)
 - HTS revision chronology: [docs/revision_changelog.md](docs/revision_changelog.md)
+- Policy timing vs. HTS dates: [docs/policy_timing.md](docs/policy_timing.md)
+
+## System requirements
+
+- **R 4.3+** with packages listed in `src/install_dependencies.R`
+- **RAM**: The full pipeline (`--full`) expands a product × country matrix of roughly 19,000 products × 240 countries during rate calculation. **32 GB RAM is recommended.** Machines with 16 GB may run out of memory during the IEEPA broadcasting step in `06_calculate_rates.R`. If you are memory-constrained, you can build individual revisions rather than running `--full`, since each revision is processed independently.
+- **Disk**: The `data/` directory (HTS JSON archives + processed snapshots) requires approximately 2 GB.
+- **OS**: Tested on Windows 10/11, macOS, and Linux. No platform-specific dependencies.
 
 ## Quick start
 

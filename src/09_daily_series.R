@@ -917,7 +917,7 @@ run_alternative_series <- function(ts, imports = NULL, policy_params = NULL,
       message('  FAILED (metal_flat): ', conditionMessage(e))
     })
 
-    # 3. Nonzero duty-free treatment
+    # 3. Nonzero duty-free treatment (sensitivity analysis: exclude 0% MFN from IEEPA)
     tryCatch({
       pp_dutyfree <- pp
       pp_dutyfree$ieepa_duty_free_treatment <- 'nonzero_base_only'

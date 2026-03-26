@@ -69,7 +69,8 @@ build_full_timeseries <- function(
   tpc_path = NULL,
   scenario = 'baseline',
   start_from = NULL,
-  stacking_method = 'mutual_exclusion'
+  stacking_method = 'mutual_exclusion',
+  use_policy_dates = TRUE
 ) {
   start_time <- Sys.time()
 
@@ -96,7 +97,12 @@ build_full_timeseries <- function(
   }
 
   # Load revision dates
-  rev_dates <- load_revision_dates(revision_dates_path)
+  rev_dates <- load_revision_dates(revision_dates_path,
+                                    use_policy_dates = use_policy_dates)
+
+  # Load one canonical policy object for this build so revision ordering,
+  # rate construction, interval creation, and downstream steps share a regime.
+  pp_build <- load_policy_params(use_policy_dates = use_policy_dates)
 
   # Load country codes
   census_codes <- read_csv(census_codes_path, col_types = cols(.default = col_character()))
@@ -159,6 +165,13 @@ build_full_timeseries <- function(
   snapshot_paths <- character()
   failed_revisions <- character()
   last_successful_rev <- if (!is.null(start_from)) start_from else NULL
+  n_revisions <- length(revisions_to_process)
+
+  cli::cli_progress_bar(
+    format = "Processing {cli::pb_current}/{cli::pb_total} [{cli::pb_bar}] {cli::pb_eta} | {rev_id} ({eff_date})",
+    total = n_revisions,
+    clear = FALSE
+  )
 
   for (i in seq_along(revisions_to_process)) {
     rev_id <- revisions_to_process[i]
@@ -166,8 +179,10 @@ build_full_timeseries <- function(
     eff_date <- rev_info$effective_date
     tpc_date <- rev_info$tpc_date
 
+    cli::cli_progress_update()
+
     message('\n', strrep('-', 60))
-    message('[', i, '/', length(revisions_to_process), '] Processing: ',
+    message('[', i, '/', n_revisions, '] Processing: ',
             rev_id, ' (effective ', eff_date, ')')
     message(strrep('-', 60))
     log_info('[', i, '/', length(revisions_to_process), '] ', rev_id,
@@ -212,7 +227,8 @@ build_full_timeseries <- function(
         countries, rev_id, eff_date,
         s232_rates = s232_rates,
         fentanyl_rates = fentanyl_rates,
-        stacking_method = stacking_method
+        stacking_method = stacking_method,
+        policy_params = pp_build
       )
 
       # h. Save snapshot
@@ -268,6 +284,7 @@ build_full_timeseries <- function(
       failed_revisions <<- c(failed_revisions, rev_id)
     })
   }
+  cli::cli_progress_done()
 
   # Report failures
   if (length(failed_revisions) > 0) {
@@ -300,8 +317,7 @@ build_full_timeseries <- function(
 
   # Add temporal intervals (valid_from / valid_until) from revision ordering
   # Final revision extends to configurable horizon (default: 2026-12-31), not Sys.Date()
-  policy_params <- load_policy_params()
-  horizon_end <- policy_params$SERIES_HORIZON_END %||% Sys.Date()
+  horizon_end <- pp_build$SERIES_HORIZON_END %||% Sys.Date()
   # Guard: horizon cannot be earlier than the final revision's effective_date
   last_eff <- max(rev_dates$effective_date[rev_dates$revision %in% unique(timeseries$revision)])
   if (horizon_end < last_eff) {
@@ -412,7 +428,8 @@ print_timeseries_summary <- function(timeseries_path = 'data/timeseries/rate_tim
 detect_incremental_start <- function(
   output_dir = 'data/timeseries',
   archive_dir = 'data/hts_archives',
-  revision_dates_path = 'config/revision_dates.csv'
+  revision_dates_path = 'config/revision_dates.csv',
+  use_policy_dates = TRUE
 ) {
   metadata_path <- file.path(output_dir, 'metadata.rds')
   if (!file.exists(metadata_path)) {
@@ -425,7 +442,8 @@ detect_incremental_start <- function(
   message('Last build: ', metadata$last_build_time, ' (', last_rev, ')')
 
   # Check for new revisions after last_rev
-  rev_dates <- load_revision_dates(revision_dates_path)
+  rev_dates <- load_revision_dates(revision_dates_path,
+                                    use_policy_dates = use_policy_dates)
   all_revisions <- rev_dates$revision
 
   available <- get_available_revisions_all_years(all_revisions, archive_dir)
@@ -456,12 +474,13 @@ detect_incremental_start <- function(
 if (sys.nframe() == 0) {
   library(here)
 
-  # Parse CLI args: --full, --start-from REV, --build-only, --core-only, --with-alternatives
+  # Parse CLI args
   args <- commandArgs(trailingOnly = TRUE)
   full_rebuild <- '--full' %in% args
   build_only <- '--build-only' %in% args
   core_only <- '--core-only' %in% args
   with_alternatives <- '--with-alternatives' %in% args
+  use_policy_dates <- !('--use-hts-dates' %in% args)  # default: policy dates
   start_from <- NULL
   for (i in seq_along(args)) {
     if (args[i] == '--start-from' && i < length(args)) start_from <- args[i + 1]
@@ -474,7 +493,7 @@ if (sys.nframe() == 0) {
   } else if (!is.null(start_from)) {
     message('Mode: Incremental from ', start_from)
   } else {
-    start_from <- detect_incremental_start()  # NULL = full backfill
+    start_from <- detect_incremental_start(use_policy_dates = use_policy_dates)
   }
 
   # --- Step B: Download missing JSON ---
@@ -484,7 +503,13 @@ if (sys.nframe() == 0) {
   )
 
   # --- Step C: Build timeseries ---
-  result <- build_full_timeseries(start_from = start_from)
+  if (use_policy_dates) {
+    message('Mode: Using policy effective dates (default; pass --use-hts-dates to override)')
+  } else {
+    message('Mode: Using raw HTS revision dates (--use-hts-dates)')
+  }
+  result <- build_full_timeseries(start_from = start_from,
+                                   use_policy_dates = use_policy_dates)
 
   # --- Step D: Summary ---
   if (!is.null(result)) {
@@ -498,7 +523,7 @@ if (sys.nframe() == 0) {
     source(here('src', 'quality_report.R'))
 
     ts <- readRDS(result$timeseries_path)
-    pp <- load_policy_params()
+    pp <- load_policy_params(use_policy_dates = use_policy_dates)
 
     if (core_only) {
       message('\n', strrep('=', 70))
@@ -538,12 +563,11 @@ if (sys.nframe() == 0) {
 
       # --- Step F: Alternative daily series ---
       # Post-build alternatives always run; rebuild alternatives only with --with-alternatives
-      source(here('src', 'apply_scenarios.R'))
-      tryCatch(
+      tryCatch({
+        source(here('src', 'apply_scenarios.R'))
         run_alternative_series(ts, imports = imports, policy_params = pp,
-                                rebuild = with_alternatives),
-        error = function(e) message('Alternative series failed: ', conditionMessage(e))
-      )
+                                rebuild = with_alternatives)
+      }, error = function(e) message('Alternative series failed: ', conditionMessage(e)))
     }
   }
 }
