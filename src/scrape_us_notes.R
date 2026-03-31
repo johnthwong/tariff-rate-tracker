@@ -1223,7 +1223,7 @@ if (sys.nframe() == 0) {
 
   # --- Per-revision PDF download ---
   if (do_download_pdfs) {
-    rev_dates <- load_revision_dates(here('config', 'revision_dates.csv'))
+    rev_dates <- load_revision_dates(here('config', 'revision_dates.csv'), use_policy_dates = FALSE)
     download_all_revision_pdfs(rev_dates$revision, dry_run = dry_run)
 
   # --- Single revision floor exemption parsing ---
@@ -1232,7 +1232,7 @@ if (sys.nframe() == 0) {
 
   # --- All revisions floor exemption parsing ---
   } else if (do_all_revisions) {
-    rev_dates <- load_revision_dates(here('config', 'revision_dates.csv'))
+    rev_dates <- load_revision_dates(here('config', 'revision_dates.csv'), use_policy_dates = FALSE)
     parse_all_revision_floor_exemptions(rev_dates$revision, dry_run = dry_run)
 
   # --- Original modes ---

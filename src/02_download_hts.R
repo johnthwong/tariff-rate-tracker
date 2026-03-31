@@ -118,8 +118,8 @@ download_missing_revisions <- function(
   dry_run = FALSE,
   revision_dates_path = 'config/revision_dates.csv'
 ) {
-  # Load expected revisions
-  rev_dates <- load_revision_dates(revision_dates_path)
+  # Load expected revisions — use HTS release order for download inventory
+  rev_dates <- load_revision_dates(revision_dates_path, use_policy_dates = FALSE)
   expected <- rev_dates$revision
 
   # Check local inventory across all years present in expected revisions

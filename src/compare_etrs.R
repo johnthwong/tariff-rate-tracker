@@ -93,7 +93,7 @@ for (d in comparison_dates) {
   # rules (metal_share) mean effective contribution differs from raw rate.
   needs_reconstruct <- FALSE
 
-  s122_cfg <- pp$section_122
+  s122_cfg <- pp$SECTION_122
   if (!is.null(s122_cfg)) {
     s122_expiry <- as.Date(s122_cfg$expiry_date)
     s122_effective <- as.Date(s122_cfg$effective_date)
@@ -111,7 +111,7 @@ for (d in comparison_dates) {
     }
   }
 
-  ieepa_inv <- pp$ieepa_invalidation_date
+  ieepa_inv <- pp$IEEPA_INVALIDATION_DATE
   if (!is.null(ieepa_inv)) {
     ieepa_inv <- as.Date(ieepa_inv)
     if (d >= ieepa_inv) {

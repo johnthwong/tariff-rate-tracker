@@ -244,8 +244,13 @@ ensure_dir <- function(path) {
 #' Returns a list with convenience fields unpacked for direct use.
 #'
 #' @param yaml_path Path to policy_params.yaml
+#' @param use_policy_dates If TRUE (default), swap date-sensitive config fields
+#'   (IEEPA invalidation, S122 effective/expiry) to their policy_effective_date
+#'   equivalents. Set FALSE when using --use-hts-dates or for utilities that
+#'   need raw HTS timing. See docs/policy_timing.md.
 #' @return List with raw params plus convenience fields
-load_policy_params <- function(yaml_path = here('config', 'policy_params.yaml')) {
+load_policy_params <- function(yaml_path = here('config', 'policy_params.yaml'),
+                               use_policy_dates = TRUE) {
   if (!file.exists(yaml_path)) {
     stop('Policy params YAML not found: ', yaml_path)
   }
@@ -364,6 +369,22 @@ load_policy_params <- function(yaml_path = here('config', 'policy_params.yaml'))
       expiry_date = as.Date(params$section_122$expiry_date),
       finalized = isTRUE(params$section_122$finalized)
     )
+  }
+
+  # Swap policy dates if requested (SCOTUS ruling + S122 coordination)
+  if (use_policy_dates) {
+    if (!is.null(params$ieepa_invalidation_policy_date)) {
+      params$IEEPA_INVALIDATION_DATE <- as.Date(params$ieepa_invalidation_policy_date)
+      message('  Policy dates: IEEPA invalidation -> ', params$IEEPA_INVALIDATION_DATE)
+    }
+    if (!is.null(params$section_122$policy_effective_date)) {
+      params$SECTION_122$effective_date <- as.Date(params$section_122$policy_effective_date)
+      message('  Policy dates: S122 effective -> ', params$SECTION_122$effective_date)
+    }
+    if (!is.null(params$section_122$policy_expiry_date)) {
+      params$SECTION_122$expiry_date <- as.Date(params$section_122$policy_expiry_date)
+      message('  Policy dates: S122 expiry -> ', params$SECTION_122$expiry_date)
+    }
   }
 
   # Local paths (optional user-specific file locations)
@@ -506,8 +527,13 @@ build_chapter99_url <- function(release_name) {
 #' Load revision dates from config CSV
 #'
 #' @param csv_path Path to revision_dates.csv
+#' @param use_policy_dates If TRUE (default), swap policy_effective_date into
+#'   effective_date where populated. This uses legal policy dates instead of
+#'   HTS revision dates. Set FALSE or pass --use-hts-dates to use raw HTS dates.
+#'   See docs/policy_timing.md for details on which revisions are affected.
 #' @return Tibble with revision, effective_date, tpc_date
-load_revision_dates <- function(csv_path = here('config', 'revision_dates.csv')) {
+load_revision_dates <- function(csv_path = here('config', 'revision_dates.csv'),
+                                use_policy_dates = TRUE) {
   if (!file.exists(csv_path)) {
     stop('Revision dates CSV not found: ', csv_path,
          '\nRun scraper or create manually.')
@@ -543,6 +569,18 @@ load_revision_dates <- function(csv_path = here('config', 'revision_dates.csv'))
     }
     # Drop the column after validation — downstream code doesn't need it
     dates <- dates %>% select(-needs_review)
+  }
+
+  # Optionally swap policy_effective_date into effective_date
+  if (use_policy_dates && 'policy_effective_date' %in% names(dates)) {
+    n_swapped <- sum(!is.na(dates$policy_effective_date))
+    if (n_swapped > 0) {
+      dates <- dates %>%
+        mutate(effective_date = if_else(!is.na(policy_effective_date),
+                                        policy_effective_date,
+                                        effective_date))
+      message('  Policy dates: swapped ', n_swapped, ' revision effective dates')
+    }
   }
 
   # Sort by effective_date
@@ -836,9 +874,38 @@ apply_stacking_rules <- function(df, cty_china = '5700', stacking_method = 'mutu
     )
   }
 
-  df %>%
+  # Per-metal-type nonmetal_share: only count the metal types that have active
+  # 232 programs covering this product. Steel chapters → steel_share, aluminum
+  # chapters + derivatives → aluminum_share, copper → copper_share.
+  # IEEPA fills everything not claimed by the active 232 program's metal type.
+  has_per_type <- all(c('steel_share', 'aluminum_share', 'copper_share') %in% names(df))
+
+  if (has_per_type) {
+    # Determine which metal type is active per product based on chapter/product type.
+    # Steel chapters: 72/73; aluminum chapters: 76; derivatives: aluminum type.
+    # Copper and other heading programs don't have metal-type 232 (they're full-product).
+    primary_chapters <- c('72', '73', '76')
+    df <- df %>%
+      mutate(
+        .ch2 = substr(hts10, 1, 2),
+        .active_type_share = case_when(
+          rate_232 > 0 & .ch2 %in% c('72', '73') ~ steel_share,
+          rate_232 > 0 & .ch2 == '76'             ~ aluminum_share,
+          rate_232 > 0 & metal_share < 1.0         ~ aluminum_share,  # derivatives
+          TRUE ~ 0
+        ),
+        nonmetal_share = if_else(rate_232 > 0 & .active_type_share > 0,
+                                  1 - .active_type_share, 0)
+      ) %>%
+      select(-.ch2, -.active_type_share)
+  } else {
+    # Fallback: aggregate metal_share (backward compat for flat/cbo methods)
+    df <- df %>%
+      mutate(nonmetal_share = if_else(rate_232 > 0 & metal_share < 1.0, 1 - metal_share, 0))
+  }
+
+  df <- df %>%
     mutate(
-      nonmetal_share = if_else(rate_232 > 0 & metal_share < 1.0, 1 - metal_share, 0),
       total_additional = case_when(
         # China with 232: 232 + recip*nonmetal + fentanyl + 301 + s122*nonmetal + s201 + other
         country == cty_china & rate_232 > 0 ~
@@ -904,9 +971,29 @@ compute_net_authority_contributions <- function(df, cty_china = '5700',
     )
   }
 
+  has_per_type <- all(c('steel_share', 'aluminum_share', 'copper_share') %in% names(df))
+
+  if (has_per_type) {
+    df <- df %>%
+      mutate(
+        .ch2 = substr(hts10, 1, 2),
+        .active_type_share = case_when(
+          rate_232 > 0 & .ch2 %in% c('72', '73') ~ steel_share,
+          rate_232 > 0 & .ch2 == '76'             ~ aluminum_share,
+          rate_232 > 0 & metal_share < 1.0         ~ aluminum_share,
+          TRUE ~ 0
+        ),
+        nonmetal_share = if_else(rate_232 > 0 & .active_type_share > 0,
+                                  1 - .active_type_share, 0)
+      ) %>%
+      select(-.ch2, -.active_type_share)
+  } else {
+    df <- df %>%
+      mutate(nonmetal_share = if_else(rate_232 > 0 & metal_share < 1.0, 1 - metal_share, 0))
+  }
+
   df %>%
     mutate(
-      nonmetal_share = if_else(rate_232 > 0 & metal_share < 1.0, 1 - metal_share, 0),
       net_232 = if_else(rate_232 > 0, rate_232, 0),
       net_ieepa = if_else(rate_232 > 0, rate_ieepa_recip * nonmetal_share, rate_ieepa_recip),
       net_fentanyl = rate_ieepa_fent,
@@ -1259,7 +1346,9 @@ load_fentanyl_carveouts <- function(path = here('resources', 'fentanyl_carveout_
 load_metal_content <- function(metal_cfg = NULL, hts10_codes = character(0),
                                derivative_hts10 = character(0)) {
   if (length(hts10_codes) == 0) {
-    return(tibble(hts10 = character(), metal_share = numeric()))
+    return(tibble(hts10 = character(), metal_share = numeric(),
+                  steel_share = numeric(), aluminum_share = numeric(),
+                  copper_share = numeric(), other_metal_share = numeric()))
   }
 
   method <- if (!is.null(metal_cfg)) metal_cfg$method %||% 'flat' else 'flat'
@@ -1273,12 +1362,20 @@ load_metal_content <- function(metal_cfg = NULL, hts10_codes = character(0),
   is_derivative <- result$hts10 %in% derivative_hts10
 
   if (sum(is_derivative) == 0) {
+    result$steel_share <- 0
+    result$aluminum_share <- 0
+    result$copper_share <- 0
+    result$other_metal_share <- 0
     message('  Metal content: no derivative products to adjust')
     return(result)
   }
 
   if (method == 'flat') {
     result$metal_share[is_derivative] <- flat_share
+    result$steel_share <- 0
+    result$aluminum_share <- 0
+    result$copper_share <- 0
+    result$other_metal_share <- 0
     message('  Metal content: flat method (', round(flat_share * 100),
             '% for ', sum(is_derivative), ' derivatives)')
 
@@ -1327,6 +1424,12 @@ load_metal_content <- function(metal_cfg = NULL, hts10_codes = character(0),
       ) %>%
       select(-cbo_share)
 
+    # CBO doesn't have per-type breakdown — use zeros
+    result$steel_share <- 0
+    result$aluminum_share <- 0
+    result$copper_share <- 0
+    result$other_metal_share <- 0
+
     n_cbo <- sum(!is.na(cbo_shares$hts10[cbo_shares$hts10 %in% derivative_hts10]))
     message('  Metal content: CBO method (', n_cbo, ' of ', sum(is_derivative),
             ' derivatives matched; high=', cbo_high_share, ', low=', cbo_low_share,
@@ -1346,27 +1449,50 @@ load_metal_content <- function(metal_cfg = NULL, hts10_codes = character(0),
       hs10 = col_character(),
       .default = col_double()
     )) %>%
-      select(hts10 = hs10, metal_share)
+      select(hts10 = hs10,
+             bea_steel = steel_share, bea_aluminum = aluminum_share,
+             bea_copper = copper_share, bea_other = other_metal_share,
+             bea_metal = metal_share)
 
     # Only apply BEA shares to derivative products
     result <- result %>%
-      left_join(bea_shares %>% rename(bea_share = metal_share), by = 'hts10') %>%
+      left_join(bea_shares, by = 'hts10') %>%
       mutate(
         metal_share = case_when(
           !is_derivative ~ 1.0,              # non-derivatives stay at 1.0
-          !is.na(bea_share) ~ bea_share,     # BEA match for derivatives
+          !is.na(bea_metal) ~ bea_metal,     # BEA match for derivatives
           TRUE ~ flat_share                   # fallback to flat for unmatched derivatives
-        )
+        ),
+        steel_share       = if_else(is_derivative & !is.na(bea_steel), bea_steel, 0),
+        aluminum_share    = if_else(is_derivative & !is.na(bea_aluminum), bea_aluminum, 0),
+        copper_share      = if_else(is_derivative & !is.na(bea_copper), bea_copper, 0),
+        other_metal_share = if_else(is_derivative & !is.na(bea_other), bea_other, 0)
       ) %>%
-      select(-bea_share)
+      select(-starts_with('bea_'))
 
-    n_bea <- sum(!is.na(bea_shares$hts10[bea_shares$hts10 %in% derivative_hts10]))
+    n_bea <- sum(bea_shares$hts10 %in% derivative_hts10)
     message('  Metal content: BEA method (', n_bea, ' of ', sum(is_derivative),
             ' derivatives matched; fallback=', flat_share, ')')
 
   } else {
     warning('Unknown metal_content method: ', method, '. Using flat fallback.')
     result$metal_share[is_derivative] <- flat_share
+    result$steel_share <- 0
+    result$aluminum_share <- 0
+    result$copper_share <- 0
+    result$other_metal_share <- 0
+  }
+
+  # Force primary chapters (72, 73, 76) to metal_share = 1.0 regardless of
+  # derivative flag. These are base metal products — the tariff applies to
+  # their full customs value, not a metal content fraction.
+  is_primary <- substr(result$hts10, 1, 2) %in% primary_chapters
+  if (any(is_primary)) {
+    result$metal_share[is_primary] <- 1.0
+    result$steel_share[is_primary] <- 0
+    result$aluminum_share[is_primary] <- 0
+    result$copper_share[is_primary] <- 0
+    result$other_metal_share[is_primary] <- 0
   }
 
   return(result)
@@ -1526,6 +1652,13 @@ apply_expiry_zeroing <- function(rev_data, sub_start, policy_params) {
 #' @return Tibble — one snapshot for the active revision at query_date
 get_rates_at_date <- function(ts, query_date, policy_params = NULL) {
   query_date <- as.Date(query_date)
+
+  # Load default policy params if not provided — ensures post-interval
+
+  # adjustments (S122 expiry, Swiss framework) are applied consistently
+  if (is.null(policy_params)) {
+    policy_params <- tryCatch(load_policy_params(), error = function(e) NULL)
+  }
 
   stopifnot(
     'valid_from' %in% names(ts),

@@ -346,7 +346,7 @@ if (sys.nframe() == 0) {
   }
 
   # Cross-reference with available JSON files
-  dates <- load_revision_dates(csv_path)
+  dates <- load_revision_dates(csv_path, use_policy_dates = FALSE)
   all_revisions <- dates$revision
   archive_dir <- here('data', 'hts_archives')
 

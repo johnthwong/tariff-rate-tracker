@@ -1,10 +1,22 @@
 # Policy Timing: Announcement vs. HTS Effective Dates
 
-The tracker uses USITC Harmonized Tariff Schedule (HTS) revision dates as the effective date for each tariff change. In most cases this aligns with the legal effective date of the policy. However, several policies have gaps between announcement, legal effective date, and HTS publication. This document catalogs those gaps for transparency and to support users who want to adjust dates.
+The tracker does **not** simply use raw USITC HTS release dates for every revision. The default build uses a hybrid timing rule:
+
+- for most revisions, it follows the tracker’s curated `effective_date` chronology in [config/revision_dates.csv](/C:/Users/ji252/Documents/GitHub/tariff-rate-tracker/config/revision_dates.csv), which is designed to reflect the tariff-policy sequence rather than the literal archive publication calendar;
+- for the two revisions where the HTS lagged the policy materially and shifting them does not create timeline collisions (`rev_16` and `2026_rev_4`), the default build uses `policy_effective_date`;
+- users who want raw HTS timing can opt out with `--use-hts-dates`.
+
+This document explains where legal effective dates, HTS archive dates, and the tracker’s chosen modeling dates differ.
 
 ## How to use this document
 
-The `config/revision_dates.csv` file maps each HTS revision to its `effective_date` (HTS publication) and `policy_effective_date` (legal effective date of the underlying proclamation/EO, when different). To model a policy as effective on its legal date rather than its HTS date, users can swap these columns or use the `policy_effective_date` column in the daily series builder.
+The checked-in [config/revision_dates.csv](/C:/Users/ji252/Documents/GitHub/tariff-rate-tracker/config/revision_dates.csv) is the tracker’s timing control table. In the default build:
+
+- `effective_date` is the main tracker chronology;
+- `policy_effective_date` is used only for the small set of HTS-late revisions where the repo intentionally overrides the main date;
+- raw HTS archive timing is available by running the pipeline with `--use-hts-dates`.
+
+So this file should be read as a modeling schedule, not as a verbatim copy of the USITC archive calendar.
 
 ## Legal sources
 
@@ -68,12 +80,35 @@ These are not tracker errors — the tracker correctly follows legal effective d
 
 ## Infrastructure for date adjustment
 
-The `config/revision_dates.csv` now includes a `policy_effective_date` column alongside the existing `effective_date` (HTS publication date). This column is populated for the 7 revisions where the legal effective date differs from the HTS date.
+The `config/revision_dates.csv` includes a `policy_effective_date` column alongside the existing `effective_date` (HTS publication date). This column is populated for the 7 revisions where the legal effective date differs from the HTS date.
 
-To create an alternative series using legal effective dates:
+### Default: policy dates (where HTS was late)
 
-1. Copy `config/revision_dates.csv` to a new file (e.g., `config/revision_dates_policy.csv`)
-2. For rows with a `policy_effective_date`, overwrite `effective_date` with that value
-3. Run the pipeline with the alternative config: modify `00_build_timeseries.R` to load your custom dates file
+The pipeline defaults to using legal policy effective dates for revisions where the HTS was published **after** the legal effective date. Only two revisions qualify:
 
-A future enhancement could add a `--use-policy-dates` flag to the build orchestrator to automate this swap.
+- **rev_16** (232 steel/aluminum 50%): HTS Jun 6 → policy Jun 4 (2 days late)
+- **2026_rev_4** (SCOTUS + S122): HTS Feb 24 → policy Feb 20 (4 days late)
+
+Revisions where HTS was published **before** the legal effective date (rev_6, rev_7, rev_11, rev_26) are NOT overridden, because shifting them later creates timeline collisions and reorderings (e.g., Liberation Day appearing after China's retaliatory escalation). For these cases, the tracker follows the HTS publication date — the date when the rates were legally in the tariff schedule — even if CBP collection began later.
+
+For the SCOTUS ruling (2026_rev_4), both IEEPA removal and Section 122 imposition are assigned to the ruling date (Feb 20, 2026), since the S122 EO was signed the same day even though CBP implementation was Feb 24. The `ieepa_invalidation_date` and `section_122.effective_date` in `policy_params.yaml` are also coordinated to Feb 20.
+
+To use raw HTS dates for all revisions instead:
+
+```bash
+Rscript src/00_build_timeseries.R --full --use-hts-dates
+```
+
+**Bundling analysis:** We decomposed each timing-gap revision to determine what share of its ETR impact belongs to the policy-date component vs. the HTS-date component (import-weighted):
+
+| Revision | Total ETR Change | Policy-date share | HTS-date share | Assessment |
+|---|---|---|---|---|
+| rev_6 (232 Autos) | +2.25pp | 100% (232) | 0% | Clean — all early by 22 days |
+| rev_7 (Liberation Day) | +5.29pp | 100% (IEEPA) | 0% | Clean — all early by 3 days |
+| rev_11 (Auto parts) | +1.65pp | 100% (232) | 0% | Clean — all early by 22 days |
+| rev_16 (232 50%) | -0.06pp | 100% (232) | 0% | Clean — all late by 2 days (small impact) |
+| rev_17 (CA fent + copper) | +0.41pp | 0% | 100% (fentanyl) | **No gap:** copper 232 shows zero ETR impact; fentanyl is correctly dated at Jul 1. `policy_effective_date` left blank. |
+| rev_26 (MHD + copper + auto) | +0.00pp | — | — | **No gap:** zero net ETR change despite new ch99 entries. `policy_effective_date` has no effect. |
+| 2026_rev_4 (SCOTUS + S122) | -4.18pp | 67.7% (IEEPA+fent removal, Feb 20) | 32.3% (S122 addition, Feb 24) | **Bundled:** flag shifts dominant component correctly but applies S122 4 days early |
+
+For finer-grained control, copy `config/revision_dates.csv` and edit individual `effective_date` values directly.
